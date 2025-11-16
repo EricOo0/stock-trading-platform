@@ -1,50 +1,154 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report:
+Version change: N/A → 1.0.0 (Initial creation)
+Modified principles: All new principles created for AI investment project
+Added sections: Core Principles (I-VII), AI Ethics & Compliance, Development Workflow, Documentation Standards
+Removed sections: None (initial creation)
+Templates requiring updates:
+  - ✅ plan-template.md (Constitution Check section updated)
+  - ✅ spec-template.md (Chinese documentation requirements)
+  - ✅ tasks-template.md (Claude skill usage requirements)
+Follow-up TODOs: None
+-->
 
-## Core Principles
+# AI投资项目Agent宪法
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+## 核心原则
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### I. 中文优先原则 (NON-NEGOTIABLE)
+所有项目文档、代码注释、用户界面和交互必须使用中文作为主要语言。
+- 代码注释和文档必须包含中文说明
+- 用户-facing的所有输出必须以中文呈现
+- 技术文档和API文档需要双语支持（中文+英文）
+- 理由：确保中文用户能够完全理解系统功能，降低使用门槛
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Claude Skill集成原则
+所有工具和功能默认通过Claude Skill方式创建和调用。
+- 优先使用Claude内置技能而非外部工具
+- 自定义技能需要遵循Claude Skill开发规范
+- 技能接口必须标准化，支持文本输入输出协议
+- 理由：保证与Claude生态系统的兼容性，简化开发流程
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### III. 投资数据安全原则 (NON-NEGOTIABLE)
+投资相关数据必须加密存储，访问需要严格权限控制。
+- 用户投资数据采用端到端加密
+- 敏感财务信息不得存储在日志中
+- 数据访问需要多层身份验证
+- 定期进行安全审计和漏洞扫描
+- 理由：保护用户财务隐私，符合金融监管要求
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### IV. AI决策透明原则
+AI模型的决策过程必须可解释、可追踪、可审计。
+- 每个投资建议必须提供决策依据
+- 模型预测需要置信度评分
+- 决策逻辑需要文档化记录
+- 提供决策路径可视化功能
+- 理由：让用户理解AI建议背后的逻辑，建立信任
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### V. 实时更新原则
+所有文档、模型和数据必须支持实时更新机制。
+- 文档变更触发自动版本更新
+- 模型更新需要A/B测试验证
+- 数据更新需要实时同步
+- 变更历史需要完整记录
+- 理由：确保信息的时效性和准确性
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### VI. 测试驱动开发原则 (NON-NEGOTIABLE)
+所有功能必须遵循TDD模式，测试先行。
+- 编写测试 → 用户确认 → 测试失败 → 实现功能
+- 每个投资建议功能需要边界测试
+- 金融计算需要精度验证测试
+- AI模型需要回测验证
+- 理由：确保金融系统的可靠性和准确性
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+### VII. 用户体验优先原则
+界面设计和交互流程必须以用户体验为中心。
+- 简化投资操作流程
+- 提供清晰的风险提示
+- 支持多种投资偏好设置
+- 响应式设计适配多设备
+- 理由：降低投资门槛，提升用户满意度
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## AI伦理与合规要求
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+### 算法公平性
+- AI模型必须定期检测和消除偏见
+- 确保不同用户群体获得公平的投资建议
+- 禁止基于敏感特征的歧视性推荐
+- 建立算法公平性评估机制
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+### 监管合规
+- 遵守相关金融法规和投资顾问规定
+- 明确AI建议与人工建议的界限
+- 提供投资风险充分披露
+- 建立合规性检查清单
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+### 隐私保护
+- 最小化数据收集原则
+- 用户数据使用透明化
+- 提供数据删除和导出功能
+- 遵守数据保护法规（如GDPR、中国个人信息保护法）
+
+## 开发工作流
+
+### 代码审查要求
+- 所有代码必须经过至少一轮中文代码审查
+- 金融相关代码需要额外的安全审查
+- AI模型更新需要风险评估审查
+- 文档更新需要准确性验证
+
+### 版本管理
+- 使用语义化版本控制（MAJOR.MINOR.PATCH）
+- 重大AI模型更新需要主版本号升级
+- 新功能添加需要次版本号升级
+- 文档和bug修复使用修订号
+
+### 部署流程
+- 生产部署需要多阶段验证
+- 金融计算功能需要额外的准确性验证
+- AI模型部署需要渐进式发布
+- 建立快速回滚机制
+
+## 文档标准
+
+### 文档完整性要求
+- 每个功能必须有对应的中文操作文档
+- API接口需要双语文档（中文详细说明+英文参考）
+- 投资决策逻辑需要详细的技术文档
+- 用户指南需要包含风险提示
+
+### 文档更新机制
+- 功能变更必须同步更新文档
+- 建立文档版本控制
+- 提供文档变更通知机制
+- 定期审查文档的准确性和完整性
+
+### 文档质量要求
+- 使用清晰简洁的中文表达
+- 提供具体的操作示例
+- 包含常见问题和解决方案
+- 建立用户反馈收集机制
+
+## 治理规则
+
+本宪法是所有开发活动的最高指导原则，任何开发决策都必须符合宪法精神。
+
+### 修订程序
+- 宪法修订需要项目维护者集体讨论
+- 重大原则变更需要用户代表参与
+- 修订后的宪法需要重新发布和培训
+- 建立宪法解释机制
+
+### 合规审查
+- 每个功能发布前必须进行宪法合规检查
+- 建立自动化合规检测工具
+- 定期进行宪法执行情况审计
+- 建立违规处理机制
+
+### 版本管理
+- 宪法版本遵循语义化版本控制
+- 每次修订都需要详细的变更说明
+- 维护宪法变更历史记录
+- 确保团队成员了解最新版本
+
+**版本**: 1.0.0 | **批准日期**: 2025-11-09 | **最后修订**: 2025-11-09
