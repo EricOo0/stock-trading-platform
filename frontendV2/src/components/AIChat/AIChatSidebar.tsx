@@ -136,10 +136,18 @@ const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
     const hasHistoricalData = klineData && klineData.length > 0;
     const dataStatus = hasHistoricalData ? '📊 **基于真实历史数据分析**' : '⚠️ **当前无历史数据支持**';
     
+    // 获取真实的基本面数据（如果可用）
+    const fundamentalData = (data as any).fundamental_data;
+    const peRatio = fundamentalData?.trailing_pe ? `${fundamentalData.trailing_pe.toFixed(2)}倍` : '暂无数据';
+    const pbRatio = fundamentalData?.price_to_book ? `${fundamentalData.price_to_book.toFixed(2)}倍` : '暂无数据';
+    const week52High = fundamentalData?.fifty_two_week_high ? `¥${fundamentalData.fifty_two_week_high.toFixed(2)}` : '暂无数据';
+    const week52Low = fundamentalData?.fifty_two_week_low ? `¥${fundamentalData.fifty_two_week_low.toFixed(2)}` : '暂无数据';
+    
     // 避免未使用变量的警告
     console.log('K线数据长度:', klineData.length);
     console.log('市场类型:', market);
     console.log('是否有历史数据:', hasHistoricalData);
+    console.log('基本面数据:', fundamentalData);
     
     return `📊 **${name} (${symbol}) 智能分析报告**
 
@@ -159,10 +167,10 @@ ${historyTable}
 • 换手率：${turnoverRate.toFixed(2)}%，${turnoverRate > 3 ? '流动性较好' : '流动性一般'}
 
 **关键指标：**
-• 市盈率：${(Math.random() * 30 + 10).toFixed(1)}倍
-• 市净率：${(Math.random() * 3 + 0.5).toFixed(2)}倍
-• 52周最高：¥${(current_price * 1.3).toFixed(2)}
-• 52周最低：¥${(current_price * 0.7).toFixed(2)}
+• 市盈率：${peRatio}
+• 市净率：${pbRatio}
+• 52周最高：${week52High}
+• 52周最低：${week52Low}
 
 **AI建议：**
 ${isPositive ? 
@@ -537,15 +545,56 @@ ${outlook === '积极乐观' ?
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#6b7280' }}>换手率:</span>
-                <span style={{ fontWeight: '500' }}>{(Math.random() * 5 + 0.5).toFixed(2)}%</span>
+                <span style={{ fontWeight: '500' }}>
+                  {(() => {
+                    const fundamentalData = (stockData as any).fundamental_data;
+                    if (fundamentalData?.float_shares && stockData.volume) {
+                      // 使用yfinance提供的真实流通股本数据计算换手率
+                      const floatShares = fundamentalData.float_shares; // 流通股数（股）
+                      const dailyVolumeShares = stockData.volume * 100; // 当日成交量（股）
+                      const turnoverRate = (dailyVolumeShares / floatShares) * 100;
+                      return `${turnoverRate.toFixed(2)}%`;
+                    } else if (fundamentalData?.average_volume_10days && stockData.volume) {
+                      // 如果没有流通股本，显示相对成交量
+                      const avgVolume = fundamentalData.average_volume_10days;
+                      const relativeVolume = (stockData.volume * 100) / avgVolume;
+                      return `${relativeVolume.toFixed(1)}倍均量`;
+                    }
+                    return '暂无数据';
+                  })()}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#6b7280' }}>市盈率:</span>
-                <span style={{ fontWeight: '500' }}>{(Math.random() * 30 + 10).toFixed(1)}倍</span>
+                <span style={{ fontWeight: '500' }}>
+                  {(() => {
+                    const fundamentalData = (stockData as any).fundamental_data;
+                    if (fundamentalData?.trailing_pe) {
+                      return `${fundamentalData.trailing_pe.toFixed(2)}倍`;
+                    }
+                    return '暂无数据';
+                  })()}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#6b7280' }}>市值:</span>
-                <span style={{ fontWeight: '500' }}>{(Math.random() * 500 + 50).toFixed(0)}亿</span>
+                <span style={{ fontWeight: '500' }}>
+                  {(() => {
+                    const fundamentalData = (stockData as any).fundamental_data;
+                    if (fundamentalData?.market_cap) {
+                      // 直接使用yfinance提供的市值数据
+                      const marketCap = fundamentalData.market_cap;
+                      if (marketCap >= 1000000000000) {
+                        return `${(marketCap / 1000000000000).toFixed(1)}万亿`;
+                      } else if (marketCap >= 100000000) {
+                        return `${(marketCap / 100000000).toFixed(0)}亿`;
+                      } else {
+                        return `${(marketCap / 10000).toFixed(0)}万`;
+                      }
+                    }
+                    return '暂无数据';
+                  })()}
+                </span>
               </div>
             </div>
           </div>

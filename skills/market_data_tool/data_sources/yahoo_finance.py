@@ -59,17 +59,24 @@ class YahooFinanceDataSource(BaseDataSource):
                 self.logger.warning(f"未找到 {symbol} 的历史数据")
                 return []
 
-            # 转换数据格式
+            # 转换数据格式（统一单位）
             historical_data = []
             for date, row in hist.iterrows():
+                volume_raw = int(row['Volume'])
+                # 根据市场类型转换成交量单位
+                if market == "A-share":
+                    volume_hands = volume_raw // 100  # 转换为手
+                else:
+                    volume_hands = volume_raw  # 美股港股保持原始股数
+                
                 historical_data.append({
                     'timestamp': date.to_pydatetime().isoformat(),
-                    'open': float(row['Open']),
-                    'high': float(row['High']),
-                    'low': float(row['Low']),
-                    'close': float(row['Close']),
-                    'volume': int(row['Volume']),
-                    'adj_close': float(row.get('Adj Close', row['Close']))
+                    'open': round(float(row['Open']), 2),  # 统一价格精度
+                    'high': round(float(row['High']), 2),
+                    'low': round(float(row['Low']), 2),
+                    'close': round(float(row['Close']), 2),
+                    'volume': volume_hands,
+                    'adj_close': round(float(row.get('Adj Close', row['Close'])), 2)
                 })
 
             self.logger.info(f"成功获取 {len(historical_data)} 条历史数据")
@@ -108,6 +115,45 @@ class YahooFinanceDataSource(BaseDataSource):
 
             # 获取股票基本信息
             info = ticker.info
+            
+            # 获取所有yfinance直接提供的数据，避免自己计算
+            fundamental_data = {
+                # 直接从yfinance获取，不计算
+                'trailing_pe': info.get('trailingPE'),
+                'forward_pe': info.get('forwardPE'),
+                'price_to_book': info.get('priceToBook'),
+                'trailing_eps': info.get('trailingEps'),
+                'book_value': info.get('bookValue'),
+                'fifty_two_week_high': info.get('fiftyTwoWeekHigh'),
+                'fifty_two_week_low': info.get('fiftyTwoWeekLow'),
+                'market_cap': info.get('marketCap'),
+                'beta': info.get('beta'),
+                'dividend_yield': info.get('trailingAnnualDividendYield'),
+                'profit_margin': info.get('profitMargins'),
+                'revenue_growth': info.get('revenueGrowth'),
+                'earnings_growth': info.get('earningsGrowth'),
+                # 股本数据
+                'shares_outstanding': info.get('sharesOutstanding'),
+                'float_shares': info.get('floatShares'),
+                'held_percent_insiders': info.get('heldPercentInsiders'),
+                'held_percent_institutions': info.get('heldPercentInstitutions'),
+                # 成交量数据
+                'average_volume': info.get('averageVolume'),
+                'average_volume_10days': info.get('averageVolume10days'),
+                'average_daily_volume_10day': info.get('averageDailyVolume10Day'),
+                # 其他可直接获取的指标
+                'current_ratio': info.get('currentRatio'),
+                'debt_to_equity': info.get('debtToEquity'),
+                'return_on_equity': info.get('returnOnEquity'),
+                'return_on_assets': info.get('returnOnAssets'),
+                'gross_margins': info.get('grossMargins'),
+                'operating_margins': info.get('operatingMargins'),
+                'ebitda': info.get('ebitda'),
+                'total_debt': info.get('totalDebt'),
+                'total_cash': info.get('totalCash'),
+                'free_cashflow': info.get('freeCashflow'),
+                'operating_cashflow': info.get('operatingCashflow')
+            }
 
             # 解析数据
             current_price = hist['Close'].iloc[-1] if len(hist) > 0 else 0
@@ -123,6 +169,9 @@ class YahooFinanceDataSource(BaseDataSource):
 
             # 转换成交量单位为手（100股 = 1手）
             volume_hands = volume // 100 if market == "A-share" else volume
+            
+            # 计算成交额（当前价格 * 成交量）
+            turnover = current_price * volume_hands
 
             # 股票名称
             stock_name = (info.get('longName') or
@@ -133,19 +182,20 @@ class YahooFinanceDataSource(BaseDataSource):
             result = {
                 "symbol": symbol,
                 "name": stock_name,
-                "current_price": float(current_price),
-                "open_price": float(open_price),
-                "high_price": float(high_price),
-                "low_price": float(low_price),
-                "previous_close": float(previous_close),
-                "change_amount": float(change_amount),
-                "change_percent": float(change_percent),
+                "current_price": round(float(current_price), 2),
+                "open_price": round(float(open_price), 2),
+                "high_price": round(float(high_price), 2),
+                "low_price": round(float(low_price), 2),
+                "previous_close": round(float(previous_close), 2),
+                "change_amount": round(float(change_amount), 2),
+                "change_percent": round(float(change_percent), 2),
                 "volume": volume_hands,
-                "turnover": float(current_price * volume),
+                "turnover": round(float(turnover), 2),
                 "timestamp": datetime.now(),
                 "market": market,
                 "currency": self._get_currency_for_market(market),
-                "status": "trading"
+                "status": "trading",
+                "fundamental_data": fundamental_data  # 添加真实基本面数据
             }
 
             self.logger.info(f"成功获取 {symbol} 数据: 当前价格 {current_price}")
