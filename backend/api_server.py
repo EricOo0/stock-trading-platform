@@ -11,6 +11,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 import datetime as dt
+from typing import Dict, List
 
 # 添加父目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,9 +43,12 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
         """处理GET请求"""
         parsed_path = urlparse(self.path)
         path = parsed_path.path
+        query_params = parse_qs(parsed_path.query)
         
         if path == '/api/market-data/hot':
             self.handle_hot_stocks()
+        elif path.startswith('/api/market/historical/'):
+            self.handle_historical_data(path, query_params)
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
@@ -186,6 +190,81 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             }
             self._set_headers(500)
             self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+    
+    def handle_historical_data(self, path: str, query_params: Dict[str, List[str]]):
+        """处理历史数据查询"""
+        try:
+            # 从路径中提取股票代码
+            path_parts = path.split('/')
+            if len(path_parts) < 4:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({'error': 'Invalid path format'}).encode())
+                return
+            
+            symbol = path_parts[-1]  # 获取路径最后一部分作为股票代码
+            
+            # 获取查询参数并转换格式
+            period = query_params.get('period', ['30d'])[0] if 'period' in query_params else '30d'
+            count = int(query_params.get('count', ['30'])[0]) if 'count' in query_params else 30
+            
+            # 转换周期格式（前端使用DAY，Yahoo使用1d）
+            if period.upper() == 'DAY':
+                period = '1d'
+            elif period.upper() == 'WEEK':
+                period = '1wk'
+            elif period.upper() == 'MONTH':
+                period = '1mo'
+            
+            logger.info(f"收到历史数据查询请求: {symbol}, 周期: {period}, 数量: {count}")
+            
+            # 调用skill获取历史数据
+            # 导入skill实例
+            from skills.market_data_tool.skill import MarketDataSkill
+            skill = MarketDataSkill()
+            
+            # 获取历史数据
+            result = skill.get_historical_data(symbol, period, '1d')
+            
+            # 处理结果
+            if result.get('status') == 'success' and result.get('data'):
+                # 限制返回的数据条数
+                historical_data = result.get('data', [])[:count]
+                
+                response = {
+                    'status': 'success',
+                    'symbol': symbol,
+                    'data': historical_data,
+                    'count': len(historical_data),
+                    'period': period,
+                    'timestamp': datetime.now().isoformat(),
+                    'data_source': 'real'
+                }
+                
+                self._set_headers(200)
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode())
+            else:
+                # 返回错误信息
+                error_response = {
+                    'status': 'error',
+                    'symbol': symbol,
+                    'message': result.get('message', '获取历史数据失败'),
+                    'timestamp': datetime.now().isoformat(),
+                    'data_source': 'real'
+                }
+                self._set_headers(200)  # 仍然返回200，但包含错误信息
+                self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+                
+        except Exception as e:
+            logger.error(f"处理历史数据查询请求失败: {str(e)}")
+            error_response = {
+                'status': 'error',
+                'symbol': '',
+                'message': f'服务器错误: {str(e)}',
+                'timestamp': datetime.now().isoformat(),
+                'data_source': 'real'
+            }
+            self._set_headers(500)
+            self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
 
 def run_server(port=8000):
     """运行API服务器"""
@@ -195,6 +274,7 @@ def run_server(port=8000):
     logger.info(f"API端点:")
     logger.info(f"  POST /api/market-data - 查询股票数据")
     logger.info(f"  GET  /api/market-data/hot - 获取热门股票")
+    logger.info(f"  GET  /api/market/historical/<symbol> - 获取历史数据")
     
     try:
         httpd.serve_forever()

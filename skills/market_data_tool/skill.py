@@ -250,6 +250,55 @@ class MarketDataSkill:
         """验证是否为有效的港股代码"""
         return bool(symbol.startswith('0') and len(symbol) == 5 and symbol.isdigit())
 
+    def get_historical_data(self, symbol: str, period: str = "30d", interval: str = "1d") -> Dict[str, Any]:
+        """
+        获取股票历史数据
+
+        Args:
+            symbol: 股票代码
+            period: 时间周期 (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
+            interval: 时间间隔 (1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo)
+
+        Returns:
+            历史数据或错误信息
+        """
+        logger.info(f"获取历史数据: {symbol}, 周期: {period}, 间隔: {interval}")
+
+        # 确定市场类型
+        market = self._determine_market(symbol)
+
+        if not market:
+            return create_error_response(
+                symbol=symbol,
+                error_code="INVALID_SYMBOL",
+                error_message=f"无法识别股票代码 {symbol} 的市场类型",
+                suggestion="请检查股票代码格式：A股6位数字，美股1-5位字母，港股5位数字"
+            )
+
+        # 根据市场类型使用相应服务
+        try:
+            if market == "A-share":
+                return self.a_share_service.get_historical_data(symbol, period, interval)
+            elif market == "US":
+                return self.us_stock_service.get_historical_data(symbol, period, interval)
+            elif market == "HK":
+                return self.hk_stock_service.get_historical_data(symbol, period, interval)
+            else:
+                return create_error_response(
+                    symbol=symbol,
+                    error_code="UNSUPPORTED_MARKET",
+                    error_message=f"暂不支持{market}市场历史数据查询",
+                    suggestion="目前支持A股、美股、港股市场历史数据查询"
+                )
+        except Exception as e:
+            logger.error(f"获取历史数据失败: {str(e)}")
+            return create_error_response(
+                symbol=symbol,
+                error_code="INTERNAL_ERROR",
+                error_message=f"获取历史数据时发生错误: {str(e)}",
+                suggestion="请稍后重试，或联系技术支持"
+            )
+
     def _handle_single_request(self, symbol: str) -> Dict[str, Any]:
         """
         处理单只股票的信息获取请求

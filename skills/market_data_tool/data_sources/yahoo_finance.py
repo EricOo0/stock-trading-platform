@@ -30,6 +30,56 @@ class YahooFinanceDataSource(BaseDataSource):
         super().__init__("yahoo", timeout)
 
     @circuit_break("yahoo")
+    def get_historical_data(self, symbol: str, market: str, period: str = "30d", interval: str = "1d") -> List[Dict[str, Any]]:
+        """
+        获取股票历史数据
+
+        Args:
+            symbol: 股票代码
+            market: 市场类型(A-share, US, HK)
+            period: 时间周期 (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
+            interval: 时间间隔 (1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo)
+
+        Returns:
+            历史数据列表，每个元素包含时间、开高低收量数据
+        """
+        try:
+            self.logger.info(f"正在从Yahoo Finance获取 {symbol} ({market}) 的历史数据，周期: {period}")
+
+            # 根据市场类型转换symbol格式
+            yahoo_symbol = self._convert_symbol_for_yahoo(symbol, market)
+            self.logger.debug(f"Yahoo Finance符号: {yahoo_symbol}")
+
+            # 获取股票数据
+            ticker = yf.Ticker(yahoo_symbol)
+
+            # 获取历史数据
+            hist = ticker.history(period=period, interval=interval)
+            if hist.empty:
+                self.logger.warning(f"未找到 {symbol} 的历史数据")
+                return []
+
+            # 转换数据格式
+            historical_data = []
+            for date, row in hist.iterrows():
+                historical_data.append({
+                    'timestamp': date.to_pydatetime().isoformat(),
+                    'open': float(row['Open']),
+                    'high': float(row['High']),
+                    'low': float(row['Low']),
+                    'close': float(row['Close']),
+                    'volume': int(row['Volume']),
+                    'adj_close': float(row.get('Adj Close', row['Close']))
+                })
+
+            self.logger.info(f"成功获取 {len(historical_data)} 条历史数据")
+            return historical_data
+
+        except Exception as e:
+            self.logger.error(f"获取历史数据失败: {str(e)}")
+            return []
+
+    @circuit_break("yahoo")
     def get_stock_quote(self, symbol: str, market: str) -> Dict[str, Any]:
         """
         获取股票行情数据

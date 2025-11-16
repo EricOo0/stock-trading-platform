@@ -6,7 +6,7 @@
 import requests
 import re
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import time
 import logging
 
@@ -28,6 +28,125 @@ class SinaFinanceDataSource(BaseDataSource):
         super().__init__("sina", timeout)
         self.base_url = "http://hq.sinajs.cn/"
         self.session = requests.Session()
+
+    def get_historical_data(self, symbol: str, market: str, period: str = "30d", interval: str = "1d") -> List[Dict[str, Any]]:
+        """
+        获取A股历史数据（新浪财经备用数据源）
+        
+        Args:
+            symbol: 股票代码
+            market: 市场类型（必须为A-share）
+            period: 时间周期（暂时不支持，返回最近30天数据）
+            interval: 时间间隔（暂时只支持日线）
+            
+        Returns:
+            历史数据列表，如果获取失败则返回空列表
+        """
+        if market != "A-share":
+            self.logger.warning(f"新浪财经只支持A股数据，不支持{market}市场")
+            return []
+            
+        try:
+            self.logger.info(f"正在从新浪财经获取 {symbol} 的历史数据")
+            
+            # 新浪财经的历史数据API（简化版本，获取最近30个交易日数据）
+            # 使用新浪的日线历史数据接口
+            sina_symbol = self._convert_to_sina_format(symbol)
+            
+            # 构造历史数据URL（获取最近30天数据）
+            import datetime
+            end_date = datetime.datetime.now()
+            start_date = end_date - datetime.timedelta(days=60)  # 获取60天数据，确保有足够的交易日
+            
+            # 新浪财经K线数据接口
+            hist_url = f"https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData"
+            params = {
+                'symbol': sina_symbol,
+                'scale': '240',  # 日线
+                'ma': 'no',
+                'datalen': '30'  # 获取30天数据
+            }
+            
+            response = self.session.get(hist_url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            
+            # 解析返回的JSON数据
+            import json
+            try:
+                data = json.loads(response.text)
+            except json.JSONDecodeError:
+                # 如果返回的不是标准JSON，尝试解析新浪特有的格式
+                data = self._parse_sina_kline_data(response.text)
+                
+            if not data or not isinstance(data, list):
+                self.logger.warning(f"未找到 {symbol} 的历史数据或数据格式错误")
+                return []
+            
+            # 转换数据格式
+            historical_data = []
+            for item in data:
+                if isinstance(item, dict) and all(key in item for key in ['day', 'open', 'high', 'low', 'close', 'volume']):
+                    try:
+                        historical_data.append({
+                            'timestamp': datetime.datetime.strptime(item['day'], '%Y-%m-%d').isoformat(),
+                            'open': float(item['open']),
+                            'high': float(item['high']),
+                            'low': float(item['low']),
+                            'close': float(item['close']),
+                            'volume': int(float(item['volume']))
+                        })
+                    except (ValueError, TypeError) as e:
+                        self.logger.warning(f"解析数据项失败: {item}, 错误: {e}")
+                        continue
+            
+            self.logger.info(f"成功从新浪财经获取 {len(historical_data)} 条历史数据")
+            return historical_data
+            
+        except Exception as e:
+            self.logger.error(f"从新浪财经获取历史数据失败: {str(e)}")
+            return []
+    
+    def _parse_sina_kline_data(self, text: str) -> List[Dict[str, Any]]:
+        """
+        解析新浪K线数据格式
+        新浪返回的数据有时是JavaScript对象格式，需要特殊处理
+        """
+        try:
+            # 尝试清理和解析数据
+            import re
+            import datetime
+            
+            # 提取数据对象
+            pattern = r'\{[^}]*\}'
+            matches = re.findall(pattern, text)
+            
+            data = []
+            for match in matches:
+                try:
+                    # 提取各个字段
+                    day_match = re.search(r'day:"([^"]*)"', match)
+                    open_match = re.search(r'open:"([^"]*)"', match)
+                    high_match = re.search(r'high:"([^"]*)"', match)
+                    low_match = re.search(r'low:"([^"]*)"', match)
+                    close_match = re.search(r'close:"([^"]*)"', match)
+                    volume_match = re.search(r'volume:"([^"]*)"', match)
+                    
+                    if all([day_match, open_match, high_match, low_match, close_match, volume_match]):
+                        data.append({
+                            'day': day_match.group(1),
+                            'open': open_match.group(1),
+                            'high': high_match.group(1),
+                            'low': low_match.group(1),
+                            'close': close_match.group(1),
+                            'volume': volume_match.group(1)
+                        })
+                except (ValueError, AttributeError):
+                    continue
+                    
+            return data
+        except Exception as e:
+            self.logger.error(f"解析新浪K线数据失败: {str(e)}")
+            return []
 
     def get_stock_quote(self, symbol: str, market: str) -> Dict[str, Any]:
         """

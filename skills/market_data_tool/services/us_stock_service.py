@@ -23,6 +23,9 @@ class USStockService:
         self.primary_source = YahooFinanceDataSource()
         self.market_type = "US"
         self.logger = logging.getLogger(self.__class__.__name__)
+        # 导入并使用全局rate_limiter
+        from ..utils.rate_limiter import rate_limiter
+        self.rate_limiter = rate_limiter
 
     def get_stock_quote(self, symbol: str) -> Dict[str, Any]:
         """
@@ -267,6 +270,71 @@ class USStockService:
                 error_code="BATCH_ERROR",
                 error_message="美股批量查询处理失败",
                 suggestion="请减少股票数量或稍后重试"
+            )
+
+    def get_historical_data(self, symbol: str, period: str = "30d", interval: str = "1d") -> Dict[str, Any]:
+        """
+        获取美股历史数据
+
+        Args:
+            symbol: 美股股票代码
+            period: 时间周期 (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
+            interval: 时间间隔 (1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo)
+
+        Returns:
+            历史数据或错误响应
+        """
+        start_time = datetime.now()
+
+        try:
+            # 1. 输入验证
+            validation_result = validate_stock_symbol(symbol, self.market_type)
+            if not validation_result:
+                return create_error_response(
+                    symbol=symbol,
+                    error_code="INVALID_SYMBOL",
+                    error_message=f"无效的股票代码: {symbol}",
+                    suggestion="请提供有效的美股代码：1-5位字母"
+                )
+
+            # 2. 速率限制检查
+            if not self.rate_limiter.check_and_consume(self.market_type):
+                return create_error_response(
+                    symbol=symbol,
+                    error_code="RATE_LIMIT_EXCEEDED",
+                    error_message="请求过于频繁，请稍后再试",
+                    suggestion="请降低查询频率，或稍后再试"
+                )
+
+            # 3. 获取历史数据
+            historical_data = self.primary_source.get_historical_data(symbol, self.market_type, period, interval)
+            
+            if not historical_data:
+                return create_error_response(
+                    symbol=symbol,
+                    error_code="NO_DATA_AVAILABLE",
+                    error_message="无法获取该股票的历史数据",
+                    suggestion="请检查股票代码是否正确，或稍后再试"
+                )
+
+            # 4. 返回成功响应
+            response_time = (datetime.now() - start_time).total_seconds() * 1000
+            
+            return create_success_response(
+                symbol=symbol,
+                data=historical_data,
+                data_source=self.primary_source.name,
+                cache_hit=False,
+                response_time_ms=response_time
+            )
+
+        except Exception as e:
+            self.logger.error(f"获取历史数据失败: {str(e)}")
+            return create_error_response(
+                symbol=symbol,
+                error_code="INTERNAL_ERROR",
+                error_message=f"获取历史数据时发生错误: {str(e)}",
+                suggestion="请稍后重试，或联系技术支持"
             )
 
     def get_service_stats(self) -> Dict[str, Any]:

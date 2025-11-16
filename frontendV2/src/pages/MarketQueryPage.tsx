@@ -3,6 +3,7 @@ import { stockAPI } from '../services/stockAPI';
 import type { StockData } from '../services/stockAPI';
 import TradingViewKLineChart from '../components/KLineChart/TradingViewKLineChart';
 import SimpleKLineChart from '../components/KLineChart/SimpleKLineChart';
+import AIChatSidebar from '../components/AIChat/AIChatSidebar';
 import type { UTCTimestamp } from 'lightweight-charts';
 
 const MarketQueryPage: React.FC = () => {
@@ -14,33 +15,24 @@ const MarketQueryPage: React.FC = () => {
   const [klineData, setKlineData] = useState<any[]>([]); // 添加K线数据状态
   const [useSimpleChart, setUseSimpleChart] = useState(false); // 图表类型切换
   const [chartError, setChartError] = useState<string>(''); // 图表错误信息
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false); // AI对话侧边栏状态
 
-  // 生成模拟K线数据
-  const generateKLineData = (basePrice: number, days: number = 30) => {
-    const data = [];
-    const now = new Date();
-    
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
+  // 获取真实历史K线数据（仅使用真实数据，默认30天）
+  const fetchHistoricalData = async (symbol: string, days: number = 30) => {
+    try {
+      console.log(`获取 ${symbol} 的历史数据，周期: ${days} 天`);
+      const historicalData = await stockAPI.getHistoricalData(symbol, '30d', days);
+      console.log(`成功获取 ${historicalData.length} 条历史数据`);
       
-      const open = basePrice + (Math.random() - 0.5) * basePrice * 0.1;
-      const close = open + (Math.random() - 0.5) * basePrice * 0.08;
-      const high = Math.max(open, close) + Math.random() * basePrice * 0.05;
-      const low = Math.min(open, close) - Math.random() * basePrice * 0.05;
-      const volume = Math.floor(Math.random() * 1000000) + 100000;
+      if (historicalData.length === 0) {
+        console.warn(`股票 ${symbol} 没有可用的历史数据`);
+      }
       
-      data.push({
-        time: Math.floor(date.getTime() / 1000) as UTCTimestamp,
-        open: Number(open.toFixed(2)),
-        high: Number(high.toFixed(2)),
-        low: Number(low.toFixed(2)),
-        close: Number(close.toFixed(2)),
-        volume,
-      });
+      return historicalData;
+    } catch (error) {
+      console.error('获取历史数据失败:', error);
+      return []; // 返回空数组，不使用模拟数据
     }
-    
-    return data;
   };
 
   // 加载热门股票
@@ -63,8 +55,13 @@ const MarketQueryPage: React.FC = () => {
       // 默认选中第一个
       if (hotStocks.length > 0) {
         setSelectedStock(hotStocks[0]);
-        const kData = generateKLineData(hotStocks[0].current_price);
-        setKlineData(kData);
+        // 异步获取历史数据（仅真实数据，30天）
+        fetchHistoricalData(hotStocks[0].symbol, 30).then(kData => {
+          setKlineData(kData);
+          if (kData.length === 0) {
+            console.warn(`股票 ${hotStocks[0].symbol} 暂无历史数据`);
+          }
+        });
       } else {
         console.log('没有获取到热门股票数据');
       }
@@ -102,9 +99,13 @@ const MarketQueryPage: React.FC = () => {
           return newData;
         });
         
-        // 生成K线数据
-        const kData = generateKLineData(response.data.current_price);
-        setKlineData(kData);
+        // 获取真实历史数据（30天）
+        fetchHistoricalData(response.data.symbol, 30).then(kData => {
+          setKlineData(kData);
+          if (kData.length === 0) {
+            console.warn(`股票 ${response.data.symbol} 暂无历史数据`);
+          }
+        });
         
         // 选中该股票
         setSelectedStock(response.data);
@@ -126,8 +127,13 @@ const MarketQueryPage: React.FC = () => {
     console.log('股票名称:', stock.name);
     console.log('当前价格:', stock.current_price);
     setSelectedStock(stock);
-    const kData = generateKLineData(stock.current_price);
-    setKlineData(kData);
+    // 获取真实历史数据（30天）
+    fetchHistoricalData(stock.symbol, 30).then(kData => {
+      setKlineData(kData);
+      if (kData.length === 0) {
+        console.warn(`股票 ${stock.symbol} 暂无历史数据`);
+      }
+    });
   };
 
   // 处理图表错误
@@ -136,6 +142,15 @@ const MarketQueryPage: React.FC = () => {
     setChartError(error.message);
     // 自动切换到简单图表
     setUseSimpleChart(true);
+  };
+
+  // AI对话侧边栏控制
+  const toggleAIChat = () => {
+    setIsAIChatOpen(!isAIChatOpen);
+  };
+
+  const closeAIChat = () => {
+    setIsAIChatOpen(false);
   };
 
   return (
@@ -181,6 +196,49 @@ const MarketQueryPage: React.FC = () => {
         flexDirection: 'column',
         justifyContent: 'center'
       }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px'
+        }}>
+          <h3 style={{
+            margin: 0,
+            fontSize: '1rem',
+            fontWeight: '600',
+            color: '#1f2937'
+          }}>
+            股票搜索
+          </h3>
+          <button
+            type="button"
+            onClick={toggleAIChat}
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              color: 'white',
+              border: 'none',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <span>🤖</span>
+            AI分析
+          </button>
+        </div>
         <form onSubmit={handleSearch} style={{
           display: 'flex',
           gap: '12px',
@@ -668,6 +726,15 @@ const MarketQueryPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* AI对话侧边栏 */}
+      <AIChatSidebar
+        isOpen={isAIChatOpen}
+        onClose={closeAIChat}
+        stockData={selectedStock}
+        klineData={klineData}
+        onToggle={toggleAIChat}
+      />
     </div>
   );
 };

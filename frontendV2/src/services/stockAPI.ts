@@ -210,6 +210,53 @@ class StockAPIService {
     return hkStockNames[symbol] || `${symbol.slice(-2)}公司`;
   }
 
+  // 获取历史K线数据（仅使用真实数据，默认30天）
+  async getHistoricalData(symbol: string, period: string = '30d', count: number = 30): Promise<any[]> {
+    try {
+      console.log(`开始获取历史数据: ${symbol}, 周期: ${period}, 数量: ${count}`);
+      
+      const response = await fetch(`${this.baseURL}/market/historical/${symbol}?period=${period}&count=${count}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      console.log(`历史数据API响应状态: ${response.status}`);
+
+      if (!response.ok) {
+        console.warn(`历史数据API返回错误状态: ${response.status}`);
+        return []; // 返回空数组，不使用模拟数据
+      }
+
+      const result = await response.json();
+      console.log('历史数据API返回:', result);
+      
+      if (result.status === 'success' && result.data && Array.isArray(result.data) && result.data.length > 0) {
+        // 转换数据格式以匹配前端需求
+        const historicalData = result.data.map((candle: any) => ({
+          time: Math.floor(new Date(candle.timestamp).getTime() / 1000) as UTCTimestamp,
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+          volume: candle.volume,
+          date: new Date(candle.timestamp).toISOString().split('T')[0],
+          data_source: 'real'
+        }));
+        
+        console.log(`成功获取 ${historicalData.length} 条真实历史数据`);
+        return historicalData;
+      } else {
+        console.warn('历史数据API返回空数据或格式错误');
+        return []; // 返回空数组，不使用模拟数据
+      }
+    } catch (error) {
+      console.error('获取历史数据失败:', error);
+      return []; // 返回空数组，不使用模拟数据
+    }
+  }
+
   // 批量搜索股票
   async searchMultipleStocks(queries: string[]): Promise<MarketResponse[]> {
     const results = await Promise.all(
