@@ -1,0 +1,476 @@
+openapi: 3.0.0
+info:
+  title: 行情数据工具 API
+  version: 1.0.0
+  description: Claude Skill 行情数据获取工具API接口，支持A股、美股、港股数据
+  contact:
+    name: AI投资助手团队
+    email: support@ai-invest.local
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: 本地开发服务器
+
+paths:
+  /quote:
+    get:
+      summary: 获取单只股票行情
+      description: 获取指定股票的实时行情数据
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 股票代码 (000001, AAPL, 00700)
+          example: "000001"
+        - name: market
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [A-share, US, HK]
+          description: 市场类型（如果不指定将自动检测）
+          example: "A-share"
+        - name: provider
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [yahoo, sina, auto]
+          description: 数据源提供商（如果不指定将使用最优选择）
+          example: "auto"
+      responses:
+        '200':
+          description: 成功获取股票行情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockQuoteResponse'
+              examples:
+                A-share:
+                  value:
+                    status: "success"
+                    symbol: "000001"
+                    data:
+                      symbol: "000001"
+                      name: "平安银行"
+                      current_price: 12.45
+                      open_price: 12.20
+                      high_price: 12.50
+                      low_price: 12.15
+                      previous_close: 12.16
+                      change_amount: 0.29
+                      change_percent: 2.38
+                      volume: 1234567
+                      turnover: 15370000.0
+                      timestamp: "2025-11-09 15:30:00"
+                      market: "A-share"
+                      currency: "CNY"
+                      status: "trading"
+                    timestamp: "2025-11-09 15:30:05"
+                    data_source: "yahoo"
+                    cache_hit: false
+                    response_time_ms: 1234
+                US-stock:
+                  value:
+                    status: "success"
+                    symbol: "AAPL"
+                    data:
+                      symbol: "AAPL"
+                      name: "Apple Inc."
+                      current_price: 175.50
+                      open_price: 174.20
+                      high_price: 176.30
+                      low_price: 173.80
+                      previous_close: 173.90
+                      change_amount: 1.60
+                      change_percent: 0.92
+                      volume: 45678900
+                      turnover: 8032000000.0
+                      timestamp: "2025-11-09 09:30:00"
+                      market: "US"
+                      currency: "USD"
+                      status: "trading"
+                    timestamp: "2025-11-09 09:30:02"
+                    data_source: "yahoo"
+                    cache_hit: false
+                    response_time_ms: 892
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid-symbol:
+                  value:
+                    status: "error"
+                    symbol: "999999"
+                    error_code: "INVALID_SYMBOL"
+                    error_message: "股票代码 999999 格式不正确"
+                    suggestion: "A股请输入6位数字代码，美股请输入1-5位字母代码，港股请输入5位数字代码"
+                    timestamp: "2025-11-09 15:30:05"
+        '404':
+          description: 股票代码不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                symbol-not-found:
+                  value:
+                    status: "error"
+                    symbol: "ZZZZZZ"
+                    error_code: "SYMBOL_NOT_FOUND"
+                    error_message: "股票代码 ZZZZZZ 未找到"
+                    suggestion: "请检查股票代码是否正确，或尝试其他代码"
+                    timestamp: "2025-11-09 15:30:05"
+        '429':
+          description: 请求频率超限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rate-limited:
+                  value:
+                    status: "error"
+                    symbol: "000001"
+                    error_code: "RATE_LIMITED"
+                    error_message: "请求频率超限，请稍后重试"
+                    suggestion: "A股每小时最多120次请求，美股港股每小时最多60次请求"
+                    reset_time: "2025-11-09 16:00:00"
+                    timestamp: "2025-11-09 15:30:05"
+
+  /batch-quotes:
+    post:
+      summary: 批量获取股票行情
+      description: 一次性获取多只股票的数据
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symbols:
+                  type: array
+                  items:
+                    type: string
+                  description: 股票代码数组，最多10个
+                  maxItems: 10
+                  example: ["000001", "AAPL", "00700"]
+                include_indices:
+                  type: boolean
+                  description: 是否同时获取主要指数数据
+                  default: false
+                  example: true
+              required:
+                - symbols
+            examples:
+              basic:
+                value:
+                  symbols: ["000001", "600000", "300001"]
+                  include_indices: false
+              with-indices:
+                value:
+                  symbols: ["AAPL", "TSLA", "MSFT"]
+                  include_indices: true
+      responses:
+        '200':
+          description: 成功获取批量股票行情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      stocks:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/StockData'
+                      indices:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/IndexData'
+                        description: 如果include_indices为true时包含
+                  summary:
+                    type: object
+                    properties:
+                      total_symbols:
+                        type: integer
+                        example: 3
+                      successful_count:
+                        type: integer
+                        example: 3
+                      failed_count:
+                        type: integer
+                        example: 0
+                  timestamp:
+                    type: string
+                    example: "2025-11-09 15:30:05"
+                  data_source:
+                    type: string
+                    example: "yahoo"
+                  response_time_ms:
+                    type: integer
+                    example: 3456
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: 请求数量过多
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                too-many-symbols:
+                  value:
+                    status: "error"
+                    error_code: "TOO_MANY_SYMBOLS"
+                    error_message: "请求的股票数量过多"
+                    suggestion: "批量请求最多支持10个股票代码"
+                    timestamp: "2025-11-09 15:30:05"
+
+  /indices:
+    get:
+      summary: 获取市场指数数据
+      description: 获取主要市场指数的最新数据
+      parameters:
+        - name: market
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [A-share, US, HK, all]
+          description: 市场类型
+          example: "A-share"
+      responses:
+        '200':
+          description: 成功获取指数数据
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IndexData'
+                  timestamp:
+                    type: string
+                    example: "2025-11-09 15:30:05"
+
+components:
+  schemas:
+    StockData:
+      type: object
+      properties:
+        symbol:
+          type: string
+          description: 股票代码
+          example: "000001"
+        name:
+          type: string
+          description: 股票名称
+          example: "平安银行"
+        current_price:
+          type: number
+          description: 当前价格
+          example: 12.45
+        open_price:
+          type: number
+          description: 开盘价
+          example: 12.20
+        high_price:
+          type: number
+          description: 最高价
+          example: 12.50
+        low_price:
+          type: number
+          description: 最低价
+          example: 12.15
+        previous_close:
+          type: number
+          description: 昨收价
+          example: 12.16
+        change_amount:
+          type: number
+          description: 涨跌额
+          example: 0.29
+        change_percent:
+          type: number
+          description: 涨跌幅百分比
+          example: 2.38
+        volume:
+          type: integer
+          description: 成交量（股）
+          example: 1234567
+        turnover:
+          type: number
+          description: 成交额（元）
+          example: 15370000.0
+        timestamp:
+          type: string
+          description: 数据时间戳
+          example: "2025-11-09 15:30:00"
+        market:
+          type: string
+          enum: [A-share, US, HK]
+          description: 市场类型
+          example: "A-share"
+        currency:
+          type: string
+          enum: [CNY, USD, HKD]
+          description: 货币类型
+          example: "CNY"
+        status:
+          type: string
+          enum: [trading, suspended, closed]
+          description: 交易状态
+          example: "trading"
+      required:
+        - symbol
+        - current_price
+        - change_percent
+        - timestamp
+
+    IndexData:
+      type: object
+      properties:
+        symbol:
+          type: string
+          description: 指数代码
+          example: "^GSPC"
+        name:
+          type: string
+          description: 指数名称
+          example: "标准普尔500指数"
+        current_value:
+          type: number
+          description: 当前点位
+          example: 4567.89
+        open_value:
+          type: number
+          description: 开盘点位
+          example: 4550.12
+        high_value:
+          type: number
+          description: 最高点位
+          example: 4575.34
+        low_value:
+          type: number
+          description: 最低点位
+          example: 4548.90
+        previous_close:
+          type: number
+          description: 昨收点位
+          example: 4555.55
+        change_amount:
+          type: number
+          description: 涨跌点位
+          example: 12.34
+        change_percent:
+          type: number
+          description: 涨跌幅百分比
+          example: 0.27
+        timestamp:
+          type: string
+          description: 数据时间戳
+          example: "2025-11-09 09:30:00"
+        market:
+          type: string
+          description: 关联市场
+          example: "US"
+      required:
+        - symbol
+        - current_value
+        - change_percent
+        - timestamp
+
+    StockQuoteResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, error, partial]
+          description: 响应状态
+        symbol:
+          type: string
+          description: 股票代码
+        data:
+          $ref: '#/components/schemas/StockData'
+          description: 股票数据
+        timestamp:
+          type: string
+          description: 响应时间戳
+        data_source:
+          type: string
+          description: 数据源
+        cache_hit:
+          type: boolean
+          description: 是否缓存命中
+        response_time_ms:
+          type: integer
+          description: 响应时间（毫秒）
+      required:
+        - status
+        - symbol
+        - timestamp
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [error]
+          description: 响应状态（错误）
+        symbol:
+          type: string
+          description: 股票代码
+        error_code:
+          type: string
+          enum: [INVALID_SYMBOL, SYMBOL_NOT_FOUND, API_ERROR, RATE_LIMITED, SERVICE_UNAVAILABLE, TIMEOUT, VALIDATION_ERROR]
+          description: 错误代码
+        error_message:
+          type: string
+          description: 错误消息（中文）
+        suggestion:
+          type: string
+          description: 用户建议
+        context:
+          type: object
+          description: 错误上下文信息
+        provider:
+          type: string
+          description: 出错的提供商
+        reset_time:
+          type: string
+          description: 限制重置时间（限流错误时）
+        timestamp:
+          type: string
+          description: 错误时间戳
+      required:
+        - status
+        - error_code
+        - error_message
+        - timestamp
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key

@@ -1,0 +1,557 @@
+openapi: 3.0.0
+info:
+  title: Market Data Dashboard API
+  version: 1.0.0
+  description: |
+    Feature2 市场数据对比功能 API
+    提供多市场股票数据对比、实时更新和历史数据分析功能
+  contact:
+    name: AI投资助手
+    url: https://example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/api
+    description: 开发服务器
+  - url: https://api.market-data.com/v1
+    description: 生产服务器
+
+paths:
+  /market-data/{symbol}:
+    get:
+      summary: 获取单个股票数据
+      description: 获取指定股票的实时市场数据
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 股票代码 (例如: "000001.SZ", "AAPL", "0700.HK")
+        - name: market
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/MarketType'
+          description: 市场类型
+      responses:
+        '200':
+          description: 成功获取市场数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketData'
+              example:
+                symbol: "000001.SZ"
+                name: "平安银行"
+                market: "ASHARE"
+                price: 12.34
+                change: 0.56
+                changePercent: 4.75
+                volume: 1234567
+                marketCap: 1234567890
+                lastUpdated: "2025-11-15T12:34:56Z"
+                currency: "CNY"
+                dataSource: "SINA"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /market-data/batch:
+    post:
+      summary: 批量获取股票数据
+      description: 同时获取多个股票的市场数据
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbols
+              properties:
+                symbols:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  maxItems: 50
+                  description: 股票代码数组
+                market:
+                  $ref: '#/components/schemas/MarketType'
+            example:
+              symbols: ["000001.SZ", "601398.SH", "601988.SH"]
+              market: "ASHARE"
+      responses:
+        '200':
+          description: 成功获取批量市场数据
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MarketData'
+                  count:
+                    type: integer
+                    description: 返回的数据条数
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /comparison:
+    post:
+      summary: 创建市场对比
+      description: 创建一个新的股票对比分析
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketComparisonRequest'
+            example:
+              name: "银行股对比分析"
+              description: "主要银行股的市场表现对比"
+              symbols: ["000001.SZ", "601398.SH", "601988.SH"]
+              timeRange:
+                start: "2025-10-01"
+                end: "2025-11-15"
+                interval: "1d"
+              metrics: ["PRICE_CHANGE", "VOLUME_CHANGE", "MARKET_CAP"]
+      responses:
+        '201':
+          description: 成功创建对比
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketComparison'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /comparison/{comparisonId}:
+    get:
+      summary: 获取对比详情
+      description: 获取指定对比的详细信息和分析结果
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 对比ID
+      responses:
+        '200':
+          description: 成功获取对比详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketComparison'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /comparison/{comparisonId}/data:
+    get:
+      summary: 获取对比数据
+      description: 获取对比的历史市场数据
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 对比ID
+      responses:
+        '200':
+          description: 成功获取对比数据
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  historicalData:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HistoricalData'
+                  summary:
+                    $ref: '#/components/schemas/ComparisonSummary'
+
+  /comparison/{comparisonId}/realtime:
+    get:
+      summary: 订阅实时对比更新
+      description: WebSocket 连接获取实时对比数据更新
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 对比ID
+      responses:
+        '101':
+          description: WebSocket 连接升级
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebSocketMessage'
+
+  /websocket/subscribe:
+    post:
+      summary: WebSocket 订阅
+      description: 订阅指定股票的实时数据更新
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbols
+              properties:
+                symbols:
+                  type: array
+                  items:
+                    type: string
+                  description: 要订阅的股票代码数组
+            example:
+              symbols: ["000001.SZ", "AAPL", "0700.HK"]
+      responses:
+        '200':
+          description: 订阅成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "subscribed"
+                  subscribedSymbols:
+                    type: array
+                    items:
+                      type: string
+
+  /websocket/unsubscribe:
+    post:
+      summary: WebSocket 取消订阅
+      description: 取消订阅指定股票的实时数据更新
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbols
+              properties:
+                symbols:
+                  type: array
+                  items:
+                    type: string
+                  description: 要取消订阅的股票代码数组
+      responses:
+        '200':
+          description: 取消订阅成功
+
+components:
+  schemas:
+    MarketType:
+      type: string
+      enum: [ASHARE, US, HK]
+      description: 市场类型 - A股、美股、港股
+
+    MarketData:
+      type: object
+      required:
+        - symbol
+        - name
+        - market
+        - price
+        - change
+        - changePercent
+        - volume
+        - lastUpdated
+        - currency
+        - dataSource
+      properties:
+        symbol:
+          type: string
+          description: 股票代码
+        name:
+          type: string
+          description: 公司名称 (中文优先)
+        market:
+          $ref: '#/components/schemas/MarketType'
+        price:
+          type: number
+          minimum: 0
+          description: 当前价格
+        change:
+          type: number
+          description: 价格变化
+        changePercent:
+          type: number
+          description: 价格变化百分比
+        volume:
+          type: integer
+          minimum: 0
+          description: 交易量
+        marketCap:
+          type: integer
+          minimum: 0
+          description: 市值
+        lastUpdated:
+          type: string
+          format: date-time
+          description: 最后更新时间
+        currency:
+          type: string
+          description: 货币代码
+        dataSource:
+          type: string
+          enum: [SINA, YAHOO, MANUAL]
+          description: 数据源
+
+    MarketComparisonRequest:
+      type: object
+      required:
+        - name
+        - symbols
+        - timeRange
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: 对比名称 (中文)
+        description:
+          type: string
+          maxLength: 500
+          description: 对比描述
+        symbols:
+          type: array
+          items:
+            type: string
+          minItems: 2
+          maxItems: 10
+          uniqueItems: true
+          description: 股票代码数组，最少2个，最多10个
+        timeRange:
+          $ref: '#/components/schemas/TimeRange'
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetricType'
+          description: 要对比的指标
+
+    MarketComparison:
+      allOf:
+        - $ref: '#/components/schemas/MarketComparisonRequest'
+        - type: object
+          properties:
+            id:
+              type: string
+              description: 对比唯一ID
+            userId:
+              type: string
+              description: 用户ID
+            createdAt:
+              type: string
+              format: date-time
+              description: 创建时间
+            updatedAt:
+              type: string
+              format: date-time
+              description: 更新时间
+            isActive:
+              type: boolean
+              description: 是否激活
+
+    TimeRange:
+      type: object
+      required:
+        - start
+        - end
+        - interval
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: 开始时间
+        end:
+          type: string
+          format: date-time
+          description: 结束时间
+        interval:
+          $ref: '#/components/schemas/TimeInterval'
+
+    TimeInterval:
+      type: string
+      enum: [1m, 5m, 1h, 1d, 1w, 1m]
+      description: 时间间隔
+
+    MetricType:
+      type: string
+      enum: [PRICE_CHANGE, VOLUME_CHANGE, MARKET_CAP, VOLATILITY, P_E_RATIO, DIVIDEND_YIELD]
+      description: 指标类型
+
+    HistoricalData:
+      type: object
+      properties:
+        symbol:
+          type: string
+        historical:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date-time
+              price:
+                type: number
+              volume:
+                type: integer
+
+    ComparisonSummary:
+      type: object
+      properties:
+        bestPerformer:
+          $ref: '#/components/schemas/MarketData'
+        worstPerformer:
+          $ref: '#/components/schemas/MarketData'
+        averageChange:
+          type: number
+        totalVolume:
+          type: integer
+
+    WebSocketMessage:
+      type: object
+      required:
+        - type
+        - payload
+        - timestamp
+      properties:
+        type:
+          type: string
+          enum: [PRICE_UPDATE, VOLUME_UPDATE, MARKET_OPEN, MARKET_CLOSE, ERROR, HEARTBEAT]
+        payload:
+          type: object
+          description: 消息载荷
+        timestamp:
+          type: string
+          format: date-time
+        market:
+          $ref: '#/components/schemas/MarketType'
+        symbol:
+          type: string
+
+    AppError:
+      type: object
+      required:
+        - code
+        - message
+        - severity
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          description: 错误消息 (中文)
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        timestamp:
+          type: string
+          format: date-time
+        symbol:
+          type: string
+        market:
+          $ref: '#/components/schemas/MarketType'
+
+    ErrorCode:
+      type: string
+      enum:
+        - MARKET_DATA_UNAVAILABLE
+        - INVALID_SYMBOL
+        - RATE_LIMIT_EXCEEDED
+        - NETWORK_ERROR
+        - PARSE_ERROR
+        - INTERNAL_ERROR
+        - CONFIGURATION_ERROR
+        - INVALID_COMPARISON
+        - COMPARISON_LIMIT_EXCEEDED
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppError'
+          example:
+            code: INVALID_SYMBOL
+            message: "股票代码格式错误"
+            severity: MEDIUM
+            timestamp: "2025-11-15T12:34:56Z"
+
+    NotFound:
+      description: 资源未找到
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppError'
+          example:
+            code: INVALID_SYMBOL
+            message: "找不到指定的股票"
+            severity: LOW
+            timestamp: "2025-11-15T12:34:56Z"
+
+    RateLimitExceeded:
+      description: 请求频率超限
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppError'
+          example:
+            code: RATE_LIMIT_EXCEEDED
+            message: "请求过于频繁，请稍后再试"
+            severity: MEDIUM
+            timestamp: "2025-11-15T12:34:56Z"
+
+    InternalError:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppError'
+          example:
+            code: INTERNAL_ERROR
+            message: "系统内部错误，请稍后再试"
+            severity: HIGH
+            timestamp: "2025-11-15T12:34:56Z"
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []

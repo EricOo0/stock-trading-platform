@@ -1,0 +1,23 @@
+# Core dependencies
+yfinance>=0.2.33
+pandas>=1.5.0
+requests>=2.28.0
+python-dotenv>=0.19.0
+
+# Utility dependencies
+pydantic>=2.0.0
+cachetools>=5.3.0
+
+# Testing dependencies (optional)
+pytest>=7.0.0
+pytest-mock>=3.11.0
+pytest-asyncio>=0.21.0
+
+# Development dependencies (optional)
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0
+
+# Logging and monitoring (optional)
+structlog>=23.0.0
+sentry-sdk>=1.25.0

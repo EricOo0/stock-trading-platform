@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>样式调试 - 行情查询系统</title>
+    <style>
+        /* 基础重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        /* 颜色测试 */
+        .color-test {
+            padding: 20px;
+            margin: 10px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .bg-blue { background-color: #3b82f6; }
+        .bg-green { background-color: #10b981; }
+        .bg-red { background-color: #ef4444; }
+        .bg-purple { background-color: #8b5cf6; }
+        .bg-orange { background-color: #f59e0b; }
+        .bg-gray { background-color: #6b7280; }
+        
+        /* 布局测试 */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 16px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .flex {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+        }
+        
+        /* 标题样式 */
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 24px;
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 16px;
+        }
+        
+        /* 状态指示器 */
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status-success {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .status-warning {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-error {
+            background-color: #fee2e2;
+            color: #dc2626;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>智能行情查询系统 - 样式调试</h1>
+        
+        <div class="card">
+            <h2>颜色测试</h2>
+            <div class="grid">
+                <div class="color-test bg-blue">蓝色 (#3b82f6)</div>
+                <div class="color-test bg-green">绿色 (#10b981)</div>
+                <div class="color-test bg-red">红色 (#ef4444)</div>
+                <div class="color-test bg-purple">紫色 (#8b5cf6)</div>
+                <div class="color-test bg-orange">橙色 (#f59e0b)</div>
+                <div class="color-test bg-gray">灰色 (#6b7280)</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>布局测试</h2>
+            <div class="flex">
+                <div style="width: 50px; height: 50px; background: #3b82f6; border-radius: 8px;"></div>
+                <div>
+                    <h3>Flex布局</h3>
+                    <p>图标和文字水平排列</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>按钮测试</h2>
+            <button class="btn btn-primary">主要按钮</button>
+        </div>
+        
+        <div class="card">
+            <h2>状态指示器</h2>
+            <div style="display: flex; gap: 12px;">
+                <span class="status status-success">成功状态</span>
+                <span class="status status-warning">警告状态</span>
+                <span class="status status-error">错误状态</span>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>系统状态</h2>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div class="flex">
+                    <span class="status status-success">✓</span>
+                    <span>开发服务器运行正常: http://localhost:3000</span>
+                </div>
+                <div class="flex">
+                    <span class="status status-success">✓</span>
+                    <span>CSS样式文件加载正常</span>
+                </div>
+                <div class="flex">
+                    <span class="status status-warning">⚠</span>
+                    <span>请检查浏览器控制台是否有JavaScript错误</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>调试建议</h2>
+            <ol style="margin-left: 20px;">
+                <li>打开浏览器开发者工具 (F12)</li>
+                <li>检查Console选项卡是否有错误信息</li>
+                <li>检查Network选项卡确认资源加载</li>
+                <li>检查Elements选项卡查看DOM结构</li>
+                <li>尝试清除浏览器缓存后刷新页面</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,1 @@
+# This code contains only infrastructure and utility functions - no main functionality yet.
