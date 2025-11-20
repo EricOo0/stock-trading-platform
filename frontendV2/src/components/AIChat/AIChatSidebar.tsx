@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { StockData } from '../../services/stockAPI';
+import { agentAPI, type AgentChatResponse, type ToolCall } from '../../services/agentAPI';
 
 interface AIChatMessage {
   id: string;
@@ -7,6 +8,8 @@ interface AIChatMessage {
   content: string;
   timestamp: Date;
   type?: 'analysis' | 'recommendation' | 'market_insight';
+  toolCalls?: ToolCall[];  // Tool calls from agent
+  sessionId?: string;       // Session ID for continuity
 }
 
 interface AIChatSidebarProps {
@@ -27,6 +30,8 @@ const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
   const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const [useRealAgent, setUseRealAgent] = useState(true);  // Toggle for using real agent
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,34 +44,71 @@ const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
     scrollToBottom();
   }, [messages]);
 
-  // 当股票数据变化时，自动生成初始分析
+  // 当股票数据变化时，清空消息并重新生成初始分析
   useEffect(() => {
-    if (stockData && messages.length === 0) {
+    if (stockData) {
+      // 清空之前的消息和会话
+      setMessages([]);
+      setSessionId(undefined);
+      // 触发新的分析
       generateInitialAnalysis();
     }
-  }, [stockData]);
+  }, [stockData?.symbol]); // 监听symbol变化而不是整个stockData对象
 
-  // 生成初始股票分析
+  // 生成初始股票分析 - 使用真实Agent
   const generateInitialAnalysis = async () => {
     if (!stockData) return;
 
     setIsLoading(true);
-    
-    // 模拟AI分析延迟
-    setTimeout(() => {
-      const analysis = generateMockAIAnalysis(stockData, klineData);
-      
-      const initialMessage: AIChatMessage = {
+
+    try {
+      if (useRealAgent) {
+        // 使用真实的AI Agent进行分析
+        const query = `请分析${stockData.symbol}(${stockData.name})的投资价值和风险`;
+        const response: AgentChatResponse = await agentAPI.chat(query, sessionId);
+
+        // 保存session ID以保持对话连续性
+        setSessionId(response.session_id);
+
+        const initialMessage: AIChatMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: response.response,
+          timestamp: new Date(),
+          type: 'analysis',
+          toolCalls: response.tool_calls,
+          sessionId: response.session_id
+        };
+
+        setMessages([initialMessage]);
+      } else {
+        // 使用mock数据（fallback）
+        const analysis = generateMockAIAnalysis(stockData, klineData);
+
+        const initialMessage: AIChatMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: analysis,
+          timestamp: new Date(),
+          type: 'analysis'
+        };
+
+        setMessages([initialMessage]);
+      }
+    } catch (error) {
+      console.error('AI analysis failed:', error);
+      // 显示AI服务不可用的提示，而不是降级到mock
+      const errorMessage: AIChatMessage = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: analysis,
+        content: `⚠️ **AI服务暂时不可用**\n\n无法连接到AI分析服务。请确保：\n1. Agent服务已启动 (端口8001)\n2. 网络连接正常\n\n--`,
         timestamp: new Date(),
         type: 'analysis'
       };
-
-      setMessages([initialMessage]);
+      setMessages([errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   // 生成历史数据表格（仅使用真实数据）
@@ -78,77 +120,77 @@ const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
     // 检查数据来源
     const hasRealData = klineData.some(item => item.data_source === 'real');
     const dataSource = hasRealData ? '📊 **真实市场数据**' : '⚠️ **数据状态未知**';
-    
+
     // 获取最近10天的数据
     const recentData = klineData.slice(-10).reverse();
-    
+
     let table = `${dataSource}\n\n`;
     table += '📈 **近10日开盘收盘价数据**\n\n';
     table += '```\n';
     table += '日期        开盘价    收盘价    涨跌幅\n';
     table += '----------  --------  --------  --------\n';
-    
+
     recentData.forEach((item, index) => {
       const date = item.date || new Date(item.time * 1000).toISOString().split('T')[0];
       const openPrice = item.open.toFixed(2);
       const closePrice = item.close.toFixed(2);
       const change = index === 0 ? 0 : ((item.close - recentData[index - 1].close) / recentData[index - 1].close * 100);
       const changeStr = index === 0 ? '0.00%' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-      
+
       table += `${date}  ${openPrice.padStart(8)}  ${closePrice.padStart(8)}  ${changeStr.padStart(8)}\n`;
     });
-    
+
     table += '```\n\n';
-    
+
     // 添加统计信息
     const avgOpen = recentData.reduce((sum, item) => sum + item.open, 0) / recentData.length;
     const avgClose = recentData.reduce((sum, item) => sum + item.close, 0) / recentData.length;
     const maxPrice = Math.max(...recentData.map(item => item.high));
     const minPrice = Math.min(...recentData.map(item => item.low));
-    
+
     table += '📊 **统计信息**\n';
     table += `• 10日平均开盘价: ¥${avgOpen.toFixed(2)}\n`;
     table += `• 10日平均收盘价: ¥${avgClose.toFixed(2)}\n`;
     table += `• 10日最高价: ¥${maxPrice.toFixed(2)}\n`;
     table += `• 10日最低价: ¥${minPrice.toFixed(2)}\n`;
     table += `• 价格波动范围: ${((maxPrice - minPrice) / minPrice * 100).toFixed(2)}%\n`;
-    
+
     return table;
   };
 
   // 生成模拟AI分析（基于真实数据）
   const generateMockAIAnalysis = (data: StockData, klineData: any[]): string => {
     const { symbol, name, current_price, change_percent, volume, turnover, market } = data;
-    
+
     // 基于涨跌幅生成不同的分析
     const isPositive = change_percent >= 0;
     const trend = isPositive ? '上涨' : '下跌';
     const sentiment = change_percent > 5 ? '强势' : change_percent < -5 ? '弱势' : '中性';
-    
+
     // 计算一些技术指标
     const volumeAnalysis = volume > 1000000 ? '放量' : '缩量';
     const turnoverRate = (turnover / (current_price * 1000000)) * 100; // 模拟换手率
-    
+
     // 生成历史数据表格
     const historyTable = generateHistoryTable(klineData);
-    
+
     // 检查是否有历史数据
     const hasHistoricalData = klineData && klineData.length > 0;
     const dataStatus = hasHistoricalData ? '📊 **基于真实历史数据分析**' : '⚠️ **当前无历史数据支持**';
-    
+
     // 获取真实的基本面数据（如果可用）
     const fundamentalData = (data as any).fundamental_data;
     const peRatio = fundamentalData?.trailing_pe ? `${fundamentalData.trailing_pe.toFixed(2)}倍` : '暂无数据';
     const pbRatio = fundamentalData?.price_to_book ? `${fundamentalData.price_to_book.toFixed(2)}倍` : '暂无数据';
     const week52High = fundamentalData?.fifty_two_week_high ? `¥${fundamentalData.fifty_two_week_high.toFixed(2)}` : '暂无数据';
     const week52Low = fundamentalData?.fifty_two_week_low ? `¥${fundamentalData.fifty_two_week_low.toFixed(2)}` : '暂无数据';
-    
+
     // 避免未使用变量的警告
     console.log('K线数据长度:', klineData.length);
     console.log('市场类型:', market);
     console.log('是否有历史数据:', hasHistoricalData);
     console.log('基本面数据:', fundamentalData);
-    
+
     return `📊 **${name} (${symbol}) 智能分析报告**
 
 ${dataStatus}
@@ -173,20 +215,19 @@ ${historyTable}
 • 52周最低：${week52Low}
 
 **AI建议：**
-${isPositive ? 
-  '✅ 当前处于上涨趋势，但需注意风险控制' :
-  '⚠️ 当前处于调整阶段，建议关注支撑位情况'
-}
+${isPositive ?
+        '✅ 当前处于上涨趋势，但需注意风险控制' :
+        '⚠️ 当前处于调整阶段，建议关注支撑位情况'
+      }
 
 **风险提示：**
-${hasHistoricalData ? 
-  '以上分析基于真实市场数据，仅供参考，投资有风险，入市需谨慎。' :
-  '⚠️ 当前缺乏历史数据支持，建议等待更多数据后再做决策。投资有风险，入市需谨慎。'
-}
+${hasHistoricalData ?
+        '以上分析基于真实市场数据，仅供参考，投资有风险，入市需谨慎。' :
+        '⚠️ 当前缺乏历史数据支持，建议等待更多数据后再做决策。投资有风险，入市需谨慎。'
+      }
 建议结合个人风险承受能力做出投资决策。`;
   };
 
-  // 发送消息
   const sendMessage = async () => {
     if (!inputMessage.trim() || !stockData) return;
 
@@ -199,24 +240,55 @@ ${hasHistoricalData ?
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputMessage;
     setInputMessage('');
     setIsLoading(true);
 
-    // 模拟AI响应
-    setTimeout(() => {
-      const aiResponse = generateMockAIResponse(inputMessage, stockData, klineData);
-      
-      const aiMessage: AIChatMessage = {
+    try {
+      if (useRealAgent) {
+        // 使用真实Agent API
+        const response: AgentChatResponse = await agentAPI.chat(currentInput, sessionId);
+        setSessionId(response.session_id);
+
+        const aiMessage: AIChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: response.response,
+          timestamp: new Date(),
+          type: getMessageType(currentInput),
+          toolCalls: response.tool_calls,
+          sessionId: response.session_id
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
+      } else {
+        // 使用mock响应
+        const aiResponse = generateMockAIResponse(currentInput, stockData, klineData);
+
+        const aiMessage: AIChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: aiResponse,
+          timestamp: new Date(),
+          type: getMessageType(currentInput)
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
+      }
+    } catch (error) {
+      console.error('Agent chat error:', error);
+      // 显示AI服务不可用的提示
+      const errorMessage: AIChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: aiResponse,
+        content: `⚠️ **AI服务暂时不可用**\n\n无法连接到AI分析服务。\n\n--`,
         timestamp: new Date(),
-        type: getMessageType(inputMessage)
+        type: getMessageType(currentInput)
       };
-
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   // 快速提问处理函数 - 已内联到onClick中
@@ -225,7 +297,7 @@ ${hasHistoricalData ?
   const generateMockAIResponse = (userInput: string, stockData: StockData, klineData: any[]): string => {
     const { name } = stockData;
     const lowerInput = userInput.toLowerCase();
-    
+
     // 避免未使用变量的警告
     console.log('K线数据长度:', klineData.length);
     console.log('股票名称:', name);
@@ -260,7 +332,7 @@ ${hasHistoricalData ?
   // 生成投资建议
   const generateRecommendation = (data: StockData): string => {
     const { change_percent, current_price } = data;
-    
+
     if (change_percent > 5) {
       return `💡 **投资建议**
 
@@ -297,7 +369,7 @@ ${data.name}当前走势相对平稳(${change_percent.toFixed(2)}%)，建议：
   // 生成风险分析
   const generateRiskAnalysis = (data: StockData): string => {
     const volatility = Math.abs(data.change_percent) > 3 ? '高' : Math.abs(data.change_percent) > 1 ? '中' : '低';
-    
+
     return `⚠️ **风险分析报告 - ${data.name}**
 
 **当前风险评估：**
@@ -324,11 +396,11 @@ ${volatility === '高' ? '• 适合风险承受能力较强的投资者' : '•
   const generateTechnicalAnalysis = (data: StockData, klineData: any[]): string => {
     // 避免未使用变量的警告
     console.log('K线数据长度:', klineData.length);
-    
+
     const trend = data.change_percent >= 0 ? '上升趋势' : '下降趋势';
     const support = (data.current_price * 0.95).toFixed(2);
     const resistance = (data.current_price * 1.05).toFixed(2);
-    
+
     return `📈 **技术分析报告 - ${data.name}**
 
 **趋势分析：**
@@ -347,19 +419,19 @@ ${volatility === '高' ? '• 适合风险承受能力较强的投资者' : '•
 • 成交量：${data.volume > 1000000 ? '放量' : '缩量'}${data.change_percent > 0 ? '上涨' : '下跌'}
 
 **操作建议：**
-${data.change_percent > 0 ? 
-  '• 关注能否突破上方阻力位' :
-  '• 关注下方支撑位能否守住'
-}
+${data.change_percent > 0 ?
+        '• 关注能否突破上方阻力位' :
+        '• 关注下方支撑位能否守住'
+      }
 • 建议等待更明确的技术信号
 • 结合基本面分析做出决策`;
   };
 
   // 生成未来展望
   const generateFutureOutlook = (data: StockData): string => {
-    const outlook = data.change_percent > 3 ? '积极乐观' : 
-                   data.change_percent < -3 ? '谨慎观望' : '中性偏稳';
-    
+    const outlook = data.change_percent > 3 ? '积极乐观' :
+      data.change_percent < -3 ? '谨慎观望' : '中性偏稳';
+
     return `🔮 **未来展望 - ${data.name}**
 
 **短期展望（1-3个月）：**
@@ -378,12 +450,12 @@ ${data.change_percent > 0 ?
 • 公司经营业绩波动
 
 **策略建议：**
-${outlook === '积极乐观' ? 
-  '• 可考虑逢低布局，但需控制仓位' :
-  outlook === '谨慎观望' ?
-  '• 建议观望，等待更明确信号' :
-  '• 保持现有仓位，密切关注变化'
-}
+${outlook === '积极乐观' ?
+        '• 可考虑逢低布局，但需控制仓位' :
+        outlook === '谨慎观望' ?
+          '• 建议观望，等待更明确信号' :
+          '• 保持现有仓位，密切关注变化'
+      }
 
 ⚠️ 以上分析基于当前市场情况，实际走势可能受多种因素影响。`;
   };
@@ -520,19 +592,19 @@ ${outlook === '积极乐观' ?
                 <div style={{
                   fontSize: '18px',
                   fontWeight: '700',
-                  color: stockData.change_percent >= 0 ? '#10b981' : '#ef4444'
+                  color: (stockData.change_percent || 0) >= 0 ? '#10b981' : '#ef4444'
                 }}>
-                  ¥{stockData.current_price.toFixed(2)}
+                  ¥{stockData.current_price?.toFixed(2) || '--'}
                 </div>
                 <div style={{
                   fontSize: '12px',
-                  color: stockData.change_percent >= 0 ? '#10b981' : '#ef4444'
+                  color: (stockData.change_percent || 0) >= 0 ? '#10b981' : '#ef4444'
                 }}>
-                  {stockData.change_percent >= 0 ? '+' : ''}{stockData.change_percent.toFixed(2)}%
+                  {(stockData.change_percent || 0) >= 0 ? '+' : ''}{stockData.change_percent?.toFixed(2) || '--'}%
                 </div>
               </div>
             </div>
-            
+
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
@@ -541,7 +613,7 @@ ${outlook === '积极乐观' ?
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#6b7280' }}>成交量:</span>
-                <span style={{ fontWeight: '500' }}>{(stockData.volume / 10000).toFixed(1)}万</span>
+                <span style={{ fontWeight: '500' }}>{stockData.volume ? (stockData.volume / 10000).toFixed(1) : '--'}万</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#6b7280' }}>换手率:</span>
@@ -670,8 +742,8 @@ ${outlook === '积极乐观' ?
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>🤖</div>
             <h4 style={{ margin: '0 0 8px 0', color: '#374151' }}>AI股票助手</h4>
             <p style={{ fontSize: '14px', margin: 0 }}>
-              {stockData ? 
-                '正在为您分析选中股票，请稍候...' : 
+              {stockData ?
+                '正在为您分析选中股票，请稍候...' :
                 '请先选择一只股票，我将为您提供专业分析'
               }
             </p>
@@ -716,7 +788,7 @@ ${outlook === '积极乐观' ?
             </div>
           ))
         )}
-        
+
         {isLoading && (
           <div style={{
             display: 'flex',

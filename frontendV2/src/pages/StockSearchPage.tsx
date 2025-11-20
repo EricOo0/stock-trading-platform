@@ -27,17 +27,17 @@ const StockSearchPage: React.FC = () => {
   const generateKLineData = (basePrice: number, days: number = 30) => {
     const data = [];
     const now = new Date();
-    
+
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      
+
       const open = basePrice + (Math.random() - 0.5) * basePrice * 0.1;
       const close = open + (Math.random() - 0.5) * basePrice * 0.08;
       const high = Math.max(open, close) + Math.random() * basePrice * 0.05;
       const low = Math.min(open, close) - Math.random() * basePrice * 0.05;
       const volume = Math.floor(Math.random() * 1000000) + 100000;
-      
+
       data.push({
         time: Math.floor(date.getTime() / 1000) as UTCTimestamp,
         open: Number(open.toFixed(2)),
@@ -47,7 +47,7 @@ const StockSearchPage: React.FC = () => {
         volume,
       });
     }
-    
+
     return data;
   };
 
@@ -58,28 +58,28 @@ const StockSearchPage: React.FC = () => {
 
     setLoading(true);
     setError('');
-    
+
     try {
       const response = await stockAPI.searchStock(searchTerm);
-      
+
       if (response.status === 'success' && response.data) {
         // 添加到搜索结果
         setSearchResults(prev => {
           const exists = prev.find(stock => stock.symbol === response.data!.symbol);
           if (exists) {
-            return prev.map(stock => 
+            return prev.map(stock =>
               stock.symbol === response.data!.symbol ? response.data! : stock
             );
           } else {
             return [response.data!, ...prev];
           }
         });
-        
+
         // 自动生成K线数据
         const kData = generateKLineData(response.data.current_price);
         console.log('Generated K-line data:', kData); // 调试信息
         setKlineData(kData);
-        
+
         // 选中该股票
         setSelectedStock(response.data);
       } else {
@@ -95,25 +95,25 @@ const StockSearchPage: React.FC = () => {
   // 快速搜索热门股票
   const quickSearch = async (symbol: string) => {
     setSearchTerm(symbol);
-    
+
     setLoading(true);
     setError('');
-    
+
     try {
       const response = await stockAPI.searchStock(symbol);
-      
+
       if (response.status === 'success' && response.data) {
         setSearchResults(prev => {
           const exists = prev.find(stock => stock.symbol === response.data!.symbol);
           if (exists) {
-            return prev.map(stock => 
+            return prev.map(stock =>
               stock.symbol === response.data!.symbol ? response.data! : stock
             );
           } else {
             return [response.data!, ...prev];
           }
         });
-        
+
         const kData = generateKLineData(response.data.current_price);
         setKlineData(kData);
         setSelectedStock(response.data);
@@ -369,7 +369,7 @@ const StockSearchPage: React.FC = () => {
               </p>
             </div>
           </div>
-          
+
           <div style={{
             flex: 1,
             overflow: 'auto',
@@ -395,9 +395,9 @@ const StockSearchPage: React.FC = () => {
                 </p>
               </div>
             ) : (
-              searchResults.map((stock) => {
+              searchResults.filter(stock => stock && stock.symbol).map((stock) => {
                 const isPositive = stock.change_amount >= 0;
-                
+
                 return (
                   <div
                     key={stock.symbol}
@@ -448,15 +448,15 @@ const StockSearchPage: React.FC = () => {
                           <span style={{
                             fontSize: '0.7rem',
                             padding: '2px 6px',
-                            background: stock.market === 'A-share' ? '#dbeafe' : 
-                                       stock.market === 'US' ? '#dcfce7' : '#f3e8ff',
-                            color: stock.market === 'A-share' ? '#1d4ed8' : 
-                                   stock.market === 'US' ? '#166534' : '#7c3aed',
+                            background: stock.market === 'A-share' ? '#dbeafe' :
+                              stock.market === 'US' ? '#dcfce7' : '#f3e8ff',
+                            color: stock.market === 'A-share' ? '#1d4ed8' :
+                              stock.market === 'US' ? '#166534' : '#7c3aed',
                             borderRadius: '3px',
                             fontWeight: '500'
                           }}>
-                            {stock.market === 'A-share' ? 'A股' : 
-                             stock.market === 'US' ? '美股' : '港股'}
+                            {stock.market === 'A-share' ? 'A股' :
+                              stock.market === 'US' ? '美股' : '港股'}
                           </span>
                         </div>
                         <h3 style={{
@@ -468,7 +468,7 @@ const StockSearchPage: React.FC = () => {
                           {stock.name}
                         </h3>
                       </div>
-                      
+
                       <div style={{
                         textAlign: 'right'
                       }}>
@@ -478,7 +478,7 @@ const StockSearchPage: React.FC = () => {
                           color: '#1f2937',
                           marginBottom: '2px'
                         }}>
-                          {stock.currency === 'CNY' ? '¥' : stock.currency === 'USD' ? '$' : 'HK$'}{stock.current_price.toFixed(2)}
+                          {stock.currency === 'CNY' ? '¥' : stock.currency === 'USD' ? '$' : 'HK$'}{stock.current_price?.toFixed(2) || '--'}
                         </div>
                         <div style={{
                           display: 'flex',
@@ -493,10 +493,10 @@ const StockSearchPage: React.FC = () => {
                             {isPositive ? '📈' : '📉'}
                           </span>
                           <span>
-                            {isPositive ? '+' : ''}{stock.change_amount.toFixed(2)}
+                            {isPositive ? '+' : ''}{stock.change_amount?.toFixed(2) || '--'}
                           </span>
                           <span>
-                            ({isPositive ? '+' : ''}{stock.change_percent.toFixed(2)}%)
+                            ({isPositive ? '+' : ''}{stock.change_percent?.toFixed(2) || '--'}%)
                           </span>
                         </div>
                       </div>
@@ -545,11 +545,11 @@ const StockSearchPage: React.FC = () => {
                 </p>
               </div>
             </div>
-            
+
             <div style={{ flex: 1, minHeight: '200px' }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 marginBottom: '8px'
               }}>

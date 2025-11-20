@@ -93,8 +93,26 @@ const TradingViewKLineChart: React.FC<TradingViewKLineChartProps> = ({
         wickVisible: true,
       });
 
+      // 验证和过滤数据
+      const validData = data.filter(item => {
+        return (
+          item &&
+          item.time &&
+          typeof item.open === 'number' && !isNaN(item.open) &&
+          typeof item.high === 'number' && !isNaN(item.high) &&
+          typeof item.low === 'number' && !isNaN(item.low) &&
+          typeof item.close === 'number' && !isNaN(item.close)
+        );
+      });
+
+      if (validData.length === 0) {
+        console.warn('TradingViewKLineChart: No valid data to render');
+        setHasError(true);
+        return;
+      }
+
       // 设置数据
-      candlestickSeries.setData(data);
+      candlestickSeries.setData(validData);
 
       // 自适应大小
       chart.timeScale().fitContent();
@@ -135,8 +153,8 @@ const TradingViewKLineChart: React.FC<TradingViewKLineChartProps> = ({
   if (!data || data.length === 0) {
     return (
       <div style={{
-        width: width,
-        height: height,
+        width,
+        height,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

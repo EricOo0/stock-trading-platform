@@ -198,7 +198,7 @@ const MarketQueryPage: React.FC = () => {
                 暂无股票数据<br />请搜索或等待加载
               </div>
             ) : (
-              stockData.map((stock: StockData) => {
+              stockData.filter(stock => stock && stock.symbol).map((stock: StockData) => {
                 const isPositive = stock.change_amount >= 0;
                 const isSelected = selectedStock?.symbol === stock.symbol;
 
@@ -229,14 +229,14 @@ const MarketQueryPage: React.FC = () => {
 
                       <div className="text-right">
                         <div className="text-sm font-bold text-gray-900 mb-1 font-mono">
-                          ¥{stock.current_price.toFixed(2)}
+                          ¥{stock.current_price?.toFixed(2) || '--'}
                         </div>
                         <div className={`
                           flex items-center justify-end gap-1 text-xs font-medium
                           ${isPositive ? 'text-red-500' : 'text-green-500'}
                         `}>
                           {isPositive ? <TrendingUp size={12} /> : <TrendingUp size={12} className="rotate-180" />}
-                          <span>{isPositive ? '+' : ''}{stock.change_percent.toFixed(2)}%</span>
+                          <span>{isPositive ? '+' : ''}{stock.change_percent?.toFixed(2) || '--'}%</span>
                         </div>
                       </div>
                     </div>
@@ -270,25 +270,25 @@ const MarketQueryPage: React.FC = () => {
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <span className="text-xs text-gray-500 block mb-1">当前价格</span>
                   <span className="text-xl font-bold text-gray-900 font-mono">
-                    ¥{selectedStock.current_price.toFixed(2)}
+                    ¥{selectedStock.current_price?.toFixed(2) || '--'}
                   </span>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <span className="text-xs text-gray-500 block mb-1">涨跌幅</span>
                   <span className={`text-xl font-bold font-mono ${selectedStock.change_amount >= 0 ? 'text-red-500' : 'text-green-500'}`}>
-                    {selectedStock.change_amount >= 0 ? '+' : ''}{selectedStock.change_percent.toFixed(2)}%
+                    {selectedStock.change_amount >= 0 ? '+' : ''}{selectedStock.change_percent?.toFixed(2) || '--'}%
                   </span>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <span className="text-xs text-gray-500 block mb-1">涨跌额</span>
                   <span className={`text-xl font-bold font-mono ${selectedStock.change_amount >= 0 ? 'text-red-500' : 'text-green-500'}`}>
-                    {selectedStock.change_amount >= 0 ? '+' : ''}{selectedStock.change_amount.toFixed(2)}
+                    {selectedStock.change_amount >= 0 ? '+' : ''}{selectedStock.change_amount?.toFixed(2) || '--'}
                   </span>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <span className="text-xs text-gray-500 block mb-1">成交量</span>
                   <span className="text-xl font-bold text-gray-900 font-mono">
-                    {(selectedStock.volume / 10000).toFixed(1)}万
+                    {selectedStock.volume ? (selectedStock.volume / 10000).toFixed(1) : '--'}万
                   </span>
                 </div>
               </div>
