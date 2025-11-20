@@ -22,9 +22,9 @@ class Config:
     CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))  # 缓存时间（秒）
 
     # 限流配置（每小时请求次数）
-    RATE_LIMIT_A_SHARE = int(os.getenv("RATE_LIMIT_A_SHARE", "120"))
-    RATE_LIMIT_US = int(os.getenv("RATE_LIMIT_US", "60"))
-    RATE_LIMIT_HK = int(os.getenv("RATE_LIMIT_HK", "60"))
+    RATE_LIMIT_A_SHARE = int(os.getenv("RATE_LIMIT_A_SHARE", "1000"))
+    RATE_LIMIT_US = int(os.getenv("RATE_LIMIT_US", "1000"))
+    RATE_LIMIT_HK = int(os.getenv("RATE_LIMIT_HK", "1000"))
 
     # 熔断器配置
     CIRCUIT_BREAKER_FAILURE_THRESHOLD = int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5"))

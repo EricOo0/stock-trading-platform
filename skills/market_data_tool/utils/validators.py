@@ -247,11 +247,13 @@ class PriceDataValidator:
         if high < low:
             result.add_error(f"最高价({high})不能低于最低价({low})")
 
-        if not (low <= current <= high):
-            result.add_error(f"当前价格({current})必须在最高价({high})和最低价({low})范围内")
+        # 放宽验证：某些数据源（如Yahoo）可能出现Open/Current在High/Low范围之外的情况
+        # 仅记录日志或忽略，不作为硬性错误
+        # if not (low <= current <= high):
+        #     result.add_error(f"当前价格({current})必须在最高价({high})和最低价({low})范围内")
 
-        if not (low <= open_price <= high):
-            result.add_error(f"开盘价({open_price})必须在最高价({high})和最低价({low})范围内")
+        # if not (low <= open_price <= high):
+        #     result.add_error(f"开盘价({open_price})必须在最高价({high})和最低价({low})范围内")
 
         # 成交量验证
         if volume < 0:

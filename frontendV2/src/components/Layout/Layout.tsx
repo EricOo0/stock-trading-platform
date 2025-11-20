@@ -22,11 +22,7 @@ const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      backgroundColor: '#f9fafb'
-    }}>
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar 
         isCollapsed={isCollapsed}
         onToggle={handleToggle}
@@ -34,27 +30,11 @@ const Layout: React.FC<LayoutProps> = ({
         onTabChange={onTabChange}
       />
       
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Header title={title} />
         
-        <main style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 0
-          }}>
+        <main className="flex-1 overflow-auto p-6 flex flex-col">
+          <div className="flex-1 flex flex-col min-h-0">
             {children}
           </div>
         </main>

@@ -54,7 +54,7 @@ class StockAPIService {
 
       const result = await response.json();
       console.log('API返回数据:', result);
-      
+
       // 转换格式以匹配我们的接口
       if (result.status === 'success' && result.data) {
         console.log('搜索成功，返回数据');
@@ -91,7 +91,7 @@ class StockAPIService {
     const symbol = this.extractSymbolFromQuery(query);
     const mockData = this.generateMockStockData(query);
     console.log(`生成模拟数据 - 查询: ${query}, 股票代码: ${symbol}, 价格: ${mockData.current_price}`);
-    
+
     const mockResponse: MarketResponse = {
       status: 'success',
       symbol: symbol,
@@ -108,22 +108,22 @@ class StockAPIService {
   private extractSymbolFromQuery(query: string): string {
     // 移除空格并转换为大写
     const cleanQuery = query.trim().toUpperCase();
-    
+
     // 如果是纯数字，可能是A股代码
     if (/^\d{6}$/.test(cleanQuery)) {
       return cleanQuery;
     }
-    
+
     // 如果是字母开头，可能是美股代码
     if (/^[A-Z]{1,5}$/.test(cleanQuery)) {
       return cleanQuery;
     }
-    
+
     // 如果是0开头的5位数字，可能是港股
     if (/^0\d{4}$/.test(cleanQuery)) {
       return cleanQuery;
     }
-    
+
     // 默认返回查询内容
     return cleanQuery;
   }
@@ -134,11 +134,11 @@ class StockAPIService {
     const basePrice = 50 + Math.random() * 200;
     const change = (Math.random() - 0.5) * 10;
     const changePercent = (change / basePrice) * 100;
-    
+
     // 根据代码格式判断市场
     let market = 'A-share';
     let name = '未知股票';
-    
+
     if (/^\d{6}$/.test(symbol)) {
       market = 'A-share';
       name = this.getMockAStockName(symbol);
@@ -214,7 +214,7 @@ class StockAPIService {
   async getHistoricalData(symbol: string, period: string = '30d', count: number = 30): Promise<any[]> {
     try {
       console.log(`开始获取历史数据: ${symbol}, 周期: ${period}, 数量: ${count}`);
-      
+
       const response = await fetch(`${this.baseURL}/market/historical/${symbol}?period=${period}&count=${count}`, {
         method: 'GET',
         headers: {
@@ -231,11 +231,12 @@ class StockAPIService {
 
       const result = await response.json();
       console.log('历史数据API返回:', result);
-      
+
       if (result.status === 'success' && result.data && Array.isArray(result.data) && result.data.length > 0) {
         // 转换数据格式以匹配前端需求
         const historicalData = result.data.map((candle: any) => ({
-          time: Math.floor(new Date(candle.timestamp).getTime() / 1000) as UTCTimestamp,
+          // 使用 YYYY-MM-DD 字符串格式，启用 Business Day 模式 (自动跳过周末)
+          time: new Date(candle.timestamp).toISOString().split('T')[0],
           open: candle.open,
           high: candle.high,
           low: candle.low,
@@ -244,7 +245,7 @@ class StockAPIService {
           date: new Date(candle.timestamp).toISOString().split('T')[0],
           data_source: 'real'
         }));
-        
+
         console.log(`成功获取 ${historicalData.length} 条真实历史数据`);
         return historicalData;
       } else {
@@ -281,7 +282,7 @@ class StockAPIService {
       }
 
       const result = await response.json();
-      
+
       if (result.status === 'success' && result.data) {
         return result.data;
       } else {

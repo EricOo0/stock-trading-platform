@@ -1,4 +1,5 @@
 import React from 'react';
+import { TrendingUp, BarChart2, Search, Eye } from 'lucide-react';
 
 interface HomePageProps {
   onNavigate?: (tab: string) => void;
@@ -7,28 +8,28 @@ interface HomePageProps {
 const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const features = [
     {
-      icon: '📈',
+      icon: <TrendingUp size={32} className="text-blue-500" />,
       title: '实时行情',
       description: 'A股、美股、港股实时数据',
-      color: '#3b82f6'
+      color: 'border-blue-500'
     },
     {
-      icon: '📊',
+      icon: <BarChart2 size={32} className="text-emerald-500" />,
       title: '技术分析',
       description: '专业K线图和技术指标',
-      color: '#10b981'
+      color: 'border-emerald-500'
     },
     {
-      icon: '🔍',
+      icon: <Search size={32} className="text-violet-500" />,
       title: '智能搜索',
       description: '多方式股票搜索',
-      color: '#8b5cf6'
+      color: 'border-violet-500'
     },
     {
-      icon: '👁️',
+      icon: <Eye size={32} className="text-amber-500" />,
       title: '自选管理',
       description: '个性化股票监控',
-      color: '#f59e0b'
+      color: 'border-amber-500'
     }
   ];
 
@@ -46,156 +47,58 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div style={{
-      height: '100%',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
-      {/* Hero Section - 30% */}
-      <div style={{
-        flex: '0 0 30%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        textAlign: 'center',
-        color: 'white',
-        padding: '20px'
-      }}>
-        <div style={{
-          width: '60px',
-          height: '60px',
-          background: 'rgba(255,255,255,0.2)',
-          borderRadius: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '16px',
-          fontSize: '28px'
-        }}>
-          📈
+    <div className="h-full flex flex-col bg-gray-50 overflow-y-auto">
+      {/* Hero Section */}
+      <div className="relative bg-slate-900 text-white py-20 px-6 text-center overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1611974765270-ca12586343bb?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80')] opacity-5 bg-cover bg-center" />
+
+        <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center">
+          <div className="w-16 h-16 bg-blue-600/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-6 border border-blue-500/30">
+            <TrendingUp size={36} className="text-blue-400" />
+          </div>
+
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight tracking-tight text-white">
+            智能行情查询系统
+          </h1>
+
+          <p className="text-lg md:text-xl text-slate-300 mb-8 max-w-lg leading-relaxed">
+            专业的金融市场数据平台，为您提供实时、准确、全面的股票行情信息
+          </p>
+
+          <button
+            onClick={handleExperienceClick}
+            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:bg-blue-700 hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-2 group"
+          >
+            立即体验
+            <span className="group-hover:translate-x-1 transition-transform">→</span>
+          </button>
         </div>
-        
-        <h1 style={{
-          fontSize: 'clamp(1.5rem, 3vw, 2.2rem)',
-          fontWeight: '700',
-          marginBottom: '12px',
-          lineHeight: '1.2'
-        }}>
-          智能行情查询系统
-        </h1>
-        
-        <p style={{
-          fontSize: 'clamp(0.85rem, 2vw, 1rem)',
-          marginBottom: '20px',
-          opacity: '0.9',
-          maxWidth: '400px',
-          lineHeight: '1.4'
-        }}>
-          专业的金融市场数据平台，为您提供实时、准确、全面的股票行情信息
-        </p>
-        
-        <button 
-          onClick={handleExperienceClick}
-          style={{
-            background: 'white',
-            color: '#667eea',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
-          }} 
-          onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
-          }} 
-          onMouseOut={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
-          }}
-        >
-          立即体验
-        </button>
       </div>
 
-      {/* Features Section - 40% */}
-      <div style={{
-        flex: '0 0 40%',
-        background: 'white',
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '20px'
-        }}>
-          <h2 style={{
-            fontSize: 'clamp(1.2rem, 2.5vw, 1.5rem)',
-            fontWeight: '700',
-            color: '#1f2937',
-            marginBottom: '8px'
-          }}>
+      {/* Features Section */}
+      <div className="py-16 px-6 max-w-6xl mx-auto w-full">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-3">
             核心功能
           </h2>
-          <p style={{
-            fontSize: '0.9rem',
-            color: '#6b7280',
-            maxWidth: '300px',
-            margin: '0 auto'
-          }}>
+          <p className="text-gray-500">
             全方位的金融数据服务
           </p>
         </div>
-        
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: '16px',
-          maxWidth: '800px',
-          margin: '0 auto'
-        }}>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((feature, index) => (
-            <div key={index} style={{
-              background: 'white',
-              padding: '16px',
-              borderRadius: '10px',
-              textAlign: 'center',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
-              transition: 'all 0.3s ease',
-              borderTop: `3px solid ${feature.color}`
-            }} onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.12)';
-            }} onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.08)';
-            }}>
-              <div style={{
-                fontSize: '28px',
-                marginBottom: '8px'
-              }}>
+            <div
+              key={index}
+              className={`bg-white p-6 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 border-t-4 ${feature.color} group`}
+            >
+              <div className="mb-4 transform group-hover:scale-110 transition-transform duration-300 inline-block">
                 {feature.icon}
               </div>
-              <h3 style={{
-                fontSize: '0.95rem',
-                fontWeight: '600',
-                color: '#1f2937',
-                marginBottom: '4px'
-              }}>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 {feature.title}
               </h3>
-              <p style={{
-                color: '#6b7280',
-                lineHeight: '1.4',
-                fontSize: '0.8rem'
-              }}>
+              <p className="text-gray-500 text-sm leading-relaxed">
                 {feature.description}
               </p>
             </div>
@@ -203,44 +106,16 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Stats Section - 20% */}
-      <div style={{
-        flex: '0 0 20%',
-        background: '#f9fafb',
-        padding: '16px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
-          gap: '16px',
-          textAlign: 'center',
-          maxWidth: '600px',
-          margin: '0 auto'
-        }}>
+      {/* Stats Section */}
+      <div className="bg-white py-12 border-y border-gray-100">
+        <div className="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           {stats.map((stat, index) => (
-            <div key={index}>
-              <div style={{
-                fontSize: 'clamp(1.2rem, 2.5vw, 1.5rem)',
-                fontWeight: '700',
-                color: '#3b82f6',
-                marginBottom: '2px'
-              }}>
+            <div key={index} className="p-4">
+              <div className="text-3xl font-bold text-blue-600 mb-1">
                 {stat.value}
-                <span style={{
-                  fontSize: '0.8rem',
-                  color: '#6b7280',
-                  marginLeft: '2px'
-                }}>
-                  {stat.suffix}
-                </span>
+                <span className="text-sm text-gray-500 ml-1 font-normal">{stat.suffix}</span>
               </div>
-              <div style={{
-                color: '#6b7280',
-                fontSize: '0.8rem'
-              }}>
+              <div className="text-sm text-gray-500 font-medium">
                 {stat.label}
               </div>
             </div>
@@ -248,47 +123,15 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Footer - 10% */}
-      <div style={{
-        flex: '0 0 10%',
-        background: '#1f2937',
-        color: 'white',
-        padding: '12px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '4px'
-        }}>
-          <div style={{
-            width: '24px',
-            height: '24px',
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '12px'
-          }}>
-            📈
+      {/* Footer */}
+      <div className="bg-slate-900 text-slate-400 py-8 text-center mt-auto">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-violet-600 rounded flex items-center justify-center text-white text-xs">
+            <TrendingUp size={14} />
           </div>
-          <span style={{
-            fontSize: '0.8rem',
-            color: '#9ca3af'
-          }}>
-            智能行情查询系统
-          </span>
+          <span className="font-medium text-slate-300">智能行情查询系统</span>
         </div>
-        <p style={{
-          color: '#9ca3af',
-          margin: 0,
-          fontSize: '0.7rem'
-        }}>
+        <p className="text-xs">
           © 2024 保留所有权利
         </p>
       </div>

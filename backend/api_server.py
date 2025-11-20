@@ -77,6 +77,7 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             
             # 调用skill获取数据
             result = main_handle(query)
+            logger.info(f"Skill返回结果: {json.dumps(result, default=str, ensure_ascii=False)}")
             
             # 处理skill返回的结果
             if result.get('status') == 'success' and result.get('data'):
@@ -179,7 +180,7 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             }
             
             self._set_headers(200)
-            self.wfile.write(json.dumps(response, ensure_ascii=False).encode())
+            self.wfile.write(json.dumps(response, ensure_ascii=False, default=str).encode())
             
         except Exception as e:
             logger.error(f"处理热门股票请求失败: {str(e)}")

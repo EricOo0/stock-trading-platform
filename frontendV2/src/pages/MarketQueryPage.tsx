@@ -4,7 +4,7 @@ import type { StockData } from '../services/stockAPI';
 import TradingViewKLineChart from '../components/KLineChart/TradingViewKLineChart';
 import SimpleKLineChart from '../components/KLineChart/SimpleKLineChart';
 import AIChatSidebar from '../components/AIChat/AIChatSidebar';
-import type { UTCTimestamp } from 'lightweight-charts';
+import { Search, BarChart2, TrendingUp, DollarSign, Activity, Bot, AlertCircle, Loader2 } from 'lucide-react';
 
 const MarketQueryPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -12,61 +12,50 @@ const MarketQueryPage: React.FC = () => {
   const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [klineData, setKlineData] = useState<any[]>([]); // 添加K线数据状态
-  const [useSimpleChart, setUseSimpleChart] = useState(false); // 图表类型切换
-  const [chartError, setChartError] = useState<string>(''); // 图表错误信息
-  const [isAIChatOpen, setIsAIChatOpen] = useState(false); // AI对话侧边栏状态
+  const [klineData, setKlineData] = useState<any[]>([]);
+  const [useSimpleChart, setUseSimpleChart] = useState(false);
+  const [chartError, setChartError] = useState<string>('');
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
 
-  // 获取真实历史K线数据（仅使用真实数据，默认30天）
-  const fetchHistoricalData = async (symbol: string, days: number = 30) => {
+  const [timeRange, setTimeRange] = useState<number>(30);
+
+  const fetchHistoricalData = async (symbol: string, days: number) => {
     try {
-      console.log(`获取 ${symbol} 的历史数据，周期: ${days} 天`);
       const historicalData = await stockAPI.getHistoricalData(symbol, '30d', days);
-      console.log(`成功获取 ${historicalData.length} 条历史数据`);
-      
-      if (historicalData.length === 0) {
-        console.warn(`股票 ${symbol} 没有可用的历史数据`);
-      }
-      
       return historicalData;
     } catch (error) {
       console.error('获取历史数据失败:', error);
-      return []; // 返回空数组，不使用模拟数据
+      return [];
     }
   };
 
-  // 加载热门股票
   useEffect(() => {
     loadHotStocks();
   }, []);
+
+  // 当时间范围改变时，重新获取数据
+  useEffect(() => {
+    if (selectedStock) {
+      fetchHistoricalData(selectedStock.symbol, timeRange).then(kData => {
+        setKlineData(kData);
+      });
+    }
+  }, [timeRange, selectedStock]);
 
   const loadHotStocks = async () => {
     try {
       setLoading(true);
       const hotStocks = await stockAPI.getHotStocks();
-      console.log('加载热门股票:', hotStocks);
-      if (hotStocks.length > 0) {
-        console.log('第一个热门股票:', hotStocks[0]);
-        console.log('股票名称:', hotStocks[0].name);
-        console.log('当前价格:', hotStocks[0].current_price);
-      }
       setStockData(hotStocks);
-      
-      // 默认选中第一个
+
       if (hotStocks.length > 0) {
         setSelectedStock(hotStocks[0]);
-        // 异步获取历史数据（仅真实数据，30天）
+        // 初始加载使用默认时间范围
         fetchHistoricalData(hotStocks[0].symbol, 30).then(kData => {
           setKlineData(kData);
-          if (kData.length === 0) {
-            console.warn(`股票 ${hotStocks[0].symbol} 暂无历史数据`);
-          }
         });
-      } else {
-        console.log('没有获取到热门股票数据');
       }
     } catch (err) {
-      console.error('加载热门股票失败:', err);
       setError('加载热门股票失败');
     } finally {
       setLoading(false);
@@ -79,43 +68,29 @@ const MarketQueryPage: React.FC = () => {
 
     setLoading(true);
     setError('');
-    
+
     try {
-      console.log('开始搜索:', searchTerm);
       const response = await stockAPI.searchStock(searchTerm);
-      console.log('搜索响应:', response);
-      
+
       if (response.status === 'success' && response.data) {
-        console.log('搜索成功，数据:', response.data);
-        // 添加到股票列表
         setStockData(prev => {
           const exists = prev.find(stock => stock.symbol === response.data!.symbol);
-          const newData = exists ? 
-            prev.map(stock => 
-              stock.symbol === response.data!.symbol ? response.data! : stock
-            ) : 
+          return exists ?
+            prev.map(stock => stock.symbol === response.data!.symbol ? response.data! : stock) :
             [response.data!, ...prev];
-          console.log('更新后的股票列表:', newData);
-          return newData;
         });
-        
-        // 获取真实历史数据（30天）
-        fetchHistoricalData(response.data.symbol, 30).then(kData => {
-          setKlineData(kData);
-          if (kData.length === 0) {
-            console.warn(`股票 ${response.data.symbol} 暂无历史数据`);
-          }
-        });
-        
-        // 选中该股票
+
         setSelectedStock(response.data);
-        setSearchTerm(''); // 清空搜索框
+        // 搜索新股票时重置为默认30天或保持当前选择
+        fetchHistoricalData(response.data.symbol, timeRange).then(kData => {
+          setKlineData(kData);
+        });
+
+        setSearchTerm('');
       } else {
-        console.log('搜索失败:', response.message);
         setError(response.message || '未找到相关股票信息');
       }
     } catch (err) {
-      console.error('搜索错误:', err);
       setError(err instanceof Error ? err.message : '搜索失败，请稍后重试');
     } finally {
       setLoading(false);
@@ -123,382 +98,145 @@ const MarketQueryPage: React.FC = () => {
   };
 
   const handleStockSelect = (stock: StockData) => {
-    console.log('选中股票:', stock);
-    console.log('股票名称:', stock.name);
-    console.log('当前价格:', stock.current_price);
     setSelectedStock(stock);
-    // 获取真实历史数据（30天）
-    fetchHistoricalData(stock.symbol, 30).then(kData => {
+    // 切换股票时使用当前选择的时间范围
+    fetchHistoricalData(stock.symbol, timeRange).then(kData => {
       setKlineData(kData);
-      if (kData.length === 0) {
-        console.warn(`股票 ${stock.symbol} 暂无历史数据`);
-      }
     });
   };
 
-  // 处理图表错误
   const handleChartError = (error: Error) => {
-    console.error('Chart error:', error);
     setChartError(error.message);
-    // 自动切换到简单图表
     setUseSimpleChart(true);
   };
 
-  // AI对话侧边栏控制
-  const toggleAIChat = () => {
-    setIsAIChatOpen(!isAIChatOpen);
-  };
-
-  const closeAIChat = () => {
-    setIsAIChatOpen(false);
-  };
+  const toggleAIChat = () => setIsAIChatOpen(!isAIChatOpen);
+  const closeAIChat = () => setIsAIChatOpen(false);
 
   return (
-    <div style={{
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '16px'
-    }}>
-      {/* 页面标题 - 10% */}
-      <div style={{
-        flex: '0 0 10%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        padding: '0 20px'
-      }}>
-        <h1 style={{
-          fontSize: 'clamp(1.3rem, 2.5vw, 1.8rem)',
-          fontWeight: '700',
-          color: '#1f2937',
-          margin: 0
-        }}>
+    <div className="h-full flex flex-col gap-6 max-w-7xl mx-auto w-full">
+      {/* Page Title */}
+      <div className="flex flex-col justify-center">
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
           行情查询
         </h1>
-        <p style={{
-          fontSize: '0.9rem',
-          color: '#6b7280',
-          margin: '4px 0 0 0'
-        }}>
-          实时股票行情数据查询
+        <p className="text-sm text-gray-500 mt-1">
+          实时股票行情数据查询与分析
         </p>
       </div>
 
-      {/* 搜索区域 - 15% */}
-      <div style={{
-        flex: '0 0 15%',
-        background: 'white',
-        borderRadius: '12px',
-        padding: '16px 20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px'
-        }}>
-          <h3 style={{
-            margin: 0,
-            fontSize: '1rem',
-            fontWeight: '600',
-            color: '#1f2937'
-          }}>
+      {/* Search Section */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+            <Search size={18} className="text-blue-500" />
             股票搜索
           </h3>
           <button
             type="button"
             onClick={toggleAIChat}
-            style={{
-              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-              color: 'white',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
+            className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-200 flex items-center gap-2 group"
           >
-            <span>🤖</span>
-            AI分析
+            <Bot size={16} className="group-hover:rotate-12 transition-transform" />
+            AI 智能分析
           </button>
         </div>
-        <form onSubmit={handleSearch} style={{
-          display: 'flex',
-          gap: '12px',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            position: 'relative',
-            flex: 1
-          }}>
-            <span style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#9ca3af',
-              fontSize: '16px'
-            }}>
-              🔍
-            </span>
+
+        <form onSubmit={handleSearch} className="flex gap-3 items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="输入股票代码或名称"
-              style={{
-                width: '100%',
-                padding: '10px 10px 10px 40px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'all 0.2s ease'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#3b82f6';
-                e.target.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#e5e7eb';
-                e.target.style.boxShadow = 'none';
-              }}
+              placeholder="输入股票代码或名称 (例如: 000001, AAPL)"
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
             />
           </div>
           <button
             type="submit"
-            style={{
-              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)';
-            }}
+            disabled={loading}
+            className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors shadow-sm shadow-blue-600/20"
           >
-            搜索
+            {loading ? '搜索中...' : '搜索'}
           </button>
         </form>
-        
-        {/* 错误和加载状态 */}
+
         {error && (
-          <div style={{
-            marginTop: '8px',
-            padding: '8px 12px',
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '6px',
-            color: '#dc2626',
-            fontSize: '14px'
-          }}>
+          <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm flex items-center gap-2">
+            <AlertCircle size={16} />
             {error}
           </div>
         )}
-        
-        {loading && (
-          <div style={{
-            marginTop: '8px',
-            padding: '8px 12px',
-            background: '#eff6ff',
-            border: '1px solid #dbeafe',
-            borderRadius: '6px',
-            color: '#2563eb',
-            fontSize: '14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <div style={{
-              width: '16px',
-              height: '16px',
-              border: '2px solid #2563eb',
-              borderTop: '2px solid transparent',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }} />
-            搜索中...
+
+        {loading && !error && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-blue-600 text-sm flex items-center gap-2">
+            <Loader2 size={16} className="animate-spin" />
+            正在搜索股票数据...
           </div>
         )}
       </div>
 
-      {/* 主要内容区域 - 75% */}
-      <div style={{
-        flex: '1',
-        display: 'grid',
-        gridTemplateColumns: selectedStock ? '2fr 1fr' : '1fr',
-        gap: '16px',
-        minHeight: 0
-      }}>
-        {/* 左侧：股票列表 */}
-        <div style={{
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <div style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #f3f4f6',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span style={{
-              fontSize: '16px'
-            }}>
-              📊
-            </span>
+      {/* Main Content */}
+      <div className={`flex-1 grid gap-6 min-h-0 ${selectedStock ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1'}`}>
+        {/* Stock List */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-[600px]">
+          <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+            <BarChart2 size={18} className="text-gray-500" />
             <div>
-              <h2 style={{
-                fontSize: '1rem',
-                fontWeight: '600',
-                color: '#1f2937',
-                margin: 0
-              }}>
-                热门股票
-              </h2>
-              <p style={{
-                color: '#6b7280',
-                margin: '2px 0 0 0',
-                fontSize: '0.8rem'
-              }}>
-                点击股票查看详细行情
-              </p>
+              <h2 className="text-sm font-semibold text-gray-800">热门股票</h2>
+              <p className="text-xs text-gray-500">点击查看详情</p>
             </div>
           </div>
-          
-          <div style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: '8px'
-          }}>
+
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {stockData.length === 0 ? (
-              <div style={{
-                padding: '20px',
-                textAlign: 'center',
-                color: '#6b7280',
-                fontSize: '0.9rem'
-              }}>
-                暂无股票数据，请先搜索或等待加载
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm p-8 text-center">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                  <Search size={20} />
+                </div>
+                暂无股票数据<br />请搜索或等待加载
               </div>
             ) : (
               stockData.map((stock: StockData) => {
                 const isPositive = stock.change_amount >= 0;
-                
+                const isSelected = selectedStock?.symbol === stock.symbol;
+
                 return (
                   <div
                     key={stock.symbol}
                     onClick={() => handleStockSelect(stock)}
-                    style={{
-                      padding: '10px 12px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      background: selectedStock?.symbol === stock.symbol ? '#eff6ff' : 'transparent',
-                      borderLeft: selectedStock?.symbol === stock.symbol ? '3px solid #3b82f6' : '3px solid transparent',
-                      borderRadius: '6px',
-                      marginBottom: '4px'
-                    }}
-                    onMouseOver={(e) => {
-                      if (selectedStock?.symbol !== stock.symbol) {
-                        e.currentTarget.style.background = '#f9fafb';
+                    className={`
+                      p-3 rounded-lg cursor-pointer transition-all duration-200 border
+                      ${isSelected
+                        ? 'bg-blue-50 border-blue-200 shadow-sm'
+                        : 'bg-white border-transparent hover:bg-gray-50 hover:border-gray-100'
                       }
-                    }}
-                    onMouseOut={(e) => {
-                      if (selectedStock?.symbol !== stock.symbol) {
-                        e.currentTarget.style.background = 'transparent';
-                      }
-                    }}
+                    `}
                   >
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}>
+                    <div className="flex items-center justify-between">
                       <div>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          marginBottom: '2px'
-                        }}>
-                          <span style={{
-                            fontSize: '0.9rem',
-                            fontWeight: '600',
-                            color: '#1f2937'
-                          }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-sm font-bold ${isSelected ? 'text-blue-700' : 'text-gray-900'}`}>
                             {stock.symbol}
                           </span>
+                          {isSelected && <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />}
                         </div>
-                        <h3 style={{
-                          fontWeight: '500',
-                          color: '#374151',
-                          margin: 0,
-                          fontSize: '0.8rem'
-                        }}>
+                        <h3 className="text-xs font-medium text-gray-500 truncate max-w-[120px]">
                           {stock.name}
                         </h3>
                       </div>
-                      
-                      <div style={{
-                        textAlign: 'right'
-                      }}>
-                        <div style={{
-                          fontSize: '1rem',
-                          fontWeight: '700',
-                          color: '#1f2937',
-                          marginBottom: '2px'
-                        }}>
+
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-gray-900 mb-1 font-mono">
                           ¥{stock.current_price.toFixed(2)}
                         </div>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                          gap: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          color: isPositive ? '#10b981' : '#ef4444'
-                        }}>
-                          <span>
-                            {isPositive ? '📈' : '📉'}
-                          </span>
-                          <span>
-                            {isPositive ? '+' : ''}{stock.change_amount.toFixed(2)}
-                          </span>
-                          <span>
-                            ({isPositive ? '+' : ''}{stock.change_percent.toFixed(2)}%)
-                          </span>
+                        <div className={`
+                          flex items-center justify-end gap-1 text-xs font-medium
+                          ${isPositive ? 'text-red-500' : 'text-green-500'}
+                        `}>
+                          {isPositive ? <TrendingUp size={12} /> : <TrendingUp size={12} className="rotate-180" />}
+                          <span>{isPositive ? '+' : ''}{stock.change_percent.toFixed(2)}%</span>
                         </div>
                       </div>
                     </div>
@@ -509,216 +247,125 @@ const MarketQueryPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 右侧：选中股票详情 */}
+        {/* Stock Details */}
         {selectedStock && (
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            padding: '16px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px',
-              paddingBottom: '8px',
-              borderBottom: '1px solid #f3f4f6'
-            }}>
-              <span style={{
-                fontSize: '16px'
-              }}>
-                💰
-              </span>
-              <div>
-                <h3 style={{
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  margin: 0
-                }}>
-                  股票详情
-                </h3>
-                <p style={{
-                  color: '#6b7280',
-                  margin: '2px 0 0 0',
-                  fontSize: '0.75rem'
-                }}>
-                  实时数据
-                </p>
-              </div>
-            </div>
-            
-            <div style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '6px 0'
-              }}>
-                <span style={{
-                  color: '#6b7280',
-                  fontSize: '0.8rem'
-                }}>
-                  选中股票
-                </span>
-                <span style={{
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  fontSize: '0.85rem'
-                }}>
-                  {selectedStock ? `${selectedStock.symbol} - ${selectedStock.name}` : ''}
-                </span>
-              </div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '6px 0'
-              }}>
-                <span style={{
-                  color: '#6b7280',
-                  fontSize: '0.8rem'
-                }}>
-                  当前价格
-                </span>
-                <span style={{
-                  fontWeight: '700',
-                  color: '#1f2937',
-                  fontSize: '0.9rem'
-                }}>
-                  {selectedStock ? `¥${selectedStock.current_price.toFixed(2)}` : '¥0.00'}
-                </span>
-              </div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '6px 0'
-              }}>
-                <span style={{
-                  color: '#6b7280',
-                  fontSize: '0.8rem'
-                }}>
-                  涨跌幅
-                </span>
-                <span style={{
-                  fontWeight: '600',
-                  color: '#10b981',
-                  fontSize: '0.85rem'
-                }}>
-                  +1.42%
-                </span>
-              </div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '6px 0'
-              }}>
-                <span style={{
-                  color: '#6b7280',
-                  fontSize: '0.8rem'
-                }}>
-                  成交量
-                </span>
-                <span style={{
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  fontSize: '0.85rem'
-                }}>
-                  15.3万手
-                </span>
-              </div>
-            </div>
-            
-            <div style={{
-              marginTop: '12px'
-            }}>
-              <h4 style={{
-                fontSize: '0.85rem',
-                fontWeight: '600',
-                color: '#1f2937',
-                margin: '0 0 6px 0'
-              }}>
-                K线图
-              </h4>
-              <div style={{
-                height: '200px',
-                background: '#f8fafc',
-                borderRadius: '8px',
-                padding: '12px',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '8px'
-                }}>
-                  <span style={{
-                    color: '#6b7280',
-                    fontSize: '0.8rem',
-                    fontWeight: '500'
-                  }}>
-                    K线图预览
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {chartError && (
-                      <span style={{ fontSize: '0.7rem', color: '#dc2626' }}>图表加载失败</span>
-                    )}
-                    <button
-                      onClick={() => setUseSimpleChart(!useSimpleChart)}
-                      style={{
-                        padding: '4px 8px',
-                        fontSize: '0.7rem',
-                        background: useSimpleChart ? '#dbeafe' : '#f3f4f6',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        color: useSimpleChart ? '#2563eb' : '#374151'
-                      }}
-                    >
-                      {useSimpleChart ? '高级图表' : '简单图表'}
-                    </button>
-                  </div>
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            {/* Detail Card */}
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                  <DollarSign size={20} />
                 </div>
-                
-                {selectedStock ? (
-                  <div style={{ flex: 1, minHeight: '150px' }}>
-                    {useSimpleChart ? (
-                      <SimpleKLineChart
-                        data={klineData}
-                        width={280}
-                        height={150}
-                      />
-                    ) : (
-                      <TradingViewKLineChart
-                        data={klineData}
-                        width={280}
-                        height={150}
-                        onError={handleChartError}
-                      />
-                    )}
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">
+                    {selectedStock.name}
+                  </h3>
+                  <p className="text-xs text-gray-500 font-mono">
+                    {selectedStock.symbol} • 实时数据
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <span className="text-xs text-gray-500 block mb-1">当前价格</span>
+                  <span className="text-xl font-bold text-gray-900 font-mono">
+                    ¥{selectedStock.current_price.toFixed(2)}
+                  </span>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <span className="text-xs text-gray-500 block mb-1">涨跌幅</span>
+                  <span className={`text-xl font-bold font-mono ${selectedStock.change_amount >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    {selectedStock.change_amount >= 0 ? '+' : ''}{selectedStock.change_percent.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <span className="text-xs text-gray-500 block mb-1">涨跌额</span>
+                  <span className={`text-xl font-bold font-mono ${selectedStock.change_amount >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    {selectedStock.change_amount >= 0 ? '+' : ''}{selectedStock.change_amount.toFixed(2)}
+                  </span>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <span className="text-xs text-gray-500 block mb-1">成交量</span>
+                  <span className="text-xl font-bold text-gray-900 font-mono">
+                    {(selectedStock.volume / 10000).toFixed(1)}万
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Chart Card */}
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1 min-h-[400px] flex flex-col">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-2">
+                  <Activity size={18} className="text-blue-500" />
+                  <h4 className="text-sm font-bold text-gray-800">K线走势图</h4>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {/* Time Range Selector */}
+                  <div className="flex bg-gray-100 rounded-lg p-1">
+                    {[7, 14, 30].map((days) => (
+                      <button
+                        key={days}
+                        onClick={() => setTimeRange(days)}
+                        className={`
+                          px-3 py-1 text-xs font-medium rounded-md transition-colors
+                          ${timeRange === days
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                          }
+                        `}
+                      >
+                        {days}天
+                      </button>
+                    ))}
                   </div>
+
+                  <div className="w-px h-4 bg-gray-200 mx-1"></div>
+
+                  {chartError && (
+                    <span className="text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle size={12} /> 图表加载失败
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setUseSimpleChart(!useSimpleChart)}
+                    className={`
+                      px-3 py-1.5 text-xs font-medium rounded-md transition-colors
+                      ${useSimpleChart
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }
+                    `}
+                  >
+                    {useSimpleChart ? '切换高级图表' : '切换简单图表'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 bg-gray-50 rounded-lg border border-gray-100 overflow-hidden relative min-h-[300px]">
+                {useSimpleChart ? (
+                  <SimpleKLineChart
+                    data={klineData}
+                    width={800}
+                    height={400}
+                  />
                 ) : (
-                  <div style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#9ca3af',
-                    fontSize: '0.8rem'
-                  }}>
-                    点击左侧股票查看K线图
+                  <TradingViewKLineChart
+                    data={klineData}
+                    width={800}
+                    height={400}
+                    onError={handleChartError}
+                  />
+                )}
+
+                {klineData.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-10">
+                    <div className="text-center text-gray-400">
+                      <Loader2 size={24} className="animate-spin mx-auto mb-2" />
+                      <p className="text-sm">加载图表数据中...</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -727,7 +374,6 @@ const MarketQueryPage: React.FC = () => {
         )}
       </div>
 
-      {/* AI对话侧边栏 */}
       <AIChatSidebar
         isOpen={isAIChatOpen}
         onClose={closeAIChat}

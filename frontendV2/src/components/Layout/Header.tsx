@@ -1,4 +1,5 @@
 import React from 'react';
+import { Bell, Settings, User, TrendingUp } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -6,122 +7,27 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ title }) => {
   return (
-    <div style={{
-      height: '70px',
-      background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-      borderBottom: '1px solid #e2e8f0',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 24px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px'
-      }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-          borderRadius: '10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '18px',
-          color: 'white',
-          boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-        }}>
-          📈
+    <div className="h-16 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-10">
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white">
+          <TrendingUp size={20} />
         </div>
-        <h1 style={{
-          fontSize: '20px',
-          fontWeight: '600',
-          color: '#1e293b',
-          margin: 0,
-          letterSpacing: '0.3px'
-        }}>
+        <h1 className="text-xl font-bold text-slate-800 tracking-tight">
           {title}
         </h1>
       </div>
-      
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px'
-      }}>
-        <button style={{
-          width: '40px',
-          height: '40px',
-          borderRadius: '10px',
-          border: '1px solid #e2e8f0',
-          background: 'white',
-          color: '#64748b',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.2s ease',
-          fontSize: '16px'
-        }} onMouseOver={(e) => {
-          e.currentTarget.style.background = '#f1f5f9';
-          e.currentTarget.style.color = '#475569';
-          e.currentTarget.style.borderColor = '#cbd5e1';
-        }} onMouseOut={(e) => {
-          e.currentTarget.style.background = 'white';
-          e.currentTarget.style.color = '#64748b';
-          e.currentTarget.style.borderColor = '#e2e8f0';
-        }}>
-          🔔
+
+      <div className="flex items-center gap-4">
+        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 hover:border-gray-300 transition-all flex items-center justify-center">
+          <Bell size={18} />
         </button>
-        
-        <button style={{
-          width: '40px',
-          height: '40px',
-          borderRadius: '10px',
-          border: '1px solid #e2e8f0',
-          background: 'white',
-          color: '#64748b',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.2s ease',
-          fontSize: '16px'
-        }} onMouseOver={(e) => {
-          e.currentTarget.style.background = '#f1f5f9';
-          e.currentTarget.style.color = '#475569';
-          e.currentTarget.style.borderColor = '#cbd5e1';
-        }} onMouseOut={(e) => {
-          e.currentTarget.style.background = 'white';
-          e.currentTarget.style.color = '#64748b';
-          e.currentTarget.style.borderColor = '#e2e8f0';
-        }}>
-          ⚙️
+
+        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 hover:border-gray-300 transition-all flex items-center justify-center">
+          <Settings size={18} />
         </button>
-        
-        <div style={{
-          width: '40px',
-          height: '40px',
-          background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-          borderRadius: '10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-          transition: 'all 0.2s ease',
-          fontSize: '16px',
-          color: 'white'
-        }} onMouseOver={(e) => {
-          e.currentTarget.style.transform = 'scale(1.05)';
-          e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
-        }} onMouseOut={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-        }}>
-          👤
+
+        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-violet-600 rounded-xl flex items-center justify-center cursor-pointer shadow-lg shadow-blue-500/20 text-white hover:scale-105 hover:shadow-blue-500/30 transition-all duration-200">
+          <User size={18} />
         </div>
       </div>
     </div>

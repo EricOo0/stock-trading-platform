@@ -134,8 +134,9 @@ class AShareService:
             return create_error_response(
                 symbol=raw_data.get("symbol", "unknown"),
                 error_code="VALIDATION_ERROR",
-                error_message=f"数据验证失败: {e}",
-                suggestion="数据源返回异常数据，请稍后重试"
+                error_message=f"数据验证失败: {e.message}",
+                suggestion="数据源返回异常数据，请稍后重试",
+                context=e.context
             )
         except Exception as e:
             logger.error(f"数据处理和验证失败: {e}")

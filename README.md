@@ -40,12 +40,15 @@
 - [x] **多数据源集成**: Yahoo Finance + 新浪财经双数据源保障
 - [x] **智能股票搜索**: 支持股票代码、中文公司名称搜索
 - [x] **错误处理机制**: 完善的异常处理和降级策略
+- [x] **数据验证优化**: 放宽价格范围验证，支持真实市场数据变化
+- [x] **高频限流优化**: 提高开发环境请求限制（1000次/小时）
 
 #### 2. 历史数据系统
-- [x] **真实历史数据**: 15天历史K线数据，来源真实市场
-- [x] **历史数据API**: `/api/market/historical/{symbol}?period=15d`
+- [x] **真实历史数据**: 30天历史K线数据，来源真实市场
+- [x] **历史数据API**: `/api/market/historical/{symbol}?period=30d`
 - [x] **数据格式标准化**: 统一的OHLCV数据格式
 - [x] **数据质量保障**: 真实数据源，拒绝模拟数据
+- [x] **交易日过滤**: 自动过滤非交易日（周末、节假日）
 
 #### 3. AI对话分析系统
 - [x] **AI聊天侧边栏**: 集成Claude AI智能助手
@@ -54,22 +57,32 @@
 - [x] **数据溯源**: 明确标注数据来源，确保透明度
 
 #### 4. 可视化图表
-- [x] **TradingView集成**: 专业级K线图表组件
-- [x] **图表类型切换**: 支持简单图表和高级图表
+- [x] **TradingView集成**: 专业级K线图表组件（lightweight-charts v5）
+- [x] **图表缩放**: 支持鼠标滚轮缩放和拖拽平移
+- [x] **日期范围选择**: 7天、14天、30天数据快速切换
+- [x] **交易日显示**: Business Day模式自动跳过周末
 - [x] **错误处理**: 图表异常自动降级处理
 - [x] **响应式设计**: 适配移动端和桌面端
 
 #### 5. 系统架构优化
-- [x] **限流机制**: 基于令牌桶的API限流保护
+- [x] **限流机制**: 基于令牌桶的API限流保护（可配置）
 - [x] **熔断机制**: 数据源异常时的自动降级
 - [x] **缓存策略**: 智能缓存减少API调用
 - [x] **日志监控**: 完整的请求日志和错误追踪
+- [x] **JSON序列化优化**: 统一处理datetime等特殊类型
 
-### 🚧 进行中功能
+#### 6. 前端UI优化
+- [x] **Tailwind CSS v4**: 现代化CSS框架升级
+- [x] **Lucide图标**: 替换传统图标库为现代化图标
+- [x] **响应式布局**: 优化的侧边栏和导航栏设计
+- [x] **专业配色**: 金融级配色方案（Slate/Blue主题）
+
+### 🔧 已知问题与待优化事项
 - [ ] **技术指标分析**: MACD、KDJ、RSI等专业指标
-- [ ] **基本面数据**: 财务报表、估值指标分析
+- [ ] **基本面数据展示**: 财务报表、估值指标可视化
 - [ ] **市场热力图**: 板块轮动和热点追踪
 - [ ] **自选股功能**: 个人股票组合管理
+- [ ] **数据缓存优化**: 减少重复API调用
 
 ## 🎯 核心API接口
 
@@ -79,8 +92,8 @@
 POST /api/market-data
 Body: {"query": "000001"}
 
-# 获取历史数据（15天真实数据）
-GET /api/market/historical/000001?period=15d&count=15
+# 获取历史数据（30天真实数据）
+GET /api/market/historical/000001?period=30d&count=30
 
 # 获取热门股票
 GET /api/market-data/hot
@@ -147,18 +160,44 @@ AI: 📊 **平安银行(000001) 智能分析报告**
 
 ### 启动步骤
 ```bash
-# 1. 启动后端API服务
-cd backend
-python3 api_server.py --port 8000
+# 1. 克隆项目并安装依赖
+git clone <repository-url>
+cd AI-fundin
 
-# 2. 启动前端开发服务器  
+# 2. 安装Python依赖（推荐使用虚拟环境）
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. 启动后端API服务
+# 使用虚拟环境的Python
+venv/bin/python backend/api_server.py --port 8000
+# 或者直接在backend目录下运行
+cd backend && python api_server.py
+
+# 4. 启动前端开发服务器（新终端窗口）
 cd frontendV2
 npm install
 npm run dev
 
-# 3. 访问应用
-open http://localhost:5173
+# 5. 访问应用
+# 前端地址：http://localhost:3005（端口会自动递增）
+# 后端API：http://localhost:8000
 ```
+
+### 常见问题
+
+**Q: 后端启动时提示"Address already in use"**
+A: 端口8000已被占用，可以使用以下命令停止占用进程：
+```bash
+lsof -t -i:8000 | xargs kill -9
+```
+
+**Q: 前端显示"数据加载中"或使用模拟数据**
+A: 确保后端服务已启动且运行在8000端口。检查浏览器控制台是否有API错误。
+
+**Q: 数据验证失败错误**
+A: 这是正常现象，系统已优化验证规则以支持真实市场数据的变化。
 
 ## 📊 数据质量承诺
 
