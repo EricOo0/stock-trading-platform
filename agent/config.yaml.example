@@ -1,6 +1,6 @@
 # LLM Configuration
 llm:
-  api_key: "sk-xoadryhpubnvadszkevovyqrjmbjpehgkhdlewwrizjffofm"
+  api_key: ""
   api_base: "https://api.siliconflow.cn/v1"
   model: "deepseek-ai/DeepSeek-V3.1-Terminus"
   temperature: 0.7
