@@ -27,6 +27,7 @@ class SkillsConfig(BaseModel):
     """Skills configuration."""
     path: str = Field(default="../skills/market_data_tool", description="Path to skills directory")
     enabled: bool = Field(default=True, description="Whether skills are enabled")
+    fred_api_key: Optional[str] = Field(default=None, description="FRED API Key")
 
 
 class AgentConfig(BaseModel):
@@ -76,11 +77,35 @@ def get_config() -> Config:
     """Get the global configuration instance."""
     global _config
     if _config is None:
-        try:
-            _config = Config.from_yaml()
-        except FileNotFoundError:
-            # Try example config
-            _config = Config.from_yaml("config.yaml.example")
+        # Determine possible config paths
+        # 1. Current directory
+        # 2. agent directory (relative to this file)
+        # 3. Project root (relative to this file)
+        
+        current_file = Path(__file__)
+        agent_dir = current_file.parent.parent
+        project_root = agent_dir.parent
+        
+        possible_paths = [
+            Path("config.yaml"),
+            agent_dir / "config.yaml",
+            project_root / "agent" / "config.yaml",
+            Path("config.yaml.example"),
+            agent_dir / "config.yaml.example",
+            project_root / "agent" / "config.yaml.example",
+        ]
+        
+        config_path = None
+        for path in possible_paths:
+            if path.exists():
+                config_path = path
+                break
+                
+        if config_path:
+            _config = Config.from_yaml(str(config_path))
+        else:
+            raise FileNotFoundError(f"Configuration file not found. Searched in: {[str(p) for p in possible_paths]}")
+            
     return _config
 
 

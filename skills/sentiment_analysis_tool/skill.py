@@ -2,6 +2,9 @@ import logging
 from typing import Dict, Any, List
 import re
 
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field, PrivateAttr
+
 from .config import Config
 from .services.news_search import NewsSearchService
 from .services.sentiment import SentimentService
@@ -10,27 +13,38 @@ from .services.sentiment import SentimentService
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class SentimentAnalysisSkill:
+class SentimentAnalysisInput(BaseModel):
+    query: str = Field(description="The query to analyze sentiment for, e.g., 'Analyze sentiment for AAPL'")
+
+class SentimentAnalysisSkill(BaseTool):
     """
     Market Sentiment Analysis Skill
     Analyzes market sentiment for specific stocks based on news and social media.
     """
+    name: str = "sentiment_analysis_tool"
+    description: str = "Analyzes market sentiment for specific stocks based on news and social media."
+    args_schema: type[BaseModel] = SentimentAnalysisInput
+
+    _news_service: NewsSearchService = PrivateAttr()
+    _sentiment_service: SentimentService = PrivateAttr()
 
     def __init__(self):
-        self.news_service = NewsSearchService()
-        self.sentiment_service = SentimentService()
+        super().__init__()
+        self._news_service = NewsSearchService()
+        self._sentiment_service = SentimentService()
         logger.info("Sentiment Analysis Skill initialized")
 
-    def main_handle(self, text_input: str) -> Dict[str, Any]:
+    def _run(self, query: str) -> Dict[str, Any]:
         """
         Main entry point for the skill.
         
         Args:
-            text_input: User query (e.g., "Analyze sentiment for AAPL")
+            query: User query (e.g., "Analyze sentiment for AAPL")
             
         Returns:
             Dictionary containing sentiment analysis result
         """
+        text_input = query
         try:
             logger.info(f"Received sentiment query: {text_input}")
             
@@ -46,11 +60,11 @@ class SentimentAnalysisSkill:
                 
             # 1. Search for news
             logger.info(f"Searching news for {symbol}...")
-            news_items = self.news_service.search_news(symbol, limit=Config.SEARCH_RESULT_LIMIT)
+            news_items = self._news_service.search_news(symbol, limit=Config.SEARCH_RESULT_LIMIT)
             
             # 2. Analyze sentiment
             logger.info(f"Analyzing sentiment for {symbol}...")
-            analysis_result = self.sentiment_service.analyze(news_items)
+            analysis_result = self._sentiment_service.analyze(news_items)
             
             # 3. Construct response
             return {
@@ -80,6 +94,10 @@ class SentimentAnalysisSkill:
                 "symbol": text_input
             }
 
+    async def _arun(self, query: str) -> Dict[str, Any]:
+        """Run the tool asynchronously."""
+        return self._run(query)
+
     def _extract_symbol(self, text: str) -> str:
         """Extract stock symbol from text"""
         # Simple extraction logic - similar to market_data_tool but simplified
@@ -108,4 +126,4 @@ class SentimentAnalysisSkill:
 def main_handle(text_input: str) -> Dict[str, Any]:
     """Wrapper function for the skill adapter"""
     skill = SentimentAnalysisSkill()
-    return skill.main_handle(text_input)
+    return skill._run(text_input)

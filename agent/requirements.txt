@@ -1,5 +1,7 @@
 # LangChain ecosystem
-langchain>=0.1.0
+langchayfinance>=0.2.36
+fredapi>=0.5.1
+akshare>=1.12.900
 langchain-openai>=0.0.5
 langchain-community>=0.0.20
 

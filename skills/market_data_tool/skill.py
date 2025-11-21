@@ -1,12 +1,10 @@
-"""
-AI-fundin市场数据获取工具 - Claude Skill主实现
-提供A股、美股、港股的实时行情数据获取功能
-"""
-
 import logging
 import time
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field, PrivateAttr
 
 # 导入基础设施
 from .config import Config
@@ -20,32 +18,44 @@ from .services.hk_stock_service import HKStockService
 logging.basicConfig(level=Config.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
-class MarketDataSkill:
+class MarketDataInput(BaseModel):
+    query: str = Field(description="The query about stock market data, e.g., 'AAPL price', '平安银行行情'")
+
+class MarketDataSkill(BaseTool):
     """
     市场数据获取工具的核心实现类
     提供自然语言接口和数据获取功能
     """
+    name: str = "market_data_tool"
+    description: str = "提供A股、美股、港股的实时行情数据获取功能，支持自然语言查询股票价格和历史数据"
+    args_schema: type[BaseModel] = MarketDataInput
+
+    _rate_limiter: Any = PrivateAttr()
+    _a_share_service: AShareService = PrivateAttr()
+    _us_stock_service: USStockService = PrivateAttr()
+    _hk_stock_service: HKStockService = PrivateAttr()
 
     def __init__(self):
         """Initialize the market data skill with all required components"""
-        self.rate_limiter = rate_limiter
-        self.a_share_service = AShareService()
-        self.us_stock_service = USStockService()
-        self.hk_stock_service = HKStockService()
-        self.logger = logging.getLogger(self.__class__.__name__)
+        super().__init__()
+        self._rate_limiter = rate_limiter
+        self._a_share_service = AShareService()
+        self._us_stock_service = USStockService()
+        self._hk_stock_service = HKStockService()
         logger.info("AI-fundin市场数据获取工具已初始化")
 
-    def main_handle(self, text_input: str) -> Dict[str, Any]:
+    def _run(self, query: str) -> Dict[str, Any]:
         """
         Claude Skill的主入口函数
         处理自然语言输入并返回市场数据
 
         Args:
-            text_input: 用户输入的自然语言文本
+            query: 用户输入的自然语言文本
 
         Returns:
             包含市场行情数据的字典，或错误信息
         """
+        text_input = query
         try:
             logger.info(f"收到用户查询: {text_input}")
 
@@ -74,6 +84,10 @@ class MarketDataSkill:
                 error_message="系统内部错误，请稍后重试",
                 suggestion="请稍后重试或联系技术支持"
             )
+
+    async def _arun(self, query: str) -> Dict[str, Any]:
+        """Run the tool asynchronously."""
+        return self._run(query)
 
     def _extract_symbols_from_text(self, text: str) -> List[str]:
         """
@@ -278,11 +292,11 @@ class MarketDataSkill:
         # 根据市场类型使用相应服务
         try:
             if market == "A-share":
-                return self.a_share_service.get_historical_data(symbol, period, interval)
+                return self._a_share_service.get_historical_data(symbol, period, interval)
             elif market == "US":
-                return self.us_stock_service.get_historical_data(symbol, period, interval)
+                return self._us_stock_service.get_historical_data(symbol, period, interval)
             elif market == "HK":
-                return self.hk_stock_service.get_historical_data(symbol, period, interval)
+                return self._hk_stock_service.get_historical_data(symbol, period, interval)
             else:
                 return create_error_response(
                     symbol=symbol,
@@ -324,11 +338,11 @@ class MarketDataSkill:
 
         # 根据市场类型使用相应服务
         if market == "A-share":
-            return self.a_share_service.get_stock_quote(symbol)
+            return self._a_share_service.get_stock_quote(symbol)
         elif market == "US":
-            return self.us_stock_service.get_stock_quote(symbol)
+            return self._us_stock_service.get_stock_quote(symbol)
         elif market == "HK":
-            return self.hk_stock_service.get_stock_quote(symbol)
+            return self._hk_stock_service.get_stock_quote(symbol)
         else:
             return create_error_response(
                 symbol=symbol,
@@ -440,7 +454,31 @@ def main_handle(text_input: str) -> Dict[str, Any]:
         main_handle("查询AAPL和TSLA的价格") -> 返回苹果和特斯拉的股票数据
     """
     skill = MarketDataSkill()
-    return skill.main_handle(text_input)
+    return skill._run(text_input)
+
+
+if __name__ == "__main__":
+    # 测试示例
+    test_queries = [
+        "获取000001的行情数据",
+        "查询AAPL的股票价格",
+        "00700现在多少钱",
+        "获取平安银行、苹果、腾讯的行情",
+        "这是什么股票？999999",
+        "获取平安银行和苹果股票的价格",
+        "比较腾讯和特斯拉的股价",
+        "获取茅台招商银行的行情"
+    ]
+
+    print("AI-fundin市场数据获取工具 - 测试demo")
+    print("=" * 50)
+
+    for query in test_queries:
+        print(f"查询: {query}")
+        result = main_handle(query)
+        print(f"提取的代码: {result.get('symbols', []) if 'symbols' in result else 'N/A'}")
+        print(f"结果状态: {result.get('status', 'unknown')}")
+        print("-" * 30)
 
 
 if __name__ == "__main__":

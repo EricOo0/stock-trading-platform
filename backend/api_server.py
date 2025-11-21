@@ -18,6 +18,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入market_data_tool skill
 from skills.market_data_tool.skill import main_handle
+from skills.macro_data_tool.skill import MacroDataSkill
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -49,6 +50,8 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             self.handle_hot_stocks()
         elif path.startswith('/api/market/historical/'):
             self.handle_historical_data(path, query_params)
+        elif path.startswith('/api/macro-data/historical/'):
+            self.handle_macro_historical_data(path, query_params)
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
@@ -266,7 +269,55 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             }
             self._set_headers(500)
             self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+            self._set_headers(500)
+            self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
 
+    def handle_macro_historical_data(self, path: str, query_params: Dict[str, List[str]]):
+        """处理宏观数据历史查询"""
+        try:
+            # 从路径中提取指标名称
+            path_parts = path.split('/')
+            if len(path_parts) < 4:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({'error': 'Invalid path format'}).encode())
+                return
+            
+            indicator = path_parts[-1]
+            
+            # 获取查询参数
+            period = query_params.get('period', ['1y'])[0] if 'period' in query_params else '1y'
+            
+            logger.info(f"收到宏观历史数据查询请求: {indicator}, 周期: {period}")
+            
+            skill = MacroDataSkill()
+            result = skill.get_historical_data(indicator, period)
+            
+            if 'error' not in result:
+                response = {
+                    'status': 'success',
+                    'data': result,
+                    'timestamp': datetime.now().isoformat()
+                }
+                self._set_headers(200)
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode())
+            else:
+                error_response = {
+                    'status': 'error',
+                    'message': result.get('error', '获取数据失败'),
+                    'timestamp': datetime.now().isoformat()
+                }
+                self._set_headers(200)
+                self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+                
+        except Exception as e:
+            logger.error(f"处理宏观历史数据查询请求失败: {str(e)}")
+            error_response = {
+                'status': 'error',
+                'message': f'服务器错误: {str(e)}',
+                'timestamp': datetime.now().isoformat()
+            }
+            self._set_headers(500)
+            self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
 def run_server(port=8000):
     """运行API服务器"""
     server_address = ('', port)

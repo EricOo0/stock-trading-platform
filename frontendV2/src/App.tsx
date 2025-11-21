@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layout } from './components/Layout';
 import { MarketQueryPage, HomePage, StockSearchPage } from './pages';
+import MacroDataPage from './pages/MacroDataPage';
 import TestPage from './pages/TestPage';
 import DebugPage from './pages/DebugPage';
 
@@ -27,6 +28,8 @@ function App() {
         return '股票搜索';
       case 'watchlist':
         return '自选股票';
+      case 'macro-data':
+        return '宏观数据';
       default:
         return '行情系统';
     }
@@ -58,6 +61,8 @@ function App() {
             </div>
           </div>
         );
+      case 'macro-data':
+        return <MacroDataPage />;
       case 'test':
         return <TestPage />;
       case 'debug':
@@ -68,7 +73,7 @@ function App() {
   };
 
   return (
-    <Layout 
+    <Layout
       activeTab={activeTab}
       onTabChange={handleTabChange}
       title={getPageTitle(activeTab)}

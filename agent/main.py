@@ -6,6 +6,8 @@ from pathlib import Path
 # Add agent directory to path for absolute imports
 agent_dir = Path(__file__).parent
 sys.path.insert(0, str(agent_dir))
+# Add project root to path for cross-module imports (e.g. skills)
+sys.path.insert(0, str(agent_dir.parent))
 
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse

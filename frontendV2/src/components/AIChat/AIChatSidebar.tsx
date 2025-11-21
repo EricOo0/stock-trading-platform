@@ -31,7 +31,7 @@ const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
-  const [useRealAgent, setUseRealAgent] = useState(true);  // Toggle for using real agent
+  const [useRealAgent] = useState(true);  // Toggle for using real agent
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 

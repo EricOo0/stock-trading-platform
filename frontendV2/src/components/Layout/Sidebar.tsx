@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe } from 'lucide-react';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -51,6 +51,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: '自选股票',
       icon: <Eye size={20} />,
       color: 'text-red-500'
+    },
+    {
+      id: 'macro-data',
+      label: '宏观数据',
+      icon: <Globe size={20} />,
+      color: 'text-cyan-500'
     }
   ];
 

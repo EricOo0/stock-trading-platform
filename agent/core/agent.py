@@ -11,7 +11,9 @@ from langchain.tools import Tool
 from core.config import Config
 from core.prompts import REACT_SYSTEM_PROMPT
 from core.memory import ConversationMemory
-from tools.manager import ToolManager
+from skills.market_data_tool.skill import MarketDataSkill
+from skills.sentiment_analysis_tool.skill import SentimentAnalysisSkill
+from skills.macro_data_tool.skill import MacroDataSkill
 from utils.exceptions import LLMError, AgentException
 
 
@@ -36,8 +38,12 @@ class StockAnalysisAgent:
         """
         self.config = config
         self.llm = self._init_llm()
-        self.tool_manager = ToolManager(config)
-        self.tools = self.tool_manager.get_tools()
+        # Load skills
+        self.tools = [
+            MarketDataSkill(),
+            SentimentAnalysisSkill(),
+            MacroDataSkill()
+        ]
         self.agent_executor = self._create_agent_executor()
         logger.info("Stock Analysis Agent initialized successfully")
     
