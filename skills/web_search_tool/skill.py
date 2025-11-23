@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Any, Optional, List
 
 from langchain.tools import BaseTool
-from duckduckgo_search import DDGS
+from ddgs import DDGS  # Updated to use new ddgs package
 from pydantic import BaseModel, Field, PrivateAttr
 
 from .config import Config
@@ -41,7 +41,7 @@ class WebSearchSkill(BaseTool):
             
             results = []
             # Use DDGS directly as per recommended usage
-            from duckduckgo_search import DDGS
+            from ddgs import DDGS  # New package
             import time
             import traceback
             import os
