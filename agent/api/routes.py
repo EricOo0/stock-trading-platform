@@ -55,7 +55,17 @@ async def chat(request: ChatRequest):
         # Parse tool calls from intermediate steps
         tool_calls = []
         for step in result.get("intermediate_steps", []):
-            if len(step) >= 2:
+            if isinstance(step, dict):
+                # Handle LangGraph format
+                agent_name = step.get("agent")
+                if agent_name: # Only include steps where agent is defined
+                    tool_calls.append(ToolCall(
+                        tool_name=agent_name,
+                        tool_input={}, # Input is not explicitly available in this simplified format
+                        tool_output=step.get("content", "")
+                    ))
+            elif isinstance(step, (list, tuple)) and len(step) >= 2:
+                # Handle legacy ReAct format
                 action, observation = step[0], step[1]
                 tool_calls.append(ToolCall(
                     tool_name=action.tool if hasattr(action, 'tool') else "unknown",
@@ -71,8 +81,34 @@ async def chat(request: ChatRequest):
             error=result.get("error")
         )
         
+        
     except Exception as e:
         logger.error(f"Chat endpoint error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """
+    Stream chat with the stock analysis agent.
+    Returns NDJSON events.
+    """
+    try:
+        agent = get_agent()
+        
+        async def event_generator():
+            import json
+            async for event in agent.stream_run(request.message):
+                yield json.dumps(event) + "\n"
+                
+        from fastapi.responses import StreamingResponse
+        return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+        
+    except Exception as e:
+        logger.error(f"Chat stream error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)

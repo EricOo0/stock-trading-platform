@@ -1,9 +1,11 @@
 # LangChain ecosystem
-langchayfinance>=0.2.36
+langchain>=0.2.36
 fredapi>=0.5.1
 akshare>=1.12.900
 langchain-openai>=0.0.5
-langchain-community>=0.0.20
+langchain-community>=0.2.0
+langgraph>=0.0.10
+duckduckgo-search>=6.0.0
 
 # Web framework
 fastapi>=0.109.0

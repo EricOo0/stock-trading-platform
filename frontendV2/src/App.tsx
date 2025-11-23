@@ -5,6 +5,8 @@ import MacroDataPage from './pages/MacroDataPage';
 import TestPage from './pages/TestPage';
 import DebugPage from './pages/DebugPage';
 
+import CouncilRoom from './components/Council/CouncilRoom';
+
 function App() {
   const [activeTab, setActiveTab] = React.useState('home');
 
@@ -16,6 +18,8 @@ function App() {
     switch (tab) {
       case 'home':
         return '首页';
+      case 'council':
+        return 'AI 顾问团';
       case 'test':
         return '测试页面';
       case 'debug':
@@ -39,6 +43,8 @@ function App() {
     switch (activeTab) {
       case 'home':
         return <HomePage onNavigate={handleTabChange} />;
+      case 'council':
+        return <CouncilRoom />;
       case 'market-query':
         return <MarketQueryPage />;
       case 'technical-analysis':

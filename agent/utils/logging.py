@@ -35,6 +35,18 @@ def setup_logging(verbose: bool = True, log_file: str = "agent.log") -> None:
         level="DEBUG",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
     )
+
+    # Separate logs for each agent
+    agents = ["Chairman", "MarketDataInvestigator", "MacroDataInvestigator", "SentimentInvestigator", "WebSearchInvestigator", "Receptionist", "Critic"]
+    for agent in agents:
+        logger.add(
+            log_dir / f"{agent}.log",
+            filter=lambda record, a=agent: a in record["message"] or a in record["extra"].get("agent_name", ""),
+            rotation="5 MB",
+            retention="3 days",
+            level="DEBUG",
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}"
+        )
     
     logger.info("Logging configured successfully")
 

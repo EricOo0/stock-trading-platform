@@ -4,12 +4,13 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 
 from langchain.tools import BaseTool
+from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field, PrivateAttr
 
-# 导入基础设施
 from .config import Config
 from .utils.rate_limiter import rate_limiter
 from .utils.error_handler import create_error_response
+from .utils.llm_symbol_extractor import LLMSymbolExtractor
 from .services.a_share_service import AShareService
 from .services.us_stock_service import USStockService
 from .services.hk_stock_service import HKStockService
@@ -19,7 +20,7 @@ logging.basicConfig(level=Config.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 class MarketDataInput(BaseModel):
-    query: str = Field(description="The query about stock market data, e.g., 'AAPL price', '平安银行行情'")
+    query: str = Field(description="The query about stock market data, e.g., 'AAPL price', '平安银行行情', 'NVIDIA stock price'")
 
 class MarketDataSkill(BaseTool):
     """
@@ -27,22 +28,33 @@ class MarketDataSkill(BaseTool):
     提供自然语言接口和数据获取功能
     """
     name: str = "market_data_tool"
-    description: str = "提供A股、美股、港股的实时行情数据获取功能，支持自然语言查询股票价格和历史数据"
+    description: str = "提供A股、美股、港股的实时行情数据获取功能，支持自然语言查询股票价格和历史数据。支持中英文公司名称和股票代码。"
     args_schema: type[BaseModel] = MarketDataInput
 
     _rate_limiter: Any = PrivateAttr()
     _a_share_service: AShareService = PrivateAttr()
     _us_stock_service: USStockService = PrivateAttr()
     _hk_stock_service: HKStockService = PrivateAttr()
+    _llm_extractor: Optional[LLMSymbolExtractor] = PrivateAttr(default=None)
 
-    def __init__(self):
-        """Initialize the market data skill with all required components"""
+    def __init__(self, llm: Optional[ChatOpenAI] = None):
+        """Initialize the market data skill with all required components
+        
+        Args:
+            llm: Optional LLM instance for intelligent symbol extraction
+        """
         super().__init__()
         self._rate_limiter = rate_limiter
         self._a_share_service = AShareService()
         self._us_stock_service = USStockService()
         self._hk_stock_service = HKStockService()
-        logger.info("AI-fundin市场数据获取工具已初始化")
+        
+        # Initialize LLM-based symbol extractor if LLM is provided
+        if llm:
+            self._llm_extractor = LLMSymbolExtractor(llm)
+            logger.info("AI-fundin市场数据获取工具已初始化 (使用LLM智能解析)")
+        else:
+            logger.info("AI-fundin市场数据获取工具已初始化 (使用正则表达式解析)")
 
     def _run(self, query: str) -> Dict[str, Any]:
         """
@@ -91,7 +103,8 @@ class MarketDataSkill(BaseTool):
 
     def _extract_symbols_from_text(self, text: str) -> List[str]:
         """
-        从自然语言文本中提取股票代码和名称，支持中文公司名称
+        从自然语言文本中提取股票代码和名称
+        优先使用LLM智能解析，回退到正则表达式
 
         Args:
             text: 用户输入的自然语言文本
@@ -99,117 +112,55 @@ class MarketDataSkill(BaseTool):
         Returns:
             股票代码列表
         """
+        # Try LLM-based extraction first
+        if self._llm_extractor:
+            try:
+                symbols = self._llm_extractor.extract(text)
+                if symbols:
+                    logger.info(f"LLM extracted symbols: {symbols} from query: {text}")
+                    return symbols[:Config.BATCH_MAX_SYMBOLS]
+            except Exception as e:
+                logger.warning(f"LLM extraction failed: {e}, falling back to regex")
+        
+        # Fallback to regex-based extraction
+        return self._extract_symbols_regex(text)
+    
+    def _extract_symbols_regex(self, text: str) -> List[str]:
+        """
+        使用正则表达式从文本中提取股票代码
+        这是LLM提取失败时的后备方案
+        
+        Args:
+            text: 用户输入的文本
+            
+        Returns:
+            股票代码列表
+        """
         symbols = []
         import re
 
-        # 中文公司名称到股票代码的映射
+        # 中文公司名称到股票代码的映射（保留常用的映射作为后备）
         chinese_company_mapping = {
-            # A股 - 银行类
-            '平安银行': '000001', '招商银行': '600036', '工商银行': '601398', '建设银行': '601939',
-            '农业银行': '601288', '中国银行': '601988', '交通银行': '601328', '中信银行': '601998',
-            '光大银行': '601818', '浦发银行': '600000', '民生银行': '600016', '华夏银行': '600015',
-            '兴业银行': '601166', '宁波银行': '002142', '南京银行': '601009', '北京银行': '601169',
-
-            # A股 - 白酒类
-            '贵州茅台': '600519', '五粮液': '000858', '泸州老窖': '000568', '洋河股份': '002304',
-            '山西汾酒': '600809', '古井贡酒': '000596', '今世缘': '603369', '水井坊': '600779',
-
-            # A股 - 保险类
-            '中国平安': '601318', '中国人寿': '601628', '中国太保': '601601', '新华保险': '601336',
-
-            # A股 - 科技类
-            '海康威视': '002415', '立讯精密': '002475', '京东方': '000725', '中兴通讯': '000063',
-            '科大讯飞': '002230', '三六零': '601360', '三安光电': '600703', '歌尔股份': '002241',
-
-            # A股 - 消费类
-            '伊利股份': '600887', '海天味业': '603288', '双汇发展': '000895', '青岛啤酒': '600600',
-            '海尔智家': '600690', '美的集团': '000333', '格力电器': '000651', '老板电器': '002508',
-
-            # A股 - 医药类
-            '恒瑞医药': '600276', '药明康德': '603259', '爱尔眼科': '300015', '片仔癀': '600436',
-            '云南白药': '000538', '复星医药': '600196', '长春高新': '000661', '迈瑞医疗': '300760',
-
-            # A股 - 新能源类
-            '宁德时代': '300750', '比亚迪': '002594', '隆基绿能': '601012', '通威股份': '600438',
-            '阳光电源': '300274', '亿纬锂能': '300014', '赣锋锂业': '002460', '天齐锂业': '002466',
-
-            # A股 - 地产类
-            '万科': '000002', '保利发展': '600048', '招商蛇口': '001979', '金地集团': '600383',
-            '新城控股': '601155', '绿地控股': '600606', '华夏幸福': '600340', '华侨城': '000069',
-
-            # A股 - 制造业
-            '三一重工': '600031', '徐工机械': '000425', '潍柴动力': '000338', '中集集团': '000039',
-            '中国中车': '601766', '中国重工': '601989', '中国船舶': '600150', '宝钢股份': '600019',
-
-            # A股 - 交通运输
-            '顺丰控股': '002352', '圆通速递': '600233', '中通快递': '02057', '韵达股份': '002120',
-            '中国国航': '601111', '南方航空': '600029', '东方航空': '600115', '春秋航空': '601021',
-
-            # A股 - 能源类
-            '中国石油': '601857', '中国石化': '600028', '中国海油': '600938', '长江电力': '600900',
-            '华能国际': '600011', '国电电力': '600795', '中国神华': '601088', '陕鼓动力': '601369',
-
-            # US Stocks - 科技公司
+            # 常用美股
             '苹果': 'AAPL', '微软': 'MSFT', '谷歌': 'GOOGL', '亚马逊': 'AMZN',
-            '特斯拉': 'TSLA', '英伟达': 'NVDA', 'META': 'META', 'META平台': 'META',
-            '脸书': 'META', '网飞': 'NFLX', '奈飞': 'NFLX', '推特': 'TWTR',
-            '甲骨文': 'ORCL', '奥多比': 'ADBE', '赛富时': 'CRM', '腾讯音乐': 'TME',
+            '特斯拉': 'TSLA', '英伟达': 'NVDA', 'META': 'META',
             '阿里巴巴': 'BABA', '百度': 'BIDU', '京东': 'JD', '拼多多': 'PDD',
-            '蔚来': 'NIO', '理想汽车': 'LI', '小鹏汽车': 'XPEV', '哔哩哔哩': 'BILI',
-            '爱奇艺': 'IQ', '网易': 'NTES', '微博': 'WB', '新东方': 'EDU',
-            '好未来': 'TAL', '携程': 'TCOM', '贝壳': 'BEKE',
-
-            # US Stocks - 传统行业
-            '伯克希尔': 'BRK', '可口可乐': 'KO', '麦当劳': 'MCD', '沃尔玛': 'WMT',
-            '迪士尼': 'DIS', '波音': 'BA', '3M': 'MMM', '强生': 'JNJ',
-            '辉瑞': 'PFE', '宝洁': 'PG', '耐克': 'NKE', '星巴克': 'SBUX',
-            '维萨': 'V', '万事达': 'MA', '美国银行': 'BAC', '摩根大通': 'JPM',
-            '高盛': 'GS', '花旗': 'C', '富国银行': 'WFC',
-
-            # HK Stocks - 科技股
-            '腾讯': '0700', '腾讯控股': '0700', '阿里巴巴港股': '9988', '美团': '3690',
-            '小米': '1810', '小米集团': '1810', '京东集团': '9618', '网易港股': '9999',
-            '比亚迪电子': '0285', '联想集团': '0992', '金山软件': '3888', '金蝶国际': '0268',
-
-            # HK Stocks - 金融股
-            '港交所': '0388', '香港交易所': '0388', '汇丰': '0005', '汇丰控股': '0005',
-            '友邦': '1299', '友邦保险': '1299', '中国太平': '00966', '中银香港': '2388',
-
-            # HK Stocks - 消费股
-            '海底捞': '6862', '周黑鸭': '1458', '颐海国际': '1579', '蒙牛乳业': '2319',
-            '伊利港股': '6863', '中国飞鹤': '6186', '恒安国际': '1044', '维达国际': '3331',
-
-            # HK Stocks - 地产建筑
-            '长和': '0001', '长江实业': '1113', '新世界': '0017', '新鸿基': '0016',
-            '恒基地产': '0012', '信和置业': '0083', '恒隆地产': '0101', '九龙仓': '0004',
-
-            # HK Stocks - 能源公用
-            '中电': '0002', '香港中华煤气': '0003', '电能实业': '0006', '港灯': '2638',
-            '昆仑能源': '0135', '华润电力': '0836', '华能国际': '0902',
-
-            # HK Stocks - 医疗
-            '药明生物': '2269', '药明康德': '2359', '中国中药': '00570', '阿里健康': '00241',
-            '京东健康': '06618', '平安好医生': '01833',
-
-            # HK Stocks - 通信
-            '中国移动': '0941', '中国联通': '0762', '中国电信': '0728', '中国铁塔': '00788',
-
-            # HK Stocks - 其他
-            '安踏': '2020', '安踏体育': '2020', '李宁': '2331', '中国旺旺': '0151',
-            '康师傅': '0322', '统一': '0220', '万洲国际': '0288', '中芯国际': '0981'
+            
+            # 常用A股
+            '平安银行': '000001', '招商银行': '600036', '贵州茅台': '600519', 
+            '五粮液': '000858', '中国平安': '601318', '宁德时代': '300750',
+            
+            # 常用港股
+            '腾讯': '00700', '腾讯控股': '00700', '美团': '03690', '小米': '01810',
         }
 
         # 步骤1: 优先处理中文公司名称
         text_clean = text.upper()
         for company_name, symbol in chinese_company_mapping.items():
-            # 使用正確的匹配模式，避免部分匹配
-            pattern = company_name.upper().replace('(', '\(').replace(')', '\)')
-            if re.search(rf'\b{pattern}\b', text_clean):
+            if company_name in text:
                 symbols.append(symbol)
-                # 从文本中移除已匹配的公司名称，避免重复匹配
-                text_clean = re.sub(rf'\b{pattern}\b', '', text_clean)
 
-        # 步骤2: 处理股票代码（如果文本中还有）
+        # 步骤2: 处理股票代码
         # Pattern 1: A股代码 (6位数字)
         matches = re.findall(r'(\d{6})', text_clean)
         symbols.extend([match for match in matches if self._is_valid_share_code(match)])
@@ -219,11 +170,10 @@ class MarketDataSkill(BaseTool):
         symbols.extend([match for match in matches if self._is_valid_us_symbol(match)])
 
         # Pattern 3: HK stock symbols (00700, 02318, etc.)
-        # 修正：确保只匹配5位数字的港股代码，避免匹配到A股代码的一部分
         matches = re.findall(r'\b0\d{4}\b', text_clean)
         symbols.extend([match for match in matches if self._is_valid_hk_code(match)])
 
-        # 步骤3: 移除重复项并保持顺序
+        # 步骤3: 移除重复项
         seen = set()
         unique_symbols = []
         for symbol in symbols:
@@ -231,22 +181,7 @@ class MarketDataSkill(BaseTool):
                 seen.add(symbol)
                 unique_symbols.append(symbol)
 
-        # 步骤4: 港股代码处理 - 去掉前面的0转换为正确的5位格式
-        final_symbols = []
-        for symbol in unique_symbols:
-            if symbol.startswith('0') and len(symbol) == 5:
-                final_symbols.append(symbol)
-            elif symbol.startswith('0') and len(symbol) == 4:
-                # 将4位代码（如0700）转换为5位（0700保持不变）
-                final_symbols.append(symbol.zfill(4))
-            elif symbol.isdigit() and len(symbol) == 6:
-                # A股代码保持不变
-                final_symbols.append(symbol)
-            else:
-                # 美股代码保持大写
-                final_symbols.append(symbol.upper())
-
-        return final_symbols[:Config.BATCH_MAX_SYMBOLS]
+        return unique_symbols[:Config.BATCH_MAX_SYMBOLS]
 
     def _is_valid_share_code(self, symbol: str) -> bool:
         """验证是否为有效的A股代码"""

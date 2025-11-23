@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe } from 'lucide-react';
+import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2 } from 'lucide-react';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -27,6 +27,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: '首页',
       icon: <Home size={20} />,
       color: 'text-violet-500'
+    },
+    {
+      id: 'council',
+      label: 'AI 顾问团',
+      icon: <Gamepad2 size={20} />,
+      color: 'text-pink-500'
     },
     {
       id: 'market-query',

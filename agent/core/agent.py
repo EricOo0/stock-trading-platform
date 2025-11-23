@@ -1,32 +1,25 @@
-"""ReAct agent implementation using LangChain."""
+"""Multi-Agent implementation using LangGraph."""
 
 from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain.prompts import PromptTemplate
-from langchain.tools import Tool
+from langgraph.graph.state import CompiledStateGraph
 
 from core.config import Config
-from core.prompts import REACT_SYSTEM_PROMPT
+from core.graph import create_graph
 from core.memory import ConversationMemory
-from skills.market_data_tool.skill import MarketDataSkill
-from skills.sentiment_analysis_tool.skill import SentimentAnalysisSkill
-from skills.macro_data_tool.skill import MacroDataSkill
 from utils.exceptions import LLMError, AgentException
 
 
 class StockAnalysisAgent:
     """
-    LangChain ReAct agent for stock analysis.
+    Multi-Agent System for stock analysis.
     
-    This agent uses the Reasoning + Acting (ReAct) paradigm to:
-    1. Think about the user's question
-    2. Decide which tool to use
-    3. Observe the tool output
-    4. Repeat until it has enough information
-    5. Provide a final answer
+    This agent uses a LangGraph-based Supervisor-Worker architecture to:
+    1. Analyze user queries via a Business Manager (Supervisor).
+    2. Route tasks to specialized agents (Macro, Market, Sentiment, Search).
+    3. Collaborate and iterate to provide a comprehensive answer.
     """
     
     def __init__(self, config: Config):
@@ -37,71 +30,23 @@ class StockAnalysisAgent:
             config: Agent configuration
         """
         self.config = config
-        self.llm = self._init_llm()
-        # Load skills
-        self.tools = [
-            MarketDataSkill(),
-            SentimentAnalysisSkill(),
-            MacroDataSkill()
-        ]
-        self.agent_executor = self._create_agent_executor()
-        logger.info("Stock Analysis Agent initialized successfully")
+        self.graph: CompiledStateGraph = self._init_graph()
+        logger.info("Stock Analysis Multi-Agent System initialized successfully")
     
-    def _init_llm(self) -> ChatOpenAI:
+    def _init_graph(self) -> CompiledStateGraph:
         """
-        Initialize the LLM.
+        Initialize the LangGraph workflow.
         
         Returns:
-            ChatOpenAI instance
+            CompiledGraph instance
         """
         try:
-            llm = ChatOpenAI(
-                model=self.config.llm.model,
-                temperature=self.config.llm.temperature,
-                max_tokens=self.config.llm.max_tokens,
-                openai_api_key=self.config.llm.api_key,
-                openai_api_base=self.config.llm.api_base,
-            )
-            logger.info(f"LLM initialized: {self.config.llm.model}")
-            return llm
+            graph = create_graph(self.config)
+            logger.info("Multi-Agent Graph created successfully")
+            return graph
         except Exception as e:
-            logger.error(f"Failed to initialize LLM: {e}")
-            raise LLMError(f"Failed to initialize LLM: {e}")
-    
-    def _create_agent_executor(self) -> AgentExecutor:
-        """
-        Create the ReAct agent executor.
-        
-        Returns:
-            AgentExecutor instance
-        """
-        try:
-            # Create prompt template
-            prompt = PromptTemplate.from_template(REACT_SYSTEM_PROMPT)
-            
-            # Create ReAct agent
-            agent = create_react_agent(
-                llm=self.llm,
-                tools=self.tools,
-                prompt=prompt
-            )
-            
-            # Create agent executor
-            agent_executor = AgentExecutor(
-                agent=agent,
-                tools=self.tools,
-                verbose=self.config.agent.verbose,
-                max_iterations=self.config.agent.max_iterations,
-                handle_parsing_errors=True,
-                return_intermediate_steps=True,
-            )
-            
-            logger.info("ReAct agent executor created successfully")
-            return agent_executor
-            
-        except Exception as e:
-            logger.error(f"Failed to create agent executor: {e}")
-            raise AgentException(f"Failed to create agent executor: {e}")
+            logger.error(f"Failed to create agent graph: {e}")
+            raise AgentException(f"Failed to create agent graph: {e}")
     
     async def run(
         self,
@@ -122,27 +67,73 @@ class StockAnalysisAgent:
             logger.info(f"Processing query: {query}")
             
             # Prepare chat history
-            chat_history = ""
-            if memory:
-                chat_history = memory.get_chat_history()
+            # In LangGraph, we usually pass the full history as 'messages'
+            # But here we might need to adapt based on how ConversationMemory works.
+            # For now, we'll just pass the new query and let the graph handle its internal state.
+            # Ideally, we should load history from memory into the graph state.
             
-            # Run agent
-            result = await self.agent_executor.ainvoke({
-                "input": query,
-                "chat_history": chat_history
-            })
+            messages = []
+            if memory:
+                # Convert memory history to LangChain messages if needed
+                # For simplicity, we'll just start with the user's query
+                # In a production app, we'd map memory.get_chat_history() to BaseMessage objects
+                pass
+                
+            from langchain_core.messages import HumanMessage
+            
+            inputs = {
+                "messages": [HumanMessage(content=query)]
+            }
+            
+            # Run graph
+            # We use ainvoke to run the graph
+            # The config recursion_limit controls the maximum number of steps
+            config = {"recursion_limit": 20}
+            
+            result = await self.graph.ainvoke(inputs, config=config)
             
             # Extract response
+            # The result is the final state. 'messages' contains the full history.
+            # The last message should be the final answer from the Business Manager.
+            final_messages = result.get("messages", [])
+            if final_messages:
+                last_message = final_messages[-1]
+                output = last_message.content
+                
+                # If the last message is a tool call (e.g. Supervisor routing to FINISH),
+                # it might have empty content. In that case, we should look at the previous message
+                # which likely contains the actual answer from a worker.
+                if not output and hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+                    logger.info("Last message is a tool call with empty content. Looking for previous meaningful message.")
+                    # Iterate backwards to find the last message with content
+                    for msg in reversed(final_messages[:-1]):
+                        if msg.content and msg.type == "ai":
+                            output = msg.content
+                            logger.info(f"Found previous content from {getattr(msg, 'name', 'Unknown')}")
+                            break
+            else:
+                output = "No response generated."
+            
+            # Intermediate steps are essentially the messages in the middle
+            # We can format them for the frontend if needed
+            intermediate_steps = []
+            for msg in final_messages[:-1]:
+                intermediate_steps.append({
+                    "agent": getattr(msg, "name", "Unknown"),
+                    "content": msg.content,
+                    "type": msg.type
+                })
+            
             response = {
-                "output": result.get("output", ""),
-                "intermediate_steps": result.get("intermediate_steps", []),
+                "output": output,
+                "intermediate_steps": intermediate_steps,
                 "success": True
             }
             
             # Update memory
             if memory:
                 memory.add_message("user", query)
-                memory.add_message("assistant", response["output"])
+                memory.add_message("assistant", output)
             
             logger.info("Query processed successfully")
             return response
@@ -155,6 +146,180 @@ class StockAnalysisAgent:
                 "success": False,
                 "error": str(e)
             }
+
+    async def stream_run(self, query: str):
+        """
+        Stream the agent execution with a user query.
+        Yields structured events:
+        - agent_start: Agent starts working (Thinking)
+        - agent_message: Agent outputs text (Speaking)
+        - routing: System routing event
+        - agent_end: Agent finishes
+        """
+        try:
+            logger.info(f"Streaming query: {query}")
+            from langchain_core.messages import HumanMessage, ToolMessage
+            
+            inputs = {
+                "messages": [HumanMessage(content=query)]
+            }
+            
+            config = {"recursion_limit": 50}  # Increased from 20 to 50
+            
+            # 1. Receptionist Start (Thinking)
+            yield {
+                "type": "agent_start",
+                "agent": "Receptionist",
+                "status": "thinking",
+                "message": "Analyzing user intent..."
+            }
+            
+            # Use astream to get updates
+            async for event in self.graph.astream(inputs, config=config, stream_mode="updates"):
+                for node_name, state_update in event.items():
+                    
+                    # Extract messages from the update
+                    messages = state_update.get("messages", [])
+                    if not isinstance(messages, list):
+                        messages = [messages]
+                    
+                    # --- Chairman Logic ---
+                    if node_name == "Chairman":
+                        next_agent = state_update.get("next")
+                        
+                        # Case 1: Chairman is routing to an agent (executing a step)
+                        if next_agent and next_agent not in ["FINISH", "Critic"]:
+                            # Extract instruction from messages
+                            instruction = "Executing step..."
+                            if messages:
+                                # The last message should be the instruction
+                                for msg in reversed(messages):
+                                    if isinstance(msg, HumanMessage):
+                                        instruction = msg.content
+                                        break
+                            
+                            # Emit routing event
+                            yield {
+                                "type": "routing",
+                                "from": "Chairman",
+                                "to": next_agent,
+                                "message": f"Routing to {next_agent}...",
+                                "instruction": instruction
+                            }
+                            
+                            # Trigger next agent Thinking (THIS is the key fix!)
+                            yield {
+                                "type": "agent_start",
+                                "agent": next_agent,
+                                "status": "thinking",
+                                "message": f"Received instruction: {instruction[:50]}..."
+                            }
+                        
+                        # Case 2: Chairman is finishing (routing to Critic)
+                        elif next_agent == "FINISH":
+                             yield {
+                                "type": "routing",
+                                "from": "Chairman",
+                                "to": "Critic",
+                                "message": "Investigation complete. Routing to Critic...",
+                                "instruction": "Review evidence and synthesize answer."
+                            }
+                             yield {
+                                "type": "agent_start",
+                                "agent": "Critic",
+                                "status": "thinking",
+                                "message": "Reviewing evidence..."
+                            }
+
+                    # --- Specialist Logic ---
+                    elif node_name in ["MacroDataInvestigator", "MarketDataInvestigator", "SentimentInvestigator", "WebSearchInvestigator"]:
+                        # Check if the agent is done (no more tool calls)
+                        # This indicates it will route back to Chairman
+                        is_done = False
+                        has_tool_calls = False
+                        
+                        if messages:
+                            last_msg = messages[-1]
+                            has_tool_calls = hasattr(last_msg, 'tool_calls') and last_msg.tool_calls
+                            
+                            # Case 1: Agent has tool calls (executing tools)
+                            if has_tool_calls:
+                                # Show what tools are being executed
+                                tool_names = [tc['name'] for tc in last_msg.tool_calls]
+                                tool_desc = ", ".join(tool_names)
+                                
+                                # If there's content, show it (agent's reasoning)
+                                if last_msg.content and last_msg.content.strip():
+                                    yield {
+                                        "type": "agent_message",
+                                        "agent": node_name,
+                                        "content": last_msg.content
+                                    }
+                                
+                                # Always show tool execution
+                                yield {
+                                    "type": "agent_message",
+                                    "agent": node_name,
+                                    "content": f"🔧 Executing: {tool_desc}"
+                                }
+                            
+                            # Case 2: Agent has content but no tool calls (final conclusion)
+                            elif last_msg.content and last_msg.content.strip():
+                                is_done = True
+                                yield {
+                                    "type": "agent_message",
+                                    "agent": node_name,
+                                    "content": last_msg.content
+                                }
+                        
+                        # Only predict Chairman thinking if the agent is truly done
+                        if is_done:
+                            yield {
+                                "type": "agent_start",
+                                "agent": "Chairman",
+                                "status": "thinking",
+                                "message": "Reviewing step results..."
+                            }
+
+                    # --- Receptionist Logic ---
+                    elif node_name == "Receptionist":
+                        # Receptionist finished, speaks the brief
+                        brief = state_update.get("research_brief", "")
+                        if brief:
+                            yield {
+                                "type": "agent_message",
+                                "agent": "Receptionist",
+                                "content": brief
+                            }
+                        
+                        # Route to Chairman
+                        yield {
+                            "type": "agent_start",
+                            "agent": "Chairman",
+                            "status": "thinking",
+                            "message": "Formulating investigation plan..."
+                        }
+
+                    # --- Critic Logic ---
+                    elif node_name == "Critic":
+                        # Critic finished, speaks final answer
+                        if messages:
+                            yield {
+                                "type": "agent_message",
+                                "agent": "Critic",
+                                "content": messages[-1].content
+                            }
+                        yield {
+                            "type": "agent_end",
+                            "agent": "Critic"
+                        }
+
+        except Exception as e:
+            logger.error(f"Error streaming agent: {e}")
+            yield {
+                "type": "error",
+                "content": f"Error: {str(e)}"
+            }
     
     def get_available_tools(self) -> List[str]:
         """
@@ -163,4 +328,11 @@ class StockAnalysisAgent:
         Returns:
             List of tool names
         """
-        return self.tool_manager.get_tool_names()
+        # In the graph architecture, tools are internal to workers.
+        # We can return the worker names or just a static list.
+        return [
+            "MacroDataInvestigator", 
+            "MarketDataInvestigator", 
+            "SentimentInvestigator", 
+            "WebSearchInvestigator"
+        ]
