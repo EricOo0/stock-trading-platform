@@ -22,6 +22,7 @@
 4. **Critic**: 总结层。在任务结束前审查所有收集到的证据，生成最终的综合回答。
 5. **EventBus**: 事件总线。所有 Agent 通过 EventBus 发布事件，API 层订阅并流式传输到前端。
 
+![](img/architecture2.png)
 ### 2.2 数据流 (Data Flow with EventBus)
 
 ```
