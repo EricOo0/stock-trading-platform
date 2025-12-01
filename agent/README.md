@@ -1,84 +1,232 @@
-# AI-Fundin Agent Core (多 Agent 架构版)
+# Stock Analysis Agent Module
 
-## 1. 项目简介
-本项目旨在构建一个基于 **"一人公司" (One-Person Company)** 理念的智能金融分析系统。通过引入 **多 Agent 协作 (Multi-Agent Collaboration)** 架构，系统能够模拟一支专业的金融分析团队，包括业务经理、宏观经济学家、市场分析师、舆情分析师和网络搜寻员，共同为用户提供深度、全面的投资分析服务。
+## 1. 模块概述 (Module Overview)
 
-## 2. 核心架构
+本模块实现了一个基于 **A2A (Agent-to-Agent)** 协议的多 Agent 协作系统，专注于股票市场分析。它采用 "Boardroom"（会议室）架构，由一个接待员（Receptionist）、一位主席（Chairman）、一位评论家（Critic）和多位专家（Specialists）组成。
 
-本项目采用 **LangGraph** 框架实现 **动态协作 (Dynamic Collaboration)** 模式，类似于"圆桌会议"。
+系统使用 **EventBus** 架构实现解耦的事件流式传输，支持实时进度反馈和多订阅者模式。
 
-### 2.1 组织架构 (Organization)
+## 2. 架构设计 (Architecture)
 
-下图展示了系统的核心角色及其关系：
+### 2.1 核心架构 (Boardroom Pattern + EventBus)
 
-```mermaid
-graph TD
-    User["👤 用户 (User)"] <--> Manager["👔 业务经理 (Business Manager)"]
-    
-    subgraph "专家团队 (Expert Team)"
-        style Manager fill:#f9f,stroke:#333,stroke-width:4px
-        Manager <--> Macro["📈 宏观数据调查员"]
-        Manager <--> Market["📊 市场数据调查员"]
-        Manager <--> Sentiment["📢 市场情绪调查员"]
-        Manager <--> Search["🔍 网络搜寻员"]
-    end
-    
-    Macro -.-> Tools1["FRED / AkShare"]
-    Market -.-> Tools2["Yahoo / 实时行情"]
-    Sentiment -.-> Tools3["新闻 / 社交媒体"]
-    Search -.-> Tools4["DuckDuckGo"]
+系统采用分层协作模式 + 事件驱动架构：
+
+1. **Receptionist**: 入口层。分析用户意图，生成研究简报（Research Brief）。
+2. **Chairman**: 决策层。基于研究简报和当前上下文，规划下一步行动，指派具体的专家 Agent。
+3. **Specialists**: 执行层。具备特定工具的 Agent，负责执行具体任务（如查股价、搜新闻）。
+   - `MacroDataInvestigator`: 宏观经济数据
+   - `MarketDataInvestigator`: 市场行情数据
+   - `SentimentInvestigator`: 舆情情感分析
+   - `WebSearchInvestigator`: 通用网络搜索
+4. **Critic**: 总结层。在任务结束前审查所有收集到的证据，生成最终的综合回答。
+5. **EventBus**: 事件总线。所有 Agent 通过 EventBus 发布事件，API 层订阅并流式传输到前端。
+
+### 2.2 数据流 (Data Flow with EventBus)
+
+```
+┌─────────────┐
+│   Frontend  │
+└──────▲──────┘
+       │ (SSE/NDJSON)
+       │
+┌──────┴──────────────────────────────────────┐
+│  API: /chat/stream                          │
+│  - Creates session_id                       │
+│  - Subscribes to EventBus                   │
+│  - Launches agent pipeline in background    │
+│  - Yields events to frontend                │
+└──────┬──────────────────────────────────────┘
+       │
+┌──────▼──────────────────────────────────────┐
+│  EventBus (core/bus.py)                     │
+│  - Session-scoped channels                  │
+│  - Async publish/subscribe                  │
+└──────▲──────────────────────────────────────┘
+       │ (publish events)
+       │
+┌──────┴──────────────────────────────────────┐
+│  Agent Pipeline                             │
+│  1. Receptionist → Research Brief           │
+│  2. Chairman → Plan & Route                 │
+│  3. Specialists → Execute & Report          │
+│  4. Critic → Final Synthesis                │
+│  (All agents publish events independently)  │
+└─────────────────────────────────────────────┘
 ```
 
-### 2.3 角色定义 (Roles)
+**事件类型**:
+- `agent_start`: Agent 开始工作
+- `agent_message`: Agent 发送消息
+- `agent_status_change`: Agent 状态变化（thinking/speaking）
+- `routing`: Chairman 路由到下一个 Agent
+- `tool_call`: Agent 调用工具
+- `agent_end`: Agent 完成工作
+- `error`: 错误信息
+- `system_end`: 整个工作流完成
 
-| 角色 | 职责 | 核心能力 | 模型建议 |
-| :--- | :--- | :--- | :--- |
-| **业务经理 (Business Manager)** | **团队大脑/主持人**。负责理解用户需求，动态调度其他 Agent 发言，把控讨论方向，并最终汇总输出。 | 复杂逻辑推理、上下文管理、决策路由 | DeepSeek-V3 / GPT-4o |
-| **宏观数据调查员 (Macro Agent)** | **宏观经济专家**。负责提供宏观经济背景，如 GDP、CPI、利率政策等。 | FRED API, AkShare, Yahoo Finance | DeepSeek-V3 / GPT-4o-mini |
-| **市场数据调查员 (Market Agent)** | **技术/市场专家**。负责分析具体标的的价格走势、技术指标和历史数据。 | 实时行情, K线数据, 技术指标计算 | DeepSeek-V3 / GPT-4o-mini |
-| **市场情绪调查员 (Sentiment Agent)** | **舆情分析师**。负责分析新闻、社交媒体的情绪倾向，判断市场恐慌/贪婪程度。 | 新闻搜索, 情感分析模型 | DeepSeek-V3 / GPT-4o |
-| **网络搜寻员 (Web Search Agent)** | **信息情报员**。负责搜索实时资讯、突发事件和非结构化信息。 | DuckDuckGo Search / Google Search | DeepSeek-V3 / GPT-4o-mini |
+### 2.3 A2A 协议集成
 
-### 2.2 工作流 (Workflow)
+每个 Agent 都被封装为独立的 A2A 服务，支持：
+- **Agent Card**: 标准化的元数据描述（能力、输入输出 Schema）
+- **Task Execution**: 标准化的任务执行接口
+- **EventBus Integration**: 所有 Agent 通过 EventBus 发布执行进度
 
-1.  **用户输入**: 用户提出复杂金融问题（如："现在适合买入特斯拉吗？"）。
-2.  **业务经理评估**: 分析问题，决定首先需要哪方面的信息（例如先看市场行情）。
-3.  **动态路由**: 调度到对应的 Agent（如 Market Agent）。
-4.  **Agent 执行**: Market Agent 调用工具获取数据，返回分析结果到公共频道。
-5.  **协作迭代**:
-    *   业务经理看到行情下跌，可能会问 Sentiment Agent："有什么负面新闻吗？"
-    *   Sentiment Agent 查找并回复："有召回事件。"
-    *   业务经理继续问 Macro Agent："这是行业普遍现象吗？"
-    *   ... (循环迭代，最多 20 轮)
-6.  **最终汇总**: 当信息充足时，业务经理汇总所有观点，生成最终报告。
-
-## 3. 技术选型
-
-*   **核心框架**: [LangGraph](https://github.com/langchain-ai/langgraph) - 用于构建有状态、多角色的图结构应用。
-*   **LLM 编排**: [LangChain](https://github.com/langchain-ai/langchain) - 提供 Tool 绑定、Prompt 管理等基础能力。
-*   **大语言模型**: **DeepSeek-V3** (通过 OpenAI 兼容接口调用) - 提供强大的推理和指令遵循能力。
-*   **Web 框架**: FastAPI - 提供 RESTful API 接口。
-*   **工具集**:
-    *   `fredapi`: 美国宏观数据。
-    *   `akshare`: 中国宏观/市场数据。
-    *   `yfinance`: 全球市场数据。
-    *   `duckduckgo-search`: 免费网络搜索。
-
-## 4. 目录结构
+## 3. 目录结构 (Directory Structure)
 
 ```
 agent/
-├── core/
-│   ├── graph.py          # LangGraph 图定义 (核心逻辑)
-│   ├── agent.py          # Agent 接口封装
-│   ├── config.py         # 配置管理
-│   └── prompts.py        # 各角色 System Prompt
-├── skills/               # 工具/技能实现
-│   ├── macro_data_tool/
-│   ├── market_data_tool/
-│   ├── sentiment_analysis_tool/
-│   └── web_search_tool/  # [新增]
-├── tests/                # 测试用例
-├── main.py               # 服务入口
-└── requirements.txt      # 依赖管理
+├── main.py                 # 程序入口，FastAPI 应用定义
+├── api/                    # API 接口层
+│   ├── routes.py           # REST API (/api/chat, /api/chat/stream)
+│   ├── a2a.py              # A2A 协议实现 (/a2a/...)
+│   └── models.py           # Pydantic 数据模型
+├── core/                   # 核心逻辑层
+│   ├── agent.py            # StockAnalysisAgent 主类
+│   ├── bus.py              # EventBus 事件总线 ⭐ NEW
+│   ├── a2a_client.py       # A2A 客户端，管理 Agent 实例
+│   ├── config.py           # 配置管理
+│   ├── memory.py           # 对话记忆管理
+│   ├── state.py            # AgentState 状态定义
+│   ├── prompts.py          # Agent 系统提示词
+│   └── agents/             # 各个 Agent 的具体实现
+│       ├── a2a_base.py     # A2A Agent 基类
+│       ├── utils.py        # Agent 工具函数
+│       ├── receptionist.py # 接待员
+│       ├── chairman.py     # 主席
+│       ├── critic.py       # 评论家
+│       ├── macro.py        # 宏观数据专家
+│       ├── market.py       # 市场数据专家
+│       ├── sentiment.py    # 情感分析专家
+│       └── web_search.py   # 网络搜索专家
+├── skills/                 # 工具/技能实现 (外部引用)
+└── utils/                  # 通用工具函数
 ```
+
+## 4. 功能特性 (Features)
+
+- **多 Agent 协作**: 动态规划任务路径，非线性执行
+- **EventBus 架构**: 解耦的事件流式传输，支持多订阅者
+- **A2A 互操作性**: 支持 Google A2A 标准，可被其他 Agent 系统发现和调用
+- **ReAct 模式**: 专家 Agent 具备推理-行动能力，并记录详细执行日志
+- **实时流式输出**: 通过 EventBus 实时推送 Agent 执行进度到前端
+
+## 5. 使用说明 (Usage)
+
+### 5.1 启动服务
+
+```bash
+# 确保配置文件存在
+cp agent/config.yaml.example agent/config.yaml
+# 编辑 config.yaml，填入 API Key
+
+# 启动服务
+python agent/main.py
+```
+
+服务默认运行在 `http://0.0.0.0:8001`。
+
+### 5.2 API 调用
+
+#### 标准对话（非流式）
+- **Endpoint**: `POST /api/chat`
+- **Body**: 
+  ```json
+  {
+    "message": "分析一下 NVDA 的股价和近期新闻",
+    "session_id": "optional_session_id"
+  }
+  ```
+- **Response**: 
+  ```json
+  {
+    "response": "...",
+    "session_id": "...",
+    "tool_calls": [...],
+    "success": true
+  }
+  ```
+
+#### 流式对话（推荐）⭐
+- **Endpoint**: `POST /api/chat/stream`
+- **Body**: 
+  ```json
+  {
+    "message": "分析一下 NVDA 的股价和近期新闻"
+  }
+  ```
+- **Response**: NDJSON 事件流
+  ```json
+  {"type":"agent_start","agent":"Receptionist","content":"Analyzing user intent...","timestamp":1234567890.123}
+  {"type":"agent_message","agent":"Receptionist","content":"分析 NVDA 股价...","timestamp":1234567890.456}
+  {"type":"routing","from":"Chairman","to":"MarketDataInvestigator","instruction":"获取 NVDA 当前股价"}
+  {"type":"tool_call","agent":"MarketDataInvestigator","tool_name":"get_stock_price","input":{"symbol":"NVDA"}}
+  {"type":"agent_message","agent":"MarketDataInvestigator","content":"NVDA 当前价格..."}
+  {"type":"system_end","agent":"System","content":"Workflow completed"}
+  ```
+
+#### A2A 调用 (以 Market Agent 为例)
+- **Get Card**: `GET /a2a/marketdatainvestigator/.well-known/agent.json`
+- **Run Task**: `POST /a2a/marketdatainvestigator/run`
+  - **Body**: `{"message": "查询 AAPL 当前价格"}`
+  - **Response**: 包含 `response` (文本结果) 和 `steps` (工具调用日志)
+
+## 6. 开发与修改 (Development)
+
+### 6.1 添加新 Agent
+
+1. 在 `agent/core/agents/` 下创建新文件（如 `crypto.py`）
+2. 继承 `BaseA2AAgent` 并实现 `run_task` 方法
+3. 在 `agent/core/a2a_client.py` 的 `_initialize_agents` 中注册
+4. Agent 会自动获得 EventBus 支持
+
+示例：
+```python
+from core.agents.a2a_base import BaseA2AAgent
+from core.config import Config
+
+class CryptoA2A(BaseA2AAgent):
+    def __init__(self, config: Config, event_bus=None):
+        super().__init__(
+            config,
+            "CryptoInvestigator",
+            "Analyzes cryptocurrency data",
+            ["crypto_analysis"],
+            [CryptoSkill()],
+            CRYPTO_SYSTEM_PROMPT,
+            event_bus=event_bus
+        )
+```
+
+### 6.2 修改现有 Agent
+
+- **Prompt**: 修改 `agent/core/prompts.py` 中的系统提示词
+- **Tools**: 在 Agent 初始化时传入不同的 Skills
+- **事件发布**: 使用 `self.publish_event(type, content, session_id, **metadata)` 发布自定义事件
+
+### 6.3 EventBus 使用
+
+所有 Agent 都可以通过 `self.event_bus` 发布事件：
+
+```python
+await self.publish_event(
+    type="custom_event",
+    content="Some message",
+    session_id=task.context_id,
+    custom_field="custom_value"
+)
+```
+
+## 7. 注意事项 (Notes)
+
+- **EventBus 架构**: 所有事件都通过 EventBus 传递，不要在 Agent 中直接 `yield`
+- **Session ID**: 每个会话都有唯一的 `session_id`，用于隔离不同用户的事件流
+- **Token Usage**: 多 Agent 协作会消耗较多 Token，建议使用低成本模型或在开发时注意
+- **A2A Security**: 当前 A2A 接口未开启鉴权，生产环境需添加 Middleware 验证
+- **错误处理**: 所有错误都会作为 `error` 事件发布到 EventBus
+
+## 8. 相关文档
+
+- [Core Module README](./core/README.md) - 核心模块详细说明
+- [Agents README](./core/agents/README.md) - Agent 实现指南
+- [API README](./api/README.md) - API 接口文档

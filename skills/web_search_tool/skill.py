@@ -50,7 +50,7 @@ class WebSearchSkill(BaseTool):
             max_retries = 2
             
             # Try different backends in order
-            backends = ["lite", "html", "auto"]  # lite is usually more reliable
+            backends = ["bing",  "duckduckgo","yahoo", "auto"]  # lite is usually more reliable
             
             for attempt in range(max_retries + 1):
                 for backend in backends:

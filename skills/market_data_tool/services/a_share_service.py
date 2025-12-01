@@ -8,6 +8,7 @@ from datetime import datetime
 import logging
 
 from ..data_sources.yahoo_finance import YahooFinanceDataSource
+from ..data_sources.akshare_data import AkShareDataSource
 from ..data_sources.sina_finance import SinaFinanceDataSource
 from ..utils.rate_limiter import rate_limiter
 from ..utils.validators import validate_stock_symbol, validate_price_data
@@ -21,8 +22,9 @@ class AShareService:
 
     def __init__(self):
         """初始化A股服务"""
-        self.primary_source = YahooFinanceDataSource()
-        self.backup_source = SinaFinanceDataSource()
+        self.primary_source = SinaFinanceDataSource()
+        self.backup_source = AkShareDataSource()
+        self.final_source = YahooFinanceDataSource()
         self.market_type = "A-share"
         self.logger = logging.getLogger(self.__class__.__name__)
         # 导入并使用全局rate_limiter
@@ -64,31 +66,41 @@ class AShareService:
 
             # 3. 尝试主数据源
             try:
-                self.logger.info(f"使用Yahoo Finance获取A股 {symbol} 数据")
+                self.logger.info(f"使用sina获取A股 {symbol} 数据")
                 data = self.primary_source.get_stock_quote(symbol, self.market_type)
-                response = self._process_data(data, start_time, "yahoo")
-                self.logger.info(f"成功从Yahoo Finance获取 {symbol} 数据")
+                response = self._process_data(data, start_time, "sina")
+                self.logger.info(f"成功从sina获取 {symbol} 数据")
                 return response
 
             except Exception as primary_error:
-                self.logger.warning(f"Yahoo Finance获取 {symbol} 数据失败: {primary_error}")
+                self.logger.warning(f"sina获取 {symbol} 数据失败: {primary_error}")
 
                 # 4. 尝试备用数据源
                 try:
-                    self.logger.info(f"使用新浪财经获取A股 {symbol} 数据（备用）")
+                    self.logger.info(f"使用AkShare获取A股 {symbol} 数据（备用）")
                     data = self.backup_source.get_stock_quote(symbol, self.market_type)
-                    response = self._process_data(data, start_time, "sina")
-                    self.logger.info(f"成功从新浪财经获取 {symbol} 数据")
+                    response = self._process_data(data, start_time, "akshare")
+                    self.logger.info(f"成功从AkShare获取 {symbol} 数据")
                     return response
 
                 except Exception as backup_error:
-                    self.logger.error(f"所有数据源获取 {symbol} 数据失败")
-                    return create_error_response(
-                        symbol=symbol,
-                        error_code="SERVICE_UNAVAILABLE",
-                        error_message=f"所有数据源均不可用：主数据源({primary_error})，备用数据源({backup_error})",
-                        suggestion="请稍后重试，或检查网络连接"
-                    )
+                    self.logger.warning(f"AkShare获取 {symbol} 数据失败: {backup_error}")
+
+                    # 5. 尝试最终数据源 (Sina)
+                    try:
+                        self.logger.info(f"使用yahoo获取A股 {symbol} 数据（最终兜底）")
+                        data = self.final_source.get_stock_quote(symbol, self.market_type)
+                        response = self._process_data(data, start_time, "yahoo")
+                        self.logger.info(f"成功从yahoo获取 {symbol} 数据")
+                        return response
+                    except Exception as final_error:
+                        self.logger.error(f"所有数据源获取 {symbol} 数据失败")
+                        return create_error_response(
+                            symbol=symbol,
+                            error_code="SERVICE_UNAVAILABLE",
+                            error_message=f"所有数据源均不可用：主({primary_error})，备({backup_error})，终({final_error})",
+                            suggestion="请稍后重试，或检查网络连接"
+                        )
 
         except Exception as e:
             self.logger.error(f"获取 {symbol} 数据时发生未预期错误: {e}")

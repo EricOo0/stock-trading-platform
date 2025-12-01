@@ -1,13 +1,10 @@
 from pydantic import BaseModel, Field
-from typing import Literal, List, Optional
+from typing import Literal
 
-class Step(BaseModel):
-    agent: Literal["MacroDataInvestigator", "MarketDataInvestigator", "SentimentInvestigator", "WebSearchInvestigator"] = Field(..., description="The agent to perform this step")
-    instruction: str = Field(..., description="Specific instruction for the agent")
-
-class CreatePlan(BaseModel):
-    """Create a step-by-step investigation plan."""
-    steps: List[Step] = Field(..., description="List of steps to execute sequentially")
+class CallAgent(BaseModel):
+    """Call a specialist agent to gather information."""
+    agent: Literal["MacroDataInvestigator", "MarketDataInvestigator", "SentimentInvestigator", "WebSearchInvestigator"] = Field(..., description="The specialist agent to call")
+    instruction: str = Field(..., description="Specific task/question for the agent")
 
 class ResearchBrief(BaseModel):
     """Structured output for the Receptionist's research brief."""

@@ -415,26 +415,3 @@ if __name__ == "__main__":
         print(f"结果状态: {result.get('status', 'unknown')}")
         print("-" * 30)
 
-
-if __name__ == "__main__":
-    # 测试示例
-    test_queries = [
-        "获取000001的行情数据",
-        "查询AAPL的股票价格",
-        "00700现在多少钱",
-        "获取平安银行、苹果、腾讯的行情",
-        "这是什么股票？999999",
-        "获取平安银行和苹果股票的价格",
-        "比较腾讯和特斯拉的股价",
-        "获取茅台招商银行的行情"
-    ]
-
-    print("AI-fundin市场数据获取工具 - 测试demo")
-    print("=" * 50)
-
-    for query in test_queries:
-        print(f"查询: {query}")
-        result = main_handle(query)
-        print(f"提取的代码: {result.get('symbols', []) if 'symbols' in result else 'N/A'}")
-        print(f"结果状态: {result.get('status', 'unknown')}")
-        print("-" * 30)

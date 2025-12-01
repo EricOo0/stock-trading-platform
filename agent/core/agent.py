@@ -1,7 +1,8 @@
-"""Multi-Agent implementation using LangGraph."""
+"""Multi-Agent implementation using A2A protocol."""
 
 from typing import Any, Dict, List, Optional
 from loguru import logger
+import asyncio
 
 from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
@@ -9,34 +10,39 @@ from langgraph.graph.state import CompiledStateGraph
 from core.config import Config
 from core.graph import create_graph
 from core.memory import ConversationMemory
+from core.a2a_client import get_a2a_agent_client, A2AAgentClient
 from utils.exceptions import LLMError, AgentException
+import uuid
 
 
 class StockAnalysisAgent:
     """
     Multi-Agent System for stock analysis.
-    
+
     This agent uses a LangGraph-based Supervisor-Worker architecture to:
     1. Analyze user queries via a Business Manager (Supervisor).
     2. Route tasks to specialized agents (Macro, Market, Sentiment, Search).
     3. Collaborate and iterate to provide a comprehensive answer.
     """
-    
+
     def __init__(self, config: Config):
         """
         Initialize the stock analysis agent.
-        
+
         Args:
             config: Agent configuration
         """
         self.config = config
         self.graph: CompiledStateGraph = self._init_graph()
-        logger.info("Stock Analysis Multi-Agent System initialized successfully")
-    
+        self.a2a_client: A2AAgentClient = get_a2a_agent_client(config)
+        logger.info(
+            "Stock Analysis Multi-Agent System initialized successfully with A2A support"
+        )
+
     def _init_graph(self) -> CompiledStateGraph:
         """
         Initialize the LangGraph workflow.
-        
+
         Returns:
             CompiledGraph instance
         """
@@ -47,51 +53,47 @@ class StockAnalysisAgent:
         except Exception as e:
             logger.error(f"Failed to create agent graph: {e}")
             raise AgentException(f"Failed to create agent graph: {e}")
-    
+
     async def run(
-        self,
-        query: str,
-        memory: Optional[ConversationMemory] = None
+        self, query: str, memory: Optional[ConversationMemory] = None
     ) -> Dict[str, Any]:
         """
         Run the agent with a user query.
-        
+
         Args:
             query: User query
             memory: Optional conversation memory
-            
+
         Returns:
             Dict with response and intermediate steps
         """
         try:
             logger.info(f"Processing query: {query}")
-            
+
             # Prepare chat history
             # In LangGraph, we usually pass the full history as 'messages'
             # But here we might need to adapt based on how ConversationMemory works.
             # For now, we'll just pass the new query and let the graph handle its internal state.
             # Ideally, we should load history from memory into the graph state.
-            
+
             messages = []
             if memory:
                 # Convert memory history to LangChain messages if needed
                 # For simplicity, we'll just start with the user's query
                 # In a production app, we'd map memory.get_chat_history() to BaseMessage objects
                 pass
-                
+
             from langchain_core.messages import HumanMessage
-            
-            inputs = {
-                "messages": [HumanMessage(content=query)]
-            }
-            
+
+            inputs = {"messages": [HumanMessage(content=query)]}
+
             # Run graph
             # We use ainvoke to run the graph
             # The config recursion_limit controls the maximum number of steps
             config = {"recursion_limit": 20}
-            
+
             result = await self.graph.ainvoke(inputs, config=config)
-            
+
             # Extract response
             # The result is the final state. 'messages' contains the full history.
             # The last message should be the final answer from the Business Manager.
@@ -99,240 +101,166 @@ class StockAnalysisAgent:
             if final_messages:
                 last_message = final_messages[-1]
                 output = last_message.content
-                
+
                 # If the last message is a tool call (e.g. Supervisor routing to FINISH),
                 # it might have empty content. In that case, we should look at the previous message
                 # which likely contains the actual answer from a worker.
-                if not output and hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-                    logger.info("Last message is a tool call with empty content. Looking for previous meaningful message.")
+                if (
+                    not output
+                    and hasattr(last_message, "tool_calls")
+                    and last_message.tool_calls
+                ):
+                    logger.info(
+                        "Last message is a tool call with empty content. Looking for previous meaningful message."
+                    )
                     # Iterate backwards to find the last message with content
                     for msg in reversed(final_messages[:-1]):
                         if msg.content and msg.type == "ai":
                             output = msg.content
-                            logger.info(f"Found previous content from {getattr(msg, 'name', 'Unknown')}")
+                            logger.info(
+                                f"Found previous content from {getattr(msg, 'name', 'Unknown')}"
+                            )
                             break
             else:
                 output = "No response generated."
-            
+
             # Intermediate steps are essentially the messages in the middle
             # We can format them for the frontend if needed
             intermediate_steps = []
             for msg in final_messages[:-1]:
-                intermediate_steps.append({
-                    "agent": getattr(msg, "name", "Unknown"),
-                    "content": msg.content,
-                    "type": msg.type
-                })
-            
+                intermediate_steps.append(
+                    {
+                        "agent": getattr(msg, "name", "Unknown"),
+                        "content": msg.content,
+                        "type": msg.type,
+                    }
+                )
+
             response = {
                 "output": output,
                 "intermediate_steps": intermediate_steps,
-                "success": True
+                "success": True,
             }
-            
+
             # Update memory
             if memory:
                 memory.add_message("user", query)
                 memory.add_message("assistant", output)
-            
+
             logger.info("Query processed successfully")
             return response
-            
+
         except Exception as e:
             logger.error(f"Error running agent: {e}")
             return {
                 "output": f"抱歉，处理您的请求时出现了错误：{str(e)}",
                 "intermediate_steps": [],
                 "success": False,
-                "error": str(e)
+                "error": str(e),
             }
 
     async def stream_run(self, query: str):
         """
-        Stream the agent execution with a user query.
-        Yields structured events:
-        - agent_start: Agent starts working (Thinking)
-        - agent_message: Agent outputs text (Speaking)
-        - routing: System routing event
-        - agent_end: Agent finishes
+        Stream the agent execution with a user query using A2A protocol.
+        Implements real-time ReAct loop with detailed progress tracking via EventBus.
         """
         try:
-            logger.info(f"Streaming query: {query}")
-            from langchain_core.messages import HumanMessage, ToolMessage
+            logger.info(f"Streaming query via A2A: {query}")
+            session_id = f"session_{uuid.uuid4().hex[:8]}"
             
-            inputs = {
-                "messages": [HumanMessage(content=query)]
-            }
+            # Get EventBus
+            from core.bus import get_event_bus
+            event_bus = get_event_bus()
             
-            config = {"recursion_limit": 50}  # Increased from 20 to 50
-            
-            # 1. Receptionist Start (Thinking)
-            yield {
-                "type": "agent_start",
-                "agent": "Receptionist",
-                "status": "thinking",
-                "message": "Analyzing user intent..."
-            }
-            
-            # Use astream to get updates
-            async for event in self.graph.astream(inputs, config=config, stream_mode="updates"):
-                for node_name, state_update in event.items():
+            # Start the agent execution in the background
+            # We use asyncio.create_task to run it without blocking the generator
+            async def run_pipeline():
+                from core.bus import Event  # Import Event here
+                try:
+                    # Call Receptionist via A2A
+                    receptionist_response = await self.a2a_client.call_agent(
+                        "receptionist", query, session_id
+                    )
                     
-                    # Extract messages from the update
-                    messages = state_update.get("messages", [])
-                    if not isinstance(messages, list):
-                        messages = [messages]
+                    if not receptionist_response.success:
+                        await event_bus.publish(Event(
+                            type="error", 
+                            session_id=session_id, 
+                            agent="System", 
+                            content=f"Receptionist failed: {receptionist_response.error}"
+                        ))
+                        return
+
+                    # 2. Chairman
+                    chairman_msg = f"User Query: {query}\n\nResearch Brief: {receptionist_response.response}"
                     
-                    # --- Chairman Logic ---
-                    if node_name == "Chairman":
-                        next_agent = state_update.get("next")
-                        
-                        # Case 1: Chairman is routing to an agent (executing a step)
-                        if next_agent and next_agent not in ["FINISH", "Critic"]:
-                            # Extract instruction from messages
-                            instruction = "Executing step..."
-                            if messages:
-                                # The last message should be the instruction
-                                for msg in reversed(messages):
-                                    if isinstance(msg, HumanMessage):
-                                        instruction = msg.content
-                                        break
-                            
-                            # Emit routing event
-                            yield {
-                                "type": "routing",
-                                "from": "Chairman",
-                                "to": next_agent,
-                                "message": f"Routing to {next_agent}...",
-                                "instruction": instruction
-                            }
-                            
-                            # Trigger next agent Thinking (THIS is the key fix!)
-                            yield {
-                                "type": "agent_start",
-                                "agent": next_agent,
-                                "status": "thinking",
-                                "message": f"Received instruction: {instruction[:50]}..."
-                            }
-                        
-                        # Case 2: Chairman is finishing (routing to Critic)
-                        elif next_agent == "FINISH":
-                             yield {
-                                "type": "routing",
-                                "from": "Chairman",
-                                "to": "Critic",
-                                "message": "Investigation complete. Routing to Critic...",
-                                "instruction": "Review evidence and synthesize answer."
-                            }
-                             yield {
-                                "type": "agent_start",
-                                "agent": "Critic",
-                                "status": "thinking",
-                                "message": "Reviewing evidence..."
-                            }
+                    chairman_response = await self.a2a_client.call_agent(
+                        "chairman", chairman_msg, session_id
+                    )
+                    
+                    if not chairman_response.success:
+                         await event_bus.publish(Event(
+                            type="error", 
+                            session_id=session_id, 
+                            agent="System", 
+                            content=f"Chairman failed: {chairman_response.error}"
+                        ))
+                         return
+                         
+                    # Done
+                    await event_bus.publish(Event(
+                        type="system_end",
+                        session_id=session_id,
+                        agent="System",
+                        content="Workflow completed"
+                    ))
+                    
+                except Exception as e:
+                    logger.error(f"Pipeline Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    await event_bus.publish(Event(
+                        type="error",
+                        session_id=session_id,
+                        agent="System",
+                        content=str(e)
+                    ))
 
-                    # --- Specialist Logic ---
-                    elif node_name in ["MacroDataInvestigator", "MarketDataInvestigator", "SentimentInvestigator", "WebSearchInvestigator"]:
-                        # Check if the agent is done (no more tool calls)
-                        # This indicates it will route back to Chairman
-                        is_done = False
-                        has_tool_calls = False
-                        
-                        if messages:
-                            last_msg = messages[-1]
-                            has_tool_calls = hasattr(last_msg, 'tool_calls') and last_msg.tool_calls
-                            
-                            # Case 1: Agent has tool calls (executing tools)
-                            if has_tool_calls:
-                                # Show what tools are being executed
-                                tool_names = [tc['name'] for tc in last_msg.tool_calls]
-                                tool_desc = ", ".join(tool_names)
-                                
-                                # If there's content, show it (agent's reasoning)
-                                if last_msg.content and last_msg.content.strip():
-                                    yield {
-                                        "type": "agent_message",
-                                        "agent": node_name,
-                                        "content": last_msg.content
-                                    }
-                                
-                                # Always show tool execution
-                                yield {
-                                    "type": "agent_message",
-                                    "agent": node_name,
-                                    "content": f"🔧 Executing: {tool_desc}"
-                                }
-                            
-                            # Case 2: Agent has content but no tool calls (final conclusion)
-                            elif last_msg.content and last_msg.content.strip():
-                                is_done = True
-                                yield {
-                                    "type": "agent_message",
-                                    "agent": node_name,
-                                    "content": last_msg.content
-                                }
-                        
-                        # Only predict Chairman thinking if the agent is truly done
-                        if is_done:
-                            yield {
-                                "type": "agent_start",
-                                "agent": "Chairman",
-                                "status": "thinking",
-                                "message": "Reviewing step results..."
-                            }
-
-                    # --- Receptionist Logic ---
-                    elif node_name == "Receptionist":
-                        # Receptionist finished, speaks the brief
-                        brief = state_update.get("research_brief", "")
-                        if brief:
-                            yield {
-                                "type": "agent_message",
-                                "agent": "Receptionist",
-                                "content": brief
-                            }
-                        
-                        # Route to Chairman
-                        yield {
-                            "type": "agent_start",
-                            "agent": "Chairman",
-                            "status": "thinking",
-                            "message": "Formulating investigation plan..."
-                        }
-
-                    # --- Critic Logic ---
-                    elif node_name == "Critic":
-                        # Critic finished, speaks final answer
-                        if messages:
-                            yield {
-                                "type": "agent_message",
-                                "agent": "Critic",
-                                "content": messages[-1].content
-                            }
-                        yield {
-                            "type": "agent_end",
-                            "agent": "Critic"
-                        }
-
+            # Launch background task
+            asyncio.create_task(run_pipeline())
+            
+            # Subscribe and yield events
+            from core.bus import Event
+            async for event in event_bus.subscribe(session_id):
+                # Convert Event object to dict for frontend
+                yield {
+                    "type": event.type,
+                    "agent": event.agent,
+                    "content": event.content,
+                    "timestamp": event.timestamp,
+                    **event.metadata
+                }
+                
         except Exception as e:
-            logger.error(f"Error streaming agent: {e}")
+            logger.error(f"Error streaming A2A agent: {e}")
             yield {
                 "type": "error",
                 "content": f"Error: {str(e)}"
             }
-    
+
+
     def get_available_tools(self) -> List[str]:
         """
         Get list of available tool names.
-        
+
         Returns:
             List of tool names
         """
         # In the graph architecture, tools are internal to workers.
         # We can return the worker names or just a static list.
         return [
-            "MacroDataInvestigator", 
-            "MarketDataInvestigator", 
-            "SentimentInvestigator", 
-            "WebSearchInvestigator"
+            "MacroDataInvestigator",
+            "MarketDataInvestigator",
+            "SentimentInvestigator",
+            "WebSearchInvestigator",
         ]

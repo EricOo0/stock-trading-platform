@@ -41,7 +41,8 @@ class TestAShareService:
 
         assert "status" in result
         assert "results" in result
-        assert result["count"] == len(test_symbols)
+        # 999999 is invalid and filtered out, so count should be 2
+        assert result["count"] == 2
 
     def test_get_market_overview(self, a_share_service):
         """测试市场概况获取"""

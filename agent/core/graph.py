@@ -19,11 +19,14 @@ from skills.macro_data_tool.skill import MacroDataSkill
 from skills.sentiment_analysis_tool.skill import SentimentAnalysisSkill
 from skills.web_search_tool.skill import WebSearchSkill
 
-# Import Nodes
-from core.nodes.receptionist import receptionist_node
-from core.nodes.chairman import chairman_node
-from core.nodes.critic import critic_node
-from core.nodes.specialist import agent_node, create_agent
+# Import Agents
+from core.agents.receptionist import receptionist_node
+from core.agents.chairman import chairman_node
+from core.agents.critic import critic_node
+from core.agents.macro import create_macro_node
+from core.agents.market import create_market_node
+from core.agents.sentiment import create_sentiment_node
+from core.agents.web_search import create_web_search_node
 
 # --- Graph Construction ---
 
@@ -61,27 +64,23 @@ def create_graph(config: Config):
 
     # 3. Create Agents
     # Macro Agent
-    macro_agent = create_agent(llm, [macro_tool], MACRO_AGENT_SYSTEM_PROMPT)
-    macro_node = functools.partial(agent_node, agent=macro_agent, name="MacroDataInvestigator")
+    macro_node = create_macro_node(llm, [macro_tool])
 
     # Market Agent
-    market_agent = create_agent(llm, [market_tool], MARKET_AGENT_SYSTEM_PROMPT)
-    market_node = functools.partial(agent_node, agent=market_agent, name="MarketDataInvestigator")
+    market_node = create_market_node(llm, [market_tool])
 
     # Sentiment Agent
-    sentiment_agent = create_agent(llm, [sentiment_tool], SENTIMENT_AGENT_SYSTEM_PROMPT)
-    sentiment_node = functools.partial(agent_node, agent=sentiment_agent, name="SentimentInvestigator")
+    sentiment_node = create_sentiment_node(llm, [sentiment_tool])
 
     # Web Search Agent
-    search_agent = create_agent(llm, [search_tool], WEB_SEARCH_AGENT_SYSTEM_PROMPT)
-    search_node = functools.partial(agent_node, agent=search_agent, name="WebSearchInvestigator")
+    search_node = create_web_search_node(llm, [search_tool])
     
     # Create wrapper functions for nodes that need LLM
     def receptionist_wrapper(state):
         return receptionist_node(state, llm)
     
-    def chairman_wrapper(state):
-        return chairman_node(state, chairman_llm)
+    async def chairman_wrapper(state):
+        return await chairman_node(state, chairman_llm)
     
     def critic_wrapper(state):
         return critic_node(state, critic_llm)  # Use dedicated critic_llm with temp 0.0

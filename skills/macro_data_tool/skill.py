@@ -38,7 +38,7 @@ class MacroDataSkill(BaseTool):
         try:
             # 1. Determine intent and route to appropriate service
             
-            # US Data (FRED)
+            # US Data (FRED Priority)
             if "cpi" in query and "china" not in query:
                 results["us_cpi"] = self._fred_service.get_latest_data("CPI")
             if "gdp" in query and "china" not in query:
@@ -49,11 +49,25 @@ class MacroDataSkill(BaseTool):
             if "fed funds" in query or "interest rate" in query:
                 results["fed_rate"] = self._fred_service.get_latest_data("FED_FUNDS_RATE")
             
-            # Market Indicators (Yahoo)
+            # Market Indicators (FRED Priority for VIX/US10Y, Yahoo for others)
             if "vix" in query or "fear" in query or "volatility" in query:
-                results["vix"] = self._yahoo_service.get_market_indicators().get("VIX")
+                # Try FRED first for VIX
+                vix_data = self._fred_service.get_latest_data("VIX")
+                if "error" not in vix_data:
+                    results["vix"] = vix_data
+                else:
+                    # Fallback to Yahoo
+                    results["vix"] = self._yahoo_service.get_market_indicators().get("VIX")
+
             if "treasury" in query or "yield" in query or "bond" in query:
-                results["us10y"] = self._yahoo_service.get_market_indicators().get("US10Y")
+                # Try FRED first for US10Y
+                us10y_data = self._fred_service.get_latest_data("US10Y")
+                if "error" not in us10y_data:
+                    results["us10y"] = us10y_data
+                else:
+                    # Fallback to Yahoo
+                    results["us10y"] = self._yahoo_service.get_market_indicators().get("US10Y")
+
             if "dollar" in query or "dxy" in query:
                 results["dxy"] = self._yahoo_service.get_market_indicators().get("DXY")
             if "probability" in query or "cut" in query or "hike" in query:
@@ -116,3 +130,38 @@ class MacroDataSkill(BaseTool):
         """Run the tool asynchronously."""
         # For now, just call the sync version
         return self._run(query)
+
+
+def main():
+    """
+    Test function for MacroDataSkill
+    """
+    import json
+    
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    print("=== Macro Data Tool Test ===")
+    
+    try:
+        skill = MacroDataSkill()
+        
+        test_queries = [
+            "What is the latest US CPI?",
+            "Show me the VIX index",
+            "China GDP data",
+            "Fed interest rate probability",
+            "General market overview"
+        ]
+        
+        for query in test_queries:
+            print(f"\nQuery: {query}")
+            result = skill._run(query)
+            print(f"Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
+            
+    except Exception as e:
+        print(f"Initialization failed: {e}")
+        print("Please ensure you have set the necessary environment variables (e.g., FRED_API_KEY)")
+
+if __name__ == "__main__":
+    main()

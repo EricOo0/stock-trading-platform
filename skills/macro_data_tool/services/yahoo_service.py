@@ -2,6 +2,7 @@ import logging
 from typing import Dict, Any, List
 import yfinance as yf
 from datetime import datetime
+from ..utils import get_session, get_retry_decorator, cached_market_data
 
 logger = logging.getLogger(__name__)
 
@@ -15,13 +16,19 @@ class YahooMacroService:
         'FED_FUNDS_FUTURES': 'ZQ=F' # Fed Funds Futures
     }
 
+    def __init__(self):
+        self.session = get_session()
+
+    @get_retry_decorator(max_attempts=3)
+    @cached_market_data
     def get_market_indicators(self) -> Dict[str, Any]:
         """Get current values for key market indicators."""
         results = {}
         
         for name, symbol in self.SYMBOLS.items():
             try:
-                ticker = yf.Ticker(symbol)
+                # Use custom session for yfinance
+                ticker = yf.Ticker(symbol, session=self.session)
                 # Get fast info or history
                 # fast_info is faster but sometimes incomplete
                 hist = ticker.history(period="1d")
@@ -44,6 +51,8 @@ class YahooMacroService:
                 
         return results
 
+    @get_retry_decorator(max_attempts=3)
+    @cached_market_data
     def get_historical_data(self, symbol_name: str, period: str = "1y") -> Dict[str, Any]:
         """Get historical data for a specific market indicator."""
         symbol = self.SYMBOLS.get(symbol_name.upper())
@@ -52,7 +61,7 @@ class YahooMacroService:
             symbol = symbol_name
             
         try:
-            ticker = yf.Ticker(symbol)
+            ticker = yf.Ticker(symbol, session=self.session)
             hist = ticker.history(period=period)
             
             if hist.empty:
@@ -78,6 +87,8 @@ class YahooMacroService:
             logger.error(f"Error fetching historical Yahoo data for {symbol_name}: {e}")
             return {"error": str(e)}
 
+    @get_retry_decorator(max_attempts=3)
+    @cached_market_data
     def analyze_fed_rate_probability(self) -> Dict[str, Any]:
         """
         Analyze Fed Funds Futures to estimate rate expectations.
@@ -85,7 +96,7 @@ class YahooMacroService:
         Price of ZQ = 100 - Expected Fed Funds Rate
         """
         try:
-            ticker = yf.Ticker(self.SYMBOLS['FED_FUNDS_FUTURES'])
+            ticker = yf.Ticker(self.SYMBOLS['FED_FUNDS_FUTURES'], session=self.session)
             hist = ticker.history(period="1d")
             
             if not hist.empty:

@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import pandas as pd
 from fredapi import Fred
+from ..utils import get_retry_decorator, cached_macro_data
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,8 @@ class FredService:
         'UNEMPLOYMENT_RATE': 'UNRATE', # Unemployment Rate
         'FED_FUNDS_RATE': 'FEDFUNDS', # Federal Funds Effective Rate
         'M2': 'M2SL',       # M2
+        'US10Y': 'DGS10',   # Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity
+        'VIX': 'VIXCLS',    # CBOE Volatility Index
     }
 
     def __init__(self, api_key: Optional[str] = None):
@@ -29,6 +32,8 @@ class FredService:
             except Exception as e:
                 logger.error(f"Failed to initialize FRED client: {e}")
 
+    @get_retry_decorator(max_attempts=3)
+    @cached_macro_data
     def get_latest_data(self, indicator: str) -> Dict[str, Any]:
         """Get the latest data for a specific indicator."""
         if not self.client:
@@ -63,6 +68,8 @@ class FredService:
             logger.error(f"Error fetching FRED data for {indicator}: {e}")
             return {"error": str(e)}
 
+    @get_retry_decorator(max_attempts=3)
+    @cached_macro_data
     def get_historical_data(self, indicator: str, limit: int = 12) -> Dict[str, Any]:
         """Get historical data for a specific indicator."""
         if not self.client:

@@ -46,8 +46,8 @@ class NewsSearchService:
             except Exception as e:
                 logger.warning(f"Reddit fetch failed: {e}")
         
-        # 2. Try Sina Finance scraper (for Chinese stocks)
-        if Config.SINA_ENABLED and self._is_chinese_stock(symbol):
+        # 2. Try Sina Finance scraper (for Chinese stocks) and self._is_chinese_stock(symbol)
+        # if Config.SINA_ENABLED and self._is_chinese_stock(symbol):
             try:
                 sina_news = self._fetch_from_sina(symbol, limit // 2)
                 news_items.extend(sina_news)
@@ -56,10 +56,10 @@ class NewsSearchService:
                 logger.warning(f"Sina scraping failed: {e}")
         
         # 3. If we still don't have enough news, use mock data as fallback
-        if len(news_items) < 3:
-            logger.warning(f"Only got {len(news_items)} real news items, supplementing with mock data")
-            mock_news = self._get_mock_news(symbol, limit - len(news_items))
-            news_items.extend(mock_news)
+        # if len(news_items) < 3:
+        #     logger.warning(f"Only got {len(news_items)} real news items, supplementing with mock data")
+        #     mock_news = self._get_mock_news(symbol, limit - len(news_items))
+        #     news_items.extend(mock_news)
         
         # Deduplicate and sort
         news_items = self._deduplicate(news_items)

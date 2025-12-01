@@ -3,12 +3,15 @@ from typing import Dict, Any, Optional
 import akshare as ak
 import pandas as pd
 from datetime import datetime
+from ..utils import get_retry_decorator, cached_macro_data
 
 logger = logging.getLogger(__name__)
 
 class AkShareService:
     """Service for fetching China macro data using AkShare."""
 
+    @get_retry_decorator(max_attempts=3)
+    @cached_macro_data
     def get_china_macro_data(self, indicator: str) -> Dict[str, Any]:
         """Get latest China macro data."""
         try:
@@ -69,6 +72,8 @@ class AkShareService:
             logger.error(f"Error fetching AkShare data for {indicator}: {e}")
             return {"error": str(e)}
 
+    @get_retry_decorator(max_attempts=3)
+    @cached_macro_data
     def get_historical_data(self, indicator: str) -> Dict[str, Any]:
         """Get historical data for China macro indicators."""
         try:

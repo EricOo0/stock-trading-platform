@@ -28,7 +28,7 @@ const CouncilRoom: React.FC = () => {
     const [agentStatus, setAgentStatus] = useState<'idle' | 'thinking' | 'speaking'>('idle');
 
     // Playback Queue
-    const playbackQueue = useRef<{ type: string; agent: string; content?: string; status?: string; to?: string; from?: string; instruction?: string }[]>([]);
+    const playbackQueue = useRef<{ type: string; agent: string; content?: string; status?: string; to?: string; from?: string; instruction?: string; tool_name?: string }[]>([]);
     const isPlaying = useRef(false);
 
     const processQueue = async () => {
@@ -39,21 +39,19 @@ const CouncilRoom: React.FC = () => {
 
         if (event) {
             if (event.type === 'agent_start') {
+                // Always activate agent and update status, even if it's already active
                 setActiveAgent(event.agent);
-                // Only override status if not already set by routing
-                if (activeAgent !== event.agent || agentStatus === 'idle') {
-                    setAgentStatus(event.status as 'thinking' | 'speaking' || 'thinking');
-                }
+                setAgentStatus(event.status as 'thinking' | 'speaking' || 'thinking');
 
                 if (event.status === 'thinking') {
                     await new Promise(resolve => setTimeout(resolve, 800));
                 }
             }
             else if (event.type === 'routing') {
-                // Pre-activate the next agent in "Thinking" mode
+                // Show routing event
                 // event: { type: 'routing', from: 'Chairman', to: 'Market', message: '...', instruction: '...' }
 
-                // 1. Finish current agent (Chairman)
+                // 1. Finish current agent
                 setAgentStatus('idle');
                 await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -62,15 +60,12 @@ const CouncilRoom: React.FC = () => {
                     setMessages(prev => [...prev, {
                         role: 'system',
                         content: `📋 COMMAND to ${event.to}: ${event.instruction}`,
-                        agentName: 'Chairman'
+                        agentName: event.from || 'Chairman'
                     }]);
                 }
 
-                // 3. Activate next agent
-                if (event.to && event.to !== 'FINISH') {
-                    setActiveAgent(event.to);
-                    setAgentStatus('thinking');
-                }
+                // 3. Don't activate next agent here - let agent_start event handle it
+                // This ensures proper state transition
             }
             else if (event.type === 'agent_message' && event.content) {
                 setActiveAgent(event.agent); // Ensure correct agent is active
@@ -80,16 +75,50 @@ const CouncilRoom: React.FC = () => {
                 const delay = Math.max(1500, Math.min(event.content.length * 20, 4000));
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
-            else if (event.type === 'agent_end') {
-                // Don't go idle immediately if we just routed
-                // We'll let the next 'agent_start' or 'routing' handle it, 
-                // or just go idle if no next event.
-                // But to be safe, we can go idle if we are not 'thinking' (which implies next agent is preparing)
-                if (agentStatus !== 'thinking') {
-                    setAgentStatus('idle');
-                    setActiveAgent(null);
+            else if (event.type === 'agent_status_change') {
+                // Update agent status (for progress indication)
+                if (event.agent === activeAgent && event.status) {
+                    setAgentStatus(event.status as 'thinking' | 'speaking');
                 }
-                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+            else if (event.type === 'tool_call') {
+                // Show tool execution in chat log
+                setMessages(prev => [...prev, {
+                    role: 'system',
+                    content: `🔧 ${event.agent} used ${event.tool_name}`,
+                    agentName: event.agent
+                }]);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            else if (event.type === 'error') {
+                // Display errors to user
+                setMessages(prev => [...prev, {
+                    role: 'system',
+                    content: `❌ ${event.agent || 'System'}: ${event.content}`,
+                    agentName: event.agent || 'System'
+                }]);
+                setAgentStatus('idle');
+                setActiveAgent(null);
+            }
+            else if (event.type === 'system_end') {
+                // Signal workflow completion
+                setMessages(prev => [...prev, {
+                    role: 'system',
+                    content: '✅ Analysis complete',
+                }]);
+                setAgentStatus('idle');
+                setActiveAgent(null);
+                setIsLoading(false);
+            }
+            else if (event.type === 'agent_end') {
+                // Use a timeout to allow next agent_start to override
+                setTimeout(() => {
+                    // Only go idle if no new agent has been activated
+                    if (activeAgent === event.agent && agentStatus !== 'thinking') {
+                        setAgentStatus('idle');
+                        setActiveAgent(null);
+                    }
+                }, 300);
             }
         }
 

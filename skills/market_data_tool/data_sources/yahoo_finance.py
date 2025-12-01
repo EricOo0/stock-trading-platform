@@ -9,9 +9,11 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 import time
 import logging
+import requests
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from .base import BaseDataSource, DataSourceError, DataSourceTimeout, SymbolNotFoundError
-from ..utils.circuit_breaker import circuit_break
+# from ..utils.circuit_breaker import circuit_break
 from ..models.schemas import StockData, MarketResponse
 from ..config import Config
 
@@ -20,16 +22,113 @@ logger = logging.getLogger(__name__)
 class YahooFinanceDataSource(BaseDataSource):
     """Yahoo Finance数据源实现类"""
 
-    def __init__(self, timeout: int = 10):
+    def __init__(self, timeout: int = 10, enable_rotation: bool = False):
         """
         初始化Yahoo Finance数据源
 
         Args:
             timeout: 请求超时时间（秒）
+            enable_rotation: 是否启用User-Agent轮换
         """
         super().__init__("yahoo", timeout)
+        
+        # 创建自定义的requests session，用于请求伪装
+        self.session = requests.Session()
+        self.enable_rotation = enable_rotation
+        
+        # 设置请求头伪装，防止被封IP
+        self._setup_session_headers()
+        
+        # 配置代理（可选）
+        proxies = self._get_proxies()
+        if proxies:
+            self.session.proxies.update(proxies)
+            self.logger.info(f"使用代理配置: {proxies}")
+        
+        # 配置yfinance使用自定义session
+        self._setup_yfinance_session()
 
-    @circuit_break("yahoo")
+    def _setup_session_headers(self):
+        """设置session的请求头伪装"""
+        if self.enable_rotation:
+            user_agent = self._rotate_user_agent()
+        else:
+            user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        
+        self.session.headers.update({
+            'User-Agent': user_agent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"macOS"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'DNT': '1'
+        })
+        
+        # self.logger.info(f"设置User-Agent: {user_agent[:50]}...")
+
+    def _setup_yfinance_session(self):
+        """配置yfinance库使用自定义的requests session"""
+        try:
+            # 设置yfinance使用我们的自定义session
+            import yfinance as yf
+            
+            # 为yfinance设置自定义session
+            if hasattr(yf, 'utils'):
+                # 新版本yfinance
+                if hasattr(yf.utils, 'session'):
+                    yf.utils.session = self.session
+            
+            # 同时设置全局session（兼容不同版本）
+            yf.session = self.session
+            
+            # 设置请求间隔，避免过于频繁的请求
+            self.session.request = self._rate_limited_request
+            
+            # self.logger.info("成功配置yfinance使用自定义session")
+            
+        except Exception as e:
+            self.logger.warning(f"配置yfinance session失败: {e}")
+
+    def _rate_limited_request(self, method, url, **kwargs):
+        """添加请求间隔的请求方法"""
+        time.sleep(0.1)  # 100ms间隔，避免过于频繁
+        return requests.Session.request(self.session, method, url, **kwargs)
+
+    def _get_proxies(self) -> Dict[str, str]:
+        """获取代理配置（可选）"""
+        # 可以在这里配置代理服务器
+        # 返回格式: {'http': 'http://proxy:port', 'https': 'https://proxy:port'}
+        return {}
+
+    def _rotate_user_agent(self) -> str:
+        """轮换User-Agent（可选功能）"""
+        user_agents = [
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0'
+        ]
+        
+        import random
+        return random.choice(user_agents)
+
+    # @circuit_break("yahoo")
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(Exception),
+        reraise=True
+    )
     def get_historical_data(self, symbol: str, market: str, period: str = "30d", interval: str = "1d") -> List[Dict[str, Any]]:
         """
         获取股票历史数据
@@ -86,7 +185,13 @@ class YahooFinanceDataSource(BaseDataSource):
             self.logger.error(f"获取历史数据失败: {str(e)}")
             return []
 
-    @circuit_break("yahoo")
+    # @circuit_break("yahoo")
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(Exception),
+        reraise=True
+    )
     def get_stock_quote(self, symbol: str, market: str) -> Dict[str, Any]:
         """
         获取股票行情数据
@@ -109,13 +214,16 @@ class YahooFinanceDataSource(BaseDataSource):
             ticker = yf.Ticker(yahoo_symbol)
 
             # 获取当前交易日数据
+            print("info-----")
+
             hist = ticker.history(period="2d")
             if hist.empty:
                 raise SymbolNotFoundError(symbol, self.name)
 
             # 获取股票基本信息
-            info = ticker.info
-            
+            # info = ticker.info
+            info = ticker.fast_info
+            print("info",info)
             # 获取所有yfinance直接提供的数据，避免自己计算
             fundamental_data = {
                 # 直接从yfinance获取，不计算
@@ -314,7 +422,7 @@ class YahooFinanceDataSource(BaseDataSource):
         try:
             # 尝试获取苹果(AAPL)的数据来测试连接
             ticker = yf.Ticker("AAPL")
-            info = ticker.info
+            info = ticker.fast_info
             return bool(info)
         except Exception as e:
             self.logger.error(f"Yahoo Finance连接测试失败: {e}")
@@ -339,3 +447,135 @@ class YahooFinanceDataSource(BaseDataSource):
                 "error": str(e),
                 "last_test": datetime.now().isoformat()
             }
+
+
+def main():
+    """
+    测试Yahoo Finance数据源的main函数
+    用于验证数据源连接和各项功能
+    """
+    import json
+    
+    # 设置日志级别
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    print("=== Yahoo Finance数据源测试 ===")
+    print("💡 提示: 启用User-Agent轮换功能可以更好地防止IP被封")
+    
+    # 创建数据源实例（启用User-Agent轮换）
+    data_source = YahooFinanceDataSource(timeout=15, enable_rotation=True)
+    
+    # 测试1: 连接测试
+    print("\n1. 测试数据源连接...")
+    connection_ok = data_source.test_connection()
+    print(f"连接状态: {'✅ 正常' if connection_ok else '❌ 失败'}")
+    
+    if not connection_ok:
+        print("数据源连接失败，请检查网络连接")
+        return
+    
+    # 测试2: 获取数据源信息
+    print("\n2. 获取数据源信息...")
+    info = data_source.get_data_source_info()
+    print(f"数据源信息: {json.dumps(info, ensure_ascii=False, indent=2)}")
+    
+    # 测试3: 获取实时行情（多市场）
+    print("\n3. 测试获取实时行情...")
+    test_symbols = [
+        ("AAPL", "US"),      # 美股 - 苹果
+        ("000001", "A-share"),  # A股 - 平安银行
+        ("00700", "HK"),     # 港股 - 腾讯控股
+        ("MSFT", "US"),      # 美股 - 微软
+        ("600036", "A-share")   # A股 - 招商银行
+    ]
+    
+    for symbol, market in test_symbols:
+        try:
+            print(f"\n获取 {symbol} ({market}) 的实时行情...")
+            quote = data_source.get_stock_quote(symbol, market)
+            print(f"✅ 成功获取数据:")
+            print(f"  - 股票名称: {quote.get('name', 'N/A')}")
+            print(f"  - 当前价格: {quote.get('currency', 'USD')}{quote.get('current_price', 'N/A')}")
+            print(f"  - 涨跌幅: {quote.get('change_percent', 0):.2f}%")
+            print(f"  - 成交量: {quote.get('volume', 0):,}")
+            print(f"  - 更新时间: {quote.get('timestamp', 'N/A')}")
+            
+            # 显示基本面数据（如果有）
+            fundamental = quote.get('fundamental_data', {})
+            if fundamental:
+                key_metrics = []
+                if fundamental.get('trailing_pe'):
+                    key_metrics.append(f"市盈率: {fundamental['trailing_pe']:.2f}")
+                if fundamental.get('market_cap'):
+                    key_metrics.append(f"市值: {fundamental['market_cap']:,}")
+                if key_metrics:
+                    print(f"  - 关键指标: {', '.join(key_metrics)}")
+                    
+        except Exception as e:
+            print(f"❌ 获取 {symbol} 数据失败: {str(e)}")
+    
+    # 测试4: 获取历史数据（不同周期和间隔）
+    print("\n4. 测试获取历史数据...")
+    
+    # 测试不同的周期和间隔组合
+    test_configs = [
+        ("AAPL", "US", "7d", "1d"),     # 美股7天日线
+        ("000001", "A-share", "30d", "1d"),  # A股30天日线
+        ("AAPL", "US", "5d", "1h"),     # 美股5天小时线
+        ("AAPL", "US", "1d", "5m"),     # 美股1天5分钟线
+    ]
+    
+    for symbol, market, period, interval in test_configs:
+        try:
+            print(f"\n测试 {symbol} ({market}) {period} {interval} 数据...")
+            historical_data = data_source.get_historical_data(symbol, market, period=period, interval=interval)
+            
+            if historical_data:
+                print(f"✅ 成功获取 {len(historical_data)} 条数据")
+                print(f"数据范围: {historical_data[0]['timestamp'][:10]} 到 {historical_data[-1]['timestamp'][:10]}")
+                print("最近3条数据:")
+                for i, data in enumerate(historical_data[-3:], 1):
+                    time_str = data['timestamp'][:19].replace('T', ' ')
+                    print(f"  {i}. {time_str}: 开{data['open']:.2f} 高{data['high']:.2f} 低{data['low']:.2f} 收{data['close']:.2f} 量{data['volume']:,}")
+            else:
+                print("⚠️ 未获取到数据")
+                
+        except Exception as e:
+            print(f"❌ 获取 {symbol} {period} {interval} 数据失败: {str(e)}")
+    
+    # 测试5: 验证股票代码
+    print("\n5. 测试股票代码验证...")
+    test_codes = [
+        ("AAPL", "US"),
+        ("000001", "A-share"),
+        ("00700", "HK"),
+        ("INVALID", "US"),
+        ("12345", "A-share"),
+        ("", "US")
+    ]
+    
+    for code, market in test_codes:
+        is_valid = data_source.validate_symbol(code, market)
+        print(f"  {code} ({market}): {'✅ 有效' if is_valid else '❌ 无效'}")
+    
+    # 测试6: 获取市场状态
+    print("\n6. 测试获取市场状态...")
+    test_markets = ["A-share", "US", "HK"]
+    
+    for market in test_markets:
+        try:
+            print(f"\n获取 {market} 市场状态...")
+            market_status = data_source.get_market_status(market)
+            print(f"交易状态: {'🟢 交易中' if market_status.get('is_trading') else '🔴 休市'}")
+            if market_status.get('last_trade_time'):
+                print(f"最后交易时间: {market_status['last_trade_time']}")
+            if market_status.get('market_hours'):
+                print(f"交易时间: {market_status['market_hours']}")
+        except Exception as e:
+            print(f"❌ 获取 {market} 市场状态失败: {str(e)}")
+    
+    print("\n=== 测试完成 ===")
+
+
+if __name__ == "__main__":
+    main()

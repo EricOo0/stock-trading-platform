@@ -8,6 +8,8 @@ from datetime import datetime
 import logging
 
 from ..data_sources.yahoo_finance import YahooFinanceDataSource
+from ..data_sources.akshare_data import AkShareDataSource
+from ..data_sources.sina_finance import SinaFinanceDataSource
 from ..utils.rate_limiter import rate_limiter
 from ..utils.validators import validate_stock_symbol, validate_price_data
 from ..utils.error_handler import create_error_response, create_success_response, ValidationError
@@ -20,7 +22,11 @@ class HKStockService:
 
     def __init__(self):
         """初始化港股服务"""
-        self.primary_source = YahooFinanceDataSource()
+        # 港股数据源优先级：Sina Finance -> Yahoo Finance -> AkShare
+        # Sina Finance支持港股，格式为hk + 股票代码（5位数字）
+        self.primary_source = SinaFinanceDataSource()
+        self.secondary_source = YahooFinanceDataSource()
+        self.fallback_source = AkShareDataSource()
         self.market_type = "HK"
         self.logger = logging.getLogger(self.__class__.__name__)
         # 导入并使用全局rate_limiter
@@ -60,22 +66,32 @@ class HKStockService:
                     suggestion="请等待配额重置后再试，港股市场限制为60次/小时"
                 )
 
-            # 3. 获取股价数据 - 港股主要由Yahoo Finance提供
-            try:
-                self.logger.info(f"使用Yahoo Finance获取港股 {symbol} 数据")
-                data = self.primary_source.get_stock_quote(symbol, self.market_type)
-                response = self._process_data(data, start_time, "yahoo")
-                self.logger.info(f"成功从Yahoo Finance获取 {symbol} 数据")
-                return response
-
-            except Exception as data_error:
-                self.logger.error(f"获取港股 {symbol} 数据失败: {data_error}")
-                return create_error_response(
-                    symbol=symbol,
-                    error_code="API_ERROR",
-                    error_message=f"数据源返回错误：{str(data_error)}",
-                    suggestion="请稍后重试，或检查股票代码是否正确"
-                )
+            # 3. 获取股价数据 - 港股数据源优先级：Sina Finance -> Yahoo Finance -> AkShare
+            data_sources = [
+                ("Sina Finance", self.primary_source),
+                ("Yahoo Finance", self.secondary_source),
+                ("AkShare", self.fallback_source)
+            ]
+            
+            for source_name, data_source in data_sources:
+                try:
+                    self.logger.info(f"使用{source_name}获取港股 {symbol} 数据")
+                    data = data_source.get_stock_quote(symbol, self.market_type)
+                    response = self._process_data(data, start_time, source_name.lower().replace(" ", "_"))
+                    self.logger.info(f"成功从{source_name}获取 {symbol} 数据")
+                    return response
+                except Exception as data_error:
+                    self.logger.warning(f"{source_name}获取港股 {symbol} 数据失败: {data_error}，尝试下一个数据源")
+                    continue
+            
+            # 所有数据源都失败
+            self.logger.error(f"所有数据源获取港股 {symbol} 数据失败")
+            return create_error_response(
+                symbol=symbol,
+                error_code="ALL_SOURCES_FAILED",
+                error_message="所有数据源均无法获取数据",
+                suggestion="请稍后重试，或检查股票代码是否正确"
+            )
 
         except Exception as e:
             self.logger.error(f"获取港股 {symbol} 数据时发生未预期错误: {e}")

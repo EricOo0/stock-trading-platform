@@ -26,7 +26,7 @@ def setup_logging(verbose: bool = True, log_file: str = "agent.log") -> None:
     )
     
     # Add file handler
-    log_dir = Path("logs")
+    log_dir = Path("./logs")
     log_dir.mkdir(exist_ok=True)
     logger.add(
         log_dir / log_file,

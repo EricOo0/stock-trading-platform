@@ -47,8 +47,15 @@ async def startup_event():
         logger.info(f"LLM Model: {config.llm.model}")
         logger.info(f"Skills enabled: {config.skills.enabled}")
         logger.info(f"Agent max iterations: {config.agent.max_iterations}")
+        
+        # Initialize A2A
+        from api.a2a import setup_a2a
+        
+        # Pass config to setup_a2a
+        setup_a2a(app, config)
+        
     except Exception as e:
-        logger.error(f"Failed to load configuration: {e}")
+        logger.error(f"Failed to load configuration or setup A2A: {e}")
         logger.warning("Using default configuration")
 
 

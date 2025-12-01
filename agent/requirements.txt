@@ -1,19 +1,19 @@
-# LangChain ecosystem
+# Core LangChain ecosystem
 langchain>=0.2.36
-fredapi>=0.5.1
-akshare>=1.12.900
 langchain-openai>=0.0.5
 langchain-community>=0.2.0
+langchain-core>=0.2.0
 langgraph>=0.0.10
-duckduckgo-search>=6.0.0
 
 # Web framework
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
+
+# Data validation
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 
-# HTTP client (for MCP communication)
+# HTTP client
 httpx>=0.26.0
 websockets>=12.0
 
@@ -24,7 +24,29 @@ pyyaml>=6.0.1
 # Logging
 loguru>=0.7.2
 
+# A2A Protocol
+a2a-sdk>=0.1.0
+
+# Data sources and APIs
+fredapi>=0.5.1
+akshare>=1.12.900
+yfinance>=0.2.0
+
+# Search
+duckduckgo-search>=6.0.0
+ddgs>=9.0.0
+
+# NLP and ML
+transformers>=4.30.0
+torch>=2.0.0
+
 # Testing
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 pytest-cov>=4.1.0
+
+# Additional dependencies for EventBus and async operations
+# (asyncio is built-in to Python 3.7+)
+# (dataclasses is built-in to Python 3.7+)
+# (typing is built-in to Python 3.5+)
+# (uuid is built-in)
