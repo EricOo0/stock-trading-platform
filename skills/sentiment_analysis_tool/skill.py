@@ -14,7 +14,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class SentimentAnalysisInput(BaseModel):
-    query: str = Field(description="The query to analyze sentiment for, e.g., 'Analyze sentiment for AAPL'")
+    symbol: str = Field(description="Stock symbol to analyze (e.g., 'AAPL', '000001', '600519')")
+    query: str = Field(default="", description="Optional query context for the analysis")
 
 class SentimentAnalysisSkill(BaseTool):
     """
@@ -22,7 +23,10 @@ class SentimentAnalysisSkill(BaseTool):
     Analyzes market sentiment for specific stocks based on news and social media.
     """
     name: str = "sentiment_analysis_tool"
-    description: str = "Analyzes market sentiment for specific stocks based on news and social media."
+    description: str = (
+        "Analyzes market sentiment for a specific stock symbol based on news and social media. "
+        "Requires a stock symbol (e.g., AAPL, 000001, 600519) as input."
+    )
     args_schema: type[BaseModel] = SentimentAnalysisInput
 
     _news_service: NewsSearchService = PrivateAttr()
@@ -34,27 +38,24 @@ class SentimentAnalysisSkill(BaseTool):
         self._sentiment_service = SentimentService()
         logger.info("Sentiment Analysis Skill initialized")
 
-    def _run(self, query: str) -> Dict[str, Any]:
+    def _run(self, symbol: str, query: str = "") -> Dict[str, Any]:
         """
         Main entry point for the skill.
         
         Args:
-            query: User query (e.g., "Analyze sentiment for AAPL")
+            symbol: Stock symbol (e.g., "AAPL", "000001", "600519")
+            query: Optional context query (not used currently)
             
         Returns:
             Dictionary containing sentiment analysis result
         """
-        text_input = query
         try:
-            logger.info(f"Received sentiment query: {text_input}")
-            
-            # Extract symbol from text
-            symbol = self._extract_symbol(text_input)
+            logger.info(f"Analyzing sentiment for {symbol}...")
             
             if not symbol:
                 return {
                     "status": "error",
-                    "message": "Could not identify a stock symbol in the query. Please provide a symbol (e.g., AAPL, 000001).",
+                    "message": "Stock symbol is required. Please provide a symbol (e.g., AAPL, 000001).",
                     "symbol": None
                 }
                 
@@ -76,6 +77,7 @@ class SentimentAnalysisSkill(BaseTool):
                     "summary": analysis_result["summary"],
                     "key_drivers": analysis_result["key_drivers"],
                     "news_count": len(news_items),
+                    "sentiment_breakdown": analysis_result["sentiment_breakdown"],
                     "recent_news": [
                         {
                             "title": item["title"],
@@ -91,39 +93,14 @@ class SentimentAnalysisSkill(BaseTool):
             return {
                 "status": "error",
                 "message": f"Internal error during analysis: {str(e)}",
-                "symbol": text_input
+                "symbol": symbol
             }
 
-    async def _arun(self, query: str) -> Dict[str, Any]:
+    async def _arun(self, symbol: str, query: str = "") -> Dict[str, Any]:
         """Run the tool asynchronously."""
-        return self._run(query)
+        return self._run(symbol, query)
 
-    def _extract_symbol(self, text: str) -> str:
-        """Extract stock symbol from text"""
-        # Simple extraction logic - similar to market_data_tool but simplified
-        # 1. Look for US stocks (AAPL, TSLA)
-        us_match = re.search(r'\b[A-Z]{1,5}\b', text)
-        if us_match:
-            return us_match.group(0)
-            
-        # 2. Look for A-share/HK codes (6 digits or 5 digits)
-        code_match = re.search(r'\b\d{5,6}\b', text)
-        if code_match:
-            return code_match.group(0)
-            
-        # 3. Look for common Chinese names (simplified mapping)
-        # In a real app, this should share the mapping from market_data_tool
-        common_names = {
-            "平安银行": "000001", "茅台": "600519", "腾讯": "00700", 
-            "阿里": "BABA", "特斯拉": "TSLA", "苹果": "AAPL"
-        }
-        for name, code in common_names.items():
-            if name in text:
-                return code
-                
-        return None
-
-def main_handle(text_input: str) -> Dict[str, Any]:
+def main_handle(symbol: str, query: str = "") -> Dict[str, Any]:
     """Wrapper function for the skill adapter"""
     skill = SentimentAnalysisSkill()
-    return skill._run(text_input)
+    return skill._run(symbol, query)

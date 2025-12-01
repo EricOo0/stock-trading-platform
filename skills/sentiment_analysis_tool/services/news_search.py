@@ -18,7 +18,7 @@ class NewsSearchService:
         self._reddit_fetcher = None
         self._sina_scraper = None
 
-    def search_news(self, symbol: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def search_news(self, symbol: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
         Search for news related to the symbol from multiple sources.
         
@@ -47,7 +47,7 @@ class NewsSearchService:
                 logger.warning(f"Reddit fetch failed: {e}")
         
         # 2. Try Sina Finance scraper (for Chinese stocks) and self._is_chinese_stock(symbol)
-        # if Config.SINA_ENABLED and self._is_chinese_stock(symbol):
+        if Config.SINA_ENABLED:
             try:
                 sina_news = self._fetch_from_sina(symbol, limit // 2)
                 news_items.extend(sina_news)

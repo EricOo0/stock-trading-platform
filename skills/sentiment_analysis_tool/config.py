@@ -7,7 +7,7 @@ class Config:
     # Search Configuration
     SEARCH_PROVIDER = os.getenv("SENTIMENT_SEARCH_PROVIDER", "reddit")  # reddit, sina, mock
     SEARCH_API_KEY = os.getenv("SENTIMENT_SEARCH_API_KEY", "")
-    SEARCH_RESULT_LIMIT = 10
+    SEARCH_RESULT_LIMIT = 100
     
     # Reddit API Configuration
     REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")

@@ -169,13 +169,17 @@ class StockAnalysisAgent:
             session_id = f"session_{uuid.uuid4().hex[:8]}"
             
             # Get EventBus
-            from core.bus import get_event_bus
+            from core.bus import get_event_bus, Event
+            import datetime
             event_bus = get_event_bus()
-            
-            # Start the agent execution in the background
-            # We use asyncio.create_task to run it without blocking the generator
+            yield {
+                    "type": "agent_start",
+                    "agent": "Receptionist",
+                    "content": "Analyzing user intent...",
+                    "timestamp": datetime.datetime.now().isoformat(),
+                }
+            # Define the pipeline execution
             async def run_pipeline():
-                from core.bus import Event  # Import Event here
                 try:
                     # Call Receptionist via A2A
                     receptionist_response = await self.a2a_client.call_agent(
@@ -190,9 +194,10 @@ class StockAnalysisAgent:
                             content=f"Receptionist failed: {receptionist_response.error}"
                         ))
                         return
-
-                    # 2. Chairman
-                    chairman_msg = f"User Query: {query}\n\nResearch Brief: {receptionist_response.response}"
+                    
+                    
+                    # 2. Chairman (currently disabled by early return above)
+                    chairman_msg = f"User Query: {query}\n\nResearch Task: {receptionist_response.response}"
                     
                     chairman_response = await self.a2a_client.call_agent(
                         "chairman", chairman_msg, session_id
@@ -226,11 +231,11 @@ class StockAnalysisAgent:
                         content=str(e)
                     ))
 
-            # Launch background task
+            # Launch background task FIRST (don't await it)
             asyncio.create_task(run_pipeline())
             
-            # Subscribe and yield events
-            from core.bus import Event
+            # Then immediately start consuming events
+            # Pipeline will publish events, and we'll yield them as they come
             async for event in event_bus.subscribe(session_id):
                 # Convert Event object to dict for frontend
                 yield {
@@ -240,6 +245,7 @@ class StockAnalysisAgent:
                     "timestamp": event.timestamp,
                     **event.metadata
                 }
+
                 
         except Exception as e:
             logger.error(f"Error streaming A2A agent: {e}")

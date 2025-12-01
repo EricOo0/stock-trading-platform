@@ -2,11 +2,43 @@ from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
+from langchain_core.callbacks.base import AsyncCallbackHandler
+from typing import Any, Dict, List
 import uuid
 
 from core.state import AgentState
 from core.prompts import CHAIRMAN_SYSTEM_PROMPT
 from core.schema import CallAgent
+
+
+class ChairmanCoTCallback(AsyncCallbackHandler):
+    """Callback to log Chairman's Chain of Thought process."""
+    
+    async def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
+        """Log when LLM starts thinking."""
+        logger.info("🧠 Chairman: Starting to think...")
+    
+    async def on_llm_end(self, response, **kwargs: Any) -> None:
+        """Log LLM's response (the thought process)."""
+        if hasattr(response, 'generations') and response.generations:
+            for generation in response.generations[0]:
+                if hasattr(generation, 'message'):
+                    message = generation.message
+                    # Log the actual thought content
+                    if hasattr(message, 'content') and message.content:
+                        logger.info(f"💭 Chairman THOUGHT: {message.content}")
+                    # Log tool calls (actions)
+                    if hasattr(message, 'tool_calls') and message.tool_calls:
+                        for tool_call in message.tool_calls:
+                            logger.info(f"🔧 Chairman ACTION: {tool_call['name']}({tool_call['args']})")
+    
+    async def on_tool_start(self, serialized: Dict[str, Any], input_str: str, **kwargs: Any) -> None:
+        """Log when a tool (CallAgent) is about to be executed."""
+        logger.info(f"⚙️  Chairman: Executing tool...")
+    
+    async def on_tool_end(self, output: str, **kwargs: Any) -> None:
+        """Log tool execution result (observation)."""
+        logger.info(f"👁️  Chairman OBSERVATION: {output[:200]}...")
 
 
 def create_chairman_chain(chairman_llm: ChatOpenAI):
@@ -272,7 +304,7 @@ class ChairmanA2A:
             # Let's reimplement the loop here for better control and event publishing
             messages = state.get("messages", [])
             review_count = 0
-            max_iterations = 5
+            max_iterations = 10
             iteration = 0
             
             # Initialize A2A specialist agents with event bus
@@ -296,11 +328,15 @@ class ChairmanA2A:
                 
                 await self.publish_event("agent_status_change", f"Planning iteration {iteration}...", task.context_id, status="thinking", iteration=iteration)
 
-                # Invoke Chairman LLM
+                # Create chairman chain and invoke with CoT callback
                 chairman_chain = create_chairman_chain(self.llm)
-                result = await chairman_chain.ainvoke({"messages": messages})
+                cot_callback = ChairmanCoTCallback()
+                result = await chairman_chain.ainvoke(
+                    {"messages": messages},
+                    config={"callbacks": [cot_callback]}
+                )
                 result.name = "Chairman"
-
+                logger.info("result:",result)
                 # Check for tool calls
                 if not result.tool_calls:
                     
@@ -350,7 +386,7 @@ class ChairmanA2A:
                 args = tool_call["args"]
                 agent_name = args.get("agent")
                 instruction = args.get("instruction")
-                
+                logger.info(f"Chairman: Routing to {agent_name} with instruction: {instruction}")
                 # Publish routing event
                 await self.publish_event("routing", f"Routing to {agent_name}", task.context_id, to=agent_name, instruction=instruction)
 

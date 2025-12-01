@@ -30,6 +30,7 @@ const CouncilRoom: React.FC = () => {
     // Playback Queue
     const playbackQueue = useRef<{ type: string; agent: string; content?: string; status?: string; to?: string; from?: string; instruction?: string; tool_name?: string }[]>([]);
     const isPlaying = useRef(false);
+    const isFirstEvent = useRef(true); // Track if this is the first event for immediate feedback
 
     const processQueue = async () => {
         if (isPlaying.current || playbackQueue.current.length === 0) return;
@@ -43,8 +44,15 @@ const CouncilRoom: React.FC = () => {
                 setActiveAgent(event.agent);
                 setAgentStatus(event.status as 'thinking' | 'speaking' || 'thinking');
 
-                if (event.status === 'thinking') {
+                // Skip delay for first event to provide immediate feedback
+                // Apply delay for subsequent events for better UX
+                if (event.status === 'thinking' && !isFirstEvent.current) {
                     await new Promise(resolve => setTimeout(resolve, 800));
+                }
+
+                // Mark that we've processed the first event
+                if (isFirstEvent.current) {
+                    isFirstEvent.current = false;
                 }
             }
             else if (event.type === 'routing') {
@@ -134,6 +142,9 @@ const CouncilRoom: React.FC = () => {
         setQuery('');
         setIsLoading(true);
         setMessages(prev => [...prev, { role: 'user', content: userQuery }]);
+
+        // Reset first event flag for immediate feedback on new query
+        isFirstEvent.current = true;
 
         try {
             const response = await fetch('http://localhost:8001/api/chat/stream', {

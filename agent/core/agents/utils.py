@@ -2,6 +2,52 @@ from loguru import logger
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
+from langchain_core.callbacks.base import AsyncCallbackHandler
+from typing import Any, Dict, List
+
+# Agent emoji identifiers
+AGENT_EMOJIS = {
+    "MarketDataInvestigator": "📈",
+    "MacroDataInvestigator": "🌍",
+    "SentimentInvestigator": "💬",
+    "WebSearchInvestigator": "🔍",
+    "Critic": "🎯",
+    "Receptionist": "👋"
+}
+
+class AgentCoTCallback(AsyncCallbackHandler):
+    """Callback to log specialist agent's Chain of Thought process with emoji identifiers."""
+    
+    def __init__(self, agent_name: str):
+        self.agent_name = agent_name
+        self.emoji = AGENT_EMOJIS.get(agent_name, "🤖")
+    
+    async def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
+        """Log when LLM starts thinking."""
+        logger.info(f"{self.emoji} {self.agent_name}: Starting to analyze...")
+    
+    async def on_llm_end(self, response, **kwargs: Any) -> None:
+        """Log LLM's response (the thought process)."""
+        if hasattr(response, 'generations') and response.generations:
+            for generation in response.generations[0]:
+                if hasattr(generation, 'message'):
+                    message = generation.message
+                    # Log the actual thought content
+                    if hasattr(message, 'content') and message.content:
+                        # Truncate long responses for readability
+                        content = message.content[:300] + "..." if len(message.content) > 300 else message.content
+                        logger.info(f"{self.emoji} {self.agent_name} THOUGHT: {content}")
+                    # Log tool calls (actions)
+                    if hasattr(message, 'tool_calls') and message.tool_calls:
+                        for tool_call in message.tool_calls:
+                            logger.info(f"{self.emoji} {self.agent_name} ACTION: {tool_call['name']}({tool_call.get('args', {})})")
+    
+    async def on_tool_end(self, output: str, **kwargs: Any) -> None:
+        """Log tool execution result (observation)."""
+        # Truncate long observations
+        obs = output[:200] + "..." if len(output) > 200 else output
+        logger.info(f"{self.emoji} {self.agent_name} OBSERVATION: {obs}")
+
 
 def create_agent(llm: ChatOpenAI, tools: list, system_prompt: str):
     """Helper function to create an agent node."""
@@ -82,14 +128,21 @@ async def run_react_agent(agent, tools, messages, max_iterations=5, event_bus=No
                 metadata={"status": "thinking", "iteration": iteration}
             ))
         
-        # Invoke agent
+        # Invoke agent with CoT callback
         # Note: agent.invoke is sync, but we are in async function. 
         # In a real async app we might want to run this in a thread pool if it blocks.
         # For now we assume it's fast enough or we use ainvoke if available.
+        cot_callback = AgentCoTCallback(agent_name)
         if hasattr(agent, "ainvoke"):
-            result = await agent.ainvoke({"messages": messages})
+            result = await agent.ainvoke(
+                {"messages": messages},
+                config={"callbacks": [cot_callback]}
+            )
         else:
-            result = agent.invoke({"messages": messages})
+            result = agent.invoke(
+                {"messages": messages},
+                config={"callbacks": [cot_callback]}
+            )
         
         # Check if agent wants to use tools
         if not result.tool_calls:
@@ -129,6 +182,7 @@ async def run_react_agent(agent, tools, messages, max_iterations=5, event_bus=No
                     content=f"Calling tool {tool_name}",
                     metadata={
                         "tool": tool_name,
+                        "tool_name": tool_name,  # Add for frontend compatibility
                         "input": tool_args,
                         "iteration": iteration
                     }
@@ -160,7 +214,7 @@ async def run_react_agent(agent, tools, messages, max_iterations=5, event_bus=No
                 "args": tool_args,
                 "result": str(tool_result)[:200]  # Truncate long results
             })
-            
+            logger.info(f"{agent_name}: Tool '{tool_name}' executed with result: {tool_result}")
             # Add tool result to messages
             messages = messages + [result] + [ToolMessage(content=str(tool_result), tool_call_id=tool_call['id'])]
     

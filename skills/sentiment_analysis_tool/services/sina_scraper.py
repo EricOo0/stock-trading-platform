@@ -20,7 +20,45 @@ class SinaFinanceScraper:
         if elapsed < Config.SCRAPER_DELAY:
             time.sleep(Config.SCRAPER_DELAY - elapsed)
         self.last_request_time = time.time()
-    
+    def _fetch_article_content(self, url: str) -> str:
+        """Helper: Visit the article URL and extract the main text"""
+        try:
+            # 简单的防爬虫延迟，避免请求过快
+            time.sleep(0.5) 
+            
+            import requests
+            from bs4 import BeautifulSoup
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            resp = requests.get(url, headers=headers, timeout=5)
+            # 新浪详情页通常是 utf-8，但也有可能是 gb2312，自动识别一下
+            resp.encoding = requests.utils.get_encodings_from_content(resp.text)[0] if requests.utils.get_encodings_from_content(resp.text) else 'utf-8'
+
+            if resp.status_code != 200:
+                return ""
+
+            soup = BeautifulSoup(resp.content, 'html.parser')
+
+            # 新浪财经正文常见的容器 ID/Class
+            # 1. 大部分老页面: <div id="artibody">
+            # 2. 部分新页面: <div class="article-content">
+            content_div = soup.find('div', id='artibody') or soup.find('div', class_='article-content') or soup.find('div', id='articleContent')
+
+            if content_div:
+                # 移除脚本和样式
+                for script in content_div(["script", "style"]):
+                    script.extract()
+                # 获取纯文本
+                return content_div.get_text(strip=True)
+            
+            return "" # 没找到正文
+            
+        except Exception as e:
+            logger.warning(f"Failed to fetch content from {url}: {e}")
+            return ""
     def scrape_news(self, symbol: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Scrape news for a stock symbol from Sina Finance.
@@ -98,7 +136,6 @@ class SinaFinanceScraper:
                     try:
                         title = link.get_text(strip=True)
                         url_path = link['href']
-                        
                         # Try to find date near the link
                         parent = link.parent
                         time_text = parent.get_text() if parent else ''
@@ -112,10 +149,18 @@ class SinaFinanceScraper:
                             full_url = url_path
                         else:
                             full_url = f"https://finance.sina.com.cn{url_path}"
-                        
+                        # 【新增】获取正文内容
+                        # 只有当这是新浪域名的链接时才去抓，防止外链报错
+                        article_content = ""
+                        if "sina.com.cn" in full_url:
+                            logger.info(f"Fetching content for: {title}")
+                            article_content = self._fetch_article_content(full_url)
+                        # 如果没抓到正文，就用标题充当摘要；抓到了就取前1000字做摘要
+                        summary = article_content[:1000] + "..." if article_content else title
+                        logger.info(f"Found article: {title} - {summary[:200]}")
                         news_items.append({
                             'title': title,
-                            'summary': title,
+                            'summary': summary,
                             'source': '新浪财经',
                             'url': full_url,
                             'published_at': published_at
@@ -151,10 +196,16 @@ class SinaFinanceScraper:
                             full_url = url_path
                         else:
                             full_url = f"https://finance.sina.com.cn{url_path}"
+                        article_content = ""
+                        if "sina.com.cn" in full_url:
+                            logger.info(f"Fetching content for: {title}")
+                            article_content = self._fetch_article_content(full_url)
+                        # 如果没抓到正文，就用标题充当摘要；抓到了就取前1000字做摘要
+                        summary = article_content[:1000] + "..." if article_content else title
                         
                         news_items.append({
                             'title': title,
-                            'summary': title,  # Sina list doesn't provide summary
+                            'summary': summary,  # Sina list doesn't provide summary
                             'source': '新浪财经',
                             'url': full_url,
                             'published_at': published_at

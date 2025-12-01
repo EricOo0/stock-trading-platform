@@ -61,7 +61,7 @@ class YahooMacroService:
             symbol = symbol_name
             
         try:
-            ticker = yf.Ticker(symbol, session=self.session)
+            ticker = yf.Ticker(symbol)
             hist = ticker.history(period=period)
             
             if hist.empty:
@@ -96,7 +96,7 @@ class YahooMacroService:
         Price of ZQ = 100 - Expected Fed Funds Rate
         """
         try:
-            ticker = yf.Ticker(self.SYMBOLS['FED_FUNDS_FUTURES'], session=self.session)
+            ticker = yf.Ticker(self.SYMBOLS['FED_FUNDS_FUTURES'])
             hist = ticker.history(period="1d")
             
             if not hist.empty:

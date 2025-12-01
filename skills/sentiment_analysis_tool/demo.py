@@ -15,23 +15,25 @@ def demo_sentiment_analysis():
     """演示不同股票的情绪分析"""
     
     test_cases = [
-        ("分析平安银行的市场情绪", "A股 - 平安银行"),
-        ("000001的情绪如何", "A股 - 代码查询"),
-        ("贵州茅台的市场情绪分析", "A股 - 贵州茅台"),
-        ("AAPL sentiment analysis", "美股 - 苹果"),
+        ("000001", "平安银行", "A股 - 平安银行"),
+        ("000001", "", "A股 - 代码查询"),
+        ("600519", "贵州茅台", "A股 - 贵州茅台"),
+        ("AAPL", "Apple", "美股 - 苹果"),
     ]
     
     print("=" * 80)
     print("情绪分析 Skill 功能演示")
     print("=" * 80)
     
-    for query, description in test_cases:
+    for symbol, name, description in test_cases:
         print(f"\n\n{'='*80}")
         print(f"📊 测试: {description}")
-        print(f"查询: \"{query}\"")
+        print(f"股票代码: {symbol}")
+        if name:
+            print(f"股票名称: {name}")
         print("=" * 80)
         
-        result = main_handle(query)
+        result = main_handle(symbol,name)
         
         if result['status'] == 'success':
             data = result['data']

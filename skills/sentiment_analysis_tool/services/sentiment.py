@@ -55,7 +55,8 @@ class SentimentService:
             with torch.no_grad():
                 outputs = self._model(**inputs)
                 probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
-            
+            logger.info(f"FinBERT analysis input: {text}")
+            logger.info(f"FinBERT analysis result: {probs}")
             # FinBERT output: [positive, negative, neutral]
             sentiment_scores = {
                 "positive": float(probs[0][0]),
@@ -158,8 +159,21 @@ class SentimentService:
         key_drivers = []
         
         for item in news_items:
-            # Combine title and summary for analysis
-            text = f"{item['title']}. {item.get('summary', '')}"
+            # Prepare text for analysis
+            title = item['title']
+            summary = item.get('summary', '')
+            
+            # If summary is same as title or empty, just use title
+            # Otherwise combine title and summary
+            if summary and summary != title:
+                text = f"{title}. {summary}"
+            else:
+                # Use only title for analysis
+                text = title
+            
+            # Log what we're analyzing (for debugging)
+            if len(text) < 50:
+                logger.debug(f"Analyzing short text: {text}")
             
             # Analyze with FinBERT
             scores = self._analyze_text_finbert(text)
@@ -206,7 +220,7 @@ class SentimentService:
             summary += f" 负面情绪较强（{avg_negative*100:.1f}%），主要受到{key_drivers[0]['title'] if key_drivers else '市场担忧'}等因素影响。"
         else:
             summary += " 正负面消息交织，市场处于观望状态。"
-        
+        print(avg_positive,avg_negative,avg_neutral,"tttt")
         return {
             "score": score,
             "rating": rating,
