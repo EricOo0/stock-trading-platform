@@ -232,22 +232,46 @@ const MarketQueryPage: React.FC = () => {
 
         {webSearchResults.length > 0 && (
           <div className="mt-4 space-y-3 max-h-[500px] overflow-y-auto">
-            {webSearchResults.map((result, index) => (
-              <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <a
-                  href={result.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-base font-semibold text-blue-600 hover:text-blue-800 hover:underline mb-2 block"
-                >
-                  {result.title}
-                </a>
-                <p className="text-sm text-gray-600 line-clamp-3">{result.body}</p>
-                <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-                  <span className="truncate">{result.href}</span>
+            {webSearchResults.map((result, index) => {
+              // Extract domain from URL
+              const getDomain = (url: string) => {
+                try {
+                  const urlObj = new URL(url);
+                  return urlObj.hostname.replace('www.', '');
+                } catch {
+                  return '';
+                }
+              };
+
+              const domain = getDomain(result.href);
+              const faviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+
+              return (
+                <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <a
+                    href={result.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-base font-semibold text-blue-600 hover:text-blue-800 hover:underline mb-2 block"
+                  >
+                    {result.title}
+                  </a>
+                  <p className="text-sm text-gray-600 line-clamp-3 mb-2">{result.body}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <img
+                      src={faviconUrl}
+                      alt={domain}
+                      className="w-4 h-4 rounded-sm"
+                      onError={(e) => {
+                        // Fallback to a default icon if favicon fails to load
+                        e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+                      }}
+                    />
+                    <span className="truncate">{domain}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
