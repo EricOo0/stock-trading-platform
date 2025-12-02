@@ -193,6 +193,25 @@ class StockAPIService {
     }
   }
 
+  // Web search for news and research
+  async webSearch(query: string): Promise<{
+    status: string;
+    results?: Array<{ title: string; href: string; body: string }>;
+    provider?: string;
+    message?: string
+  }> {
+    try {
+      const response = await fetch(`${this.baseURL}/web-search?q=${encodeURIComponent(query)}`);
+      return response.json();
+    } catch (error) {
+      console.error('Web search failed:', error);
+      return {
+        status: 'error',
+        message: 'Web search failed'
+      };
+    }
+  }
+
 
 }
 export const stockAPI = new StockAPIService();

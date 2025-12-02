@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layout } from './components/Layout';
 import { MarketQueryPage, HomePage, StockSearchPage } from './pages';
+import TechnicalAnalysisPage from './pages/TechnicalAnalysisPage';
 import MacroDataPage from './pages/MacroDataPage';
 import TestPage from './pages/TestPage';
 import DebugPage from './pages/DebugPage';
@@ -48,14 +49,7 @@ function App() {
       case 'market-query':
         return <MarketQueryPage />;
       case 'technical-analysis':
-        return (
-          <div className="flex items-center justify-center h-96">
-            <div className="text-center">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">技术分析</h2>
-              <p className="text-gray-600">功能开发中...</p>
-            </div>
-          </div>
-        );
+        return <TechnicalAnalysisPage />;
       case 'stock-search':
         return <StockSearchPage />;
       case 'watchlist':

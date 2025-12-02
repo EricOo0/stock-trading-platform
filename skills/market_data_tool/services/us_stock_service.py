@@ -322,26 +322,44 @@ class USStockService:
                     suggestion="请降低查询频率，或稍后再试"
                 )
 
-            # 3. 获取历史数据
-            historical_data = self.primary_source.get_historical_data(symbol, self.market_type, period, interval)
+            # 3. 获取历史数据 - 尝试所有可用数据源
+            data_sources = [
+                ("Sina Finance", self.primary_source),
+                ("Yahoo Finance", self.secondary_source),
+                ("AkShare", self.fallback_source)
+            ]
             
-            if not historical_data:
-                return create_error_response(
-                    symbol=symbol,
-                    error_code="NO_DATA_AVAILABLE",
-                    error_message="无法获取该股票的历史数据",
-                    suggestion="请检查股票代码是否正确，或稍后再试"
-                )
+            for source_name, data_source in data_sources:
+                try:
+                    self.logger.info(f"尝试从 {source_name} 获取美股 {symbol} 历史数据")
+                    historical_data = data_source.get_historical_data(symbol, self.market_type, period, interval)
+                    
+                    if historical_data:
+                        self.logger.info(f"成功从 {source_name} 获取 {symbol} 历史数据 ({len(historical_data)}条)")
+                        
+                        # 4. 返回成功响应
+                        response_time = (datetime.now() - start_time).total_seconds() * 1000
+                        
+                        return create_success_response(
+                            symbol=symbol,
+                            data=historical_data,
+                            data_source=source_name.lower().replace(" ", "_"),
+                            cache_hit=False,
+                            response_time_ms=response_time
+                        )
+                    else:
+                        self.logger.warning(f"{source_name} 返回空数据")
+                        
+                except Exception as e:
+                    self.logger.warning(f"{source_name} 获取历史数据失败: {str(e)}")
+                    continue
 
-            # 4. 返回成功响应
-            response_time = (datetime.now() - start_time).total_seconds() * 1000
-            
-            return create_success_response(
+            # 所有数据源都失败
+            return create_error_response(
                 symbol=symbol,
-                data=historical_data,
-                data_source=self.primary_source.name,
-                cache_hit=False,
-                response_time_ms=response_time
+                error_code="NO_DATA_AVAILABLE",
+                error_message="所有数据源均无法获取该股票的历史数据",
+                suggestion="请检查股票代码是否正确，或稍后再试"
             )
 
         except Exception as e:

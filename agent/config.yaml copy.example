@@ -1,0 +1,33 @@
+# LLM Configuration
+llm:
+  api_key: ""
+  api_base: "https://api.siliconflow.cn/v1"
+  model: "deepseek-ai/DeepSeek-V3.1-Terminus"
+  temperature: 0.7
+  max_tokens: 2000
+
+# MCP Servers (optional)
+mcp_servers:
+  - name: "example-mcp-server"
+    url: "http://localhost:9000"
+    enabled: false
+
+# Skills Configuration
+skills:
+  path: "../skills/market_data_tool"
+  enabled: true
+
+# Agent Configuration
+  # Macro Data Skill
+  fred_api_key: "YOUR_FRED_API_KEY"  # Get from https://fred.stlouisfed.org/docs/api/api_key.html
+  tavily_api_key: "your_key_here"
+  serpapi_api_key: "your_key_here"
+agent:
+  max_iterations: 10
+  verbose: true
+
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 8001
+  reload: true

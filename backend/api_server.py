@@ -15,10 +15,13 @@ from typing import Dict, List
 
 # 添加父目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 添加agent目录到Python路径 (for utils.logging)
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'agent'))
 
 # 导入market_data_tool skill
 from skills.market_data_tool.skill import main_handle
 from skills.macro_data_tool.skill import MacroDataSkill
+from skills.web_search_tool.skill import WebSearchSkill
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -52,6 +55,10 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             self.handle_historical_data(path, query_params)
         elif path.startswith('/api/macro-data/historical/'):
             self.handle_macro_historical_data(path, query_params)
+        elif path.startswith('/api/market/technical/'):
+            self.handle_technical_analysis(path, query_params)
+        elif path == '/api/web-search':
+            self.handle_web_search(query_params)
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
@@ -272,6 +279,185 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             self._set_headers(500)
             self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
 
+    def handle_technical_analysis(self, path: str, query_params: Dict[str, List[str]]):
+        """处理技术面分析请求"""
+        try:
+            # 从路径中提取股票代码
+            path_parts = path.split('/')
+            if len(path_parts) < 4:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({'error': 'Invalid path format'}).encode())
+                return
+            
+            symbol = path_parts[-1]
+            period = query_params.get('period', ['1y'])[0]
+            
+            logger.info(f"收到技术分析请求: {symbol}, 周期: {period}")
+            
+            # 获取历史数据
+            from skills.market_data_tool.skill import MarketDataSkill
+            skill = MarketDataSkill()
+            # 强制使用日线数据进行指标计算
+            result = skill.get_historical_data(symbol, period, '1d')
+            
+            if result.get('status') != 'success' or not result.get('data'):
+                self._set_headers(404)
+                self.wfile.write(json.dumps({'error': 'No data found'}).encode())
+                return
+
+            # 转换为DataFrame并计算指标
+            import pandas as pd
+            df = pd.DataFrame(result['data'])
+            if 'timestamp' in df.columns:
+                df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+                df = df.sort_values('timestamp')
+            
+            # 确保数值列为float
+            for col in ['open', 'high', 'low', 'close', 'volume']:
+                if col in df.columns:
+                    df[col] = df[col].astype(float)
+
+            # 1. 计算移动平均线 (MA)
+            for window in [5, 10, 20, 30, 60]:
+                df[f'ma{window}'] = df['close'].rolling(window=window).mean()
+
+            # 2. 计算布林带 (BOLL)
+            # 中轨 = 20日均线
+            # 上轨 = 中轨 + 2 * 标准差
+            # 下轨 = 中轨 - 2 * 标准差
+            df['boll_mid'] = df['close'].rolling(window=20).mean()
+            std20 = df['close'].rolling(window=20).std()
+            df['boll_upper'] = df['boll_mid'] + 2 * std20
+            df['boll_lower'] = df['boll_mid'] - 2 * std20
+
+            # 3. 计算 MACD
+            # EMA12, EMA26
+            exp12 = df['close'].ewm(span=12, adjust=False).mean()
+            exp26 = df['close'].ewm(span=26, adjust=False).mean()
+            df['macd_dif'] = exp12 - exp26
+            df['macd_dea'] = df['macd_dif'].ewm(span=9, adjust=False).mean()
+            df['macd_bar'] = 2 * (df['macd_dif'] - df['macd_dea'])
+
+            # 4. 计算 RSI (14日)
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['rsi14'] = 100 - (100 / (1 + rs))
+            # 填充NaN (早期数据可能没有RSI)
+            df['rsi14'] = df['rsi14'].fillna(50) 
+
+            # 5. 计算 KDJ (9, 3, 3)
+            low_min = df['low'].rolling(window=9).min()
+            high_max = df['high'].rolling(window=9).max()
+            rsv = (df['close'] - low_min) / (high_max - low_min) * 100
+            # Pandas没有直接的SMA/EMA递归计算，这里用ewm模拟或者循环
+            # K = 2/3 * PrevK + 1/3 * RSV
+            # D = 2/3 * PrevD + 1/3 * K
+            # J = 3 * K - 2 * D
+            # 为简单起见，使用ewm(com=2)近似 1/3权重
+            df['kdj_k'] = rsv.ewm(com=2, adjust=False).mean()
+            df['kdj_d'] = df['kdj_k'].ewm(com=2, adjust=False).mean()
+            df['kdj_j'] = 3 * df['kdj_k'] - 2 * df['kdj_d']
+
+            # 处理NaN和无穷大
+            df = df.fillna(0)
+            
+            # 转换回字典列表
+            # datetime需要转回字符串
+            if 'timestamp' in df.columns:
+                # 检查是否为datetime类型
+                if pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+                    df['timestamp'] = df['timestamp'].dt.strftime('%Y-%m-%d')
+                else:
+                    # 如果是字符串或其他类型，尝试转换或保持原样
+                    # 假设如果是字符串已经是 ISO 格式，或者我们需要统一格式
+                    try:
+                        # 尝试转换为 datetime 然后再格式化，以确保格式统一
+                        df['timestamp'] = pd.to_datetime(df['timestamp']).dt.strftime('%Y-%m-%d')
+                    except Exception:
+                        # 如果转换失败，保留原样
+                        pass
+            
+            technical_data = df.to_dict('records')
+
+            response = {
+                'status': 'success',
+                'symbol': symbol,
+                'data': technical_data,
+                'count': len(technical_data),
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self._set_headers(200)
+            self.wfile.write(json.dumps(response, ensure_ascii=False, default=str).encode())
+
+        except Exception as e:
+            logger.error(f"处理技术分析请求失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            error_response = {
+                'status': 'error',
+                'message': f'服务器错误: {str(e)}',
+                'timestamp': datetime.now().isoformat()
+            }
+            self._set_headers(500)
+            self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+    
+    def handle_web_search(self, query_params: Dict[str, List[str]]):
+        """处理网络搜索请求"""
+        try:
+            query = query_params.get('q', [''])[0]
+            
+            if not query:
+                error_response = {
+                    'status': 'error',
+                    'message': '搜索查询不能为空',
+                    'timestamp': datetime.now().isoformat()
+                }
+                self._set_headers(400)
+                self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+                return
+            
+            logger.info(f"执行网络搜索: {query}")
+            
+            # 初始化WebSearchSkill
+            web_search_skill = WebSearchSkill(tavily_api_key="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")
+            
+            # 执行搜索
+            result = web_search_skill._run(query)
+            
+            if result.get('status') == 'success':
+                response = {
+                    'status': 'success',
+                    'query': query,
+                    'results': result.get('raw_results', []),  # Return structured array
+                    'provider': result.get('provider', 'unknown'),
+                    'timestamp': datetime.now().isoformat()
+                }
+                self._set_headers(200)
+            else:
+                response = {
+                    'status': 'error',
+                    'message': result.get('message', '搜索失败'),
+                    'timestamp': datetime.now().isoformat()
+                }
+                self._set_headers(500)
+            
+            self.wfile.write(json.dumps(response, ensure_ascii=False).encode())
+            
+        except Exception as e:
+            logger.error(f"处理网络搜索请求失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            error_response = {
+                'status': 'error',
+                'message': f'服务器错误: {str(e)}',
+                'timestamp': datetime.now().isoformat()
+            }
+            self._set_headers(500)
+            self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+
     def handle_macro_historical_data(self, path: str, query_params: Dict[str, List[str]]):
         """处理宏观数据历史查询"""
         try:
@@ -327,6 +513,7 @@ def run_server(port=8000):
     logger.info(f"  POST /api/market-data - 查询股票数据")
     logger.info(f"  GET  /api/market-data/hot - 获取热门股票")
     logger.info(f"  GET  /api/market/historical/<symbol> - 获取历史数据")
+    logger.info(f"  GET  /api/market/technical/<symbol> - 获取技术分析数据(含指标)")
     
     try:
         httpd.serve_forever()

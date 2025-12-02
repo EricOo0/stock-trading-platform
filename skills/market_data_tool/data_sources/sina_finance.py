@@ -47,7 +47,7 @@ class SinaFinanceDataSource(BaseDataSource):
             return []
             
         try:
-            self.logger.info(f"正在从新浪财经获取 {symbol} 的历史数据，周期: {period}, 间隔: {interval}")
+            self.logger.info(f"正在从新浪财经获取 {symbol} 的历史数据，周期: {period}, 间隔: {interval},市场: {market}")
             
             # 解析时间周期
             days = self._parse_period(period)
@@ -287,7 +287,7 @@ class SinaFinanceDataSource(BaseDataSource):
 
             # 根据代码前缀判断市场
             prefix = symbol[:3]
-            if prefix in ["000", "002", "300"]:
+            if prefix in ["000", "002", "300","001"]:
                 # 深证市场
                 return f"sz{symbol}"
             elif prefix in ["600", "601", "603"]:

@@ -28,6 +28,8 @@ class SkillsConfig(BaseModel):
     path: str = Field(default="../skills/market_data_tool", description="Path to skills directory")
     enabled: bool = Field(default=True, description="Whether skills are enabled")
     fred_api_key: Optional[str] = Field(default=None, description="FRED API Key")
+    tavily_api_key: Optional[str] = Field(default=None, description="Tavily API Key")
+    serpapi_api_key: Optional[str] = Field(default=None, description="SerpApi API Key")
 
 
 class AgentConfig(BaseModel):

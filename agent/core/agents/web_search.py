@@ -14,12 +14,18 @@ from skills.web_search_tool.skill import WebSearchSkill
 
 class WebSearchA2A(BaseA2AAgent):
     def __init__(self, config: Config, event_bus=None):
+        # Initialize WebSearchSkill with API keys from config
+        web_search_skill = WebSearchSkill(
+            tavily_api_key=config.skills.tavily_api_key,
+            serpapi_api_key=config.skills.serpapi_api_key
+        )
+        
         super().__init__(
             config, 
             "WebSearchInvestigator", 
             "Performs general web searches.",
             ["web_search"],
-            [WebSearchSkill()],
+            [web_search_skill],
             WEB_SEARCH_AGENT_SYSTEM_PROMPT,
             event_bus=event_bus
         )

@@ -4,8 +4,10 @@ Test script for WebSearchSkill to verify DuckDuckGo functionality
 import sys
 import os
 
-# Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+# Add the project root and agent directory to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, 'agent'))
 
 from skills.web_search_tool.skill import WebSearchSkill
 from utils.logging import logger
@@ -18,7 +20,7 @@ def test_web_search():
     print("=" * 80)
     
     # Initialize the skill
-    skill = WebSearchSkill()
+    skill = WebSearchSkill(tavily_api_key="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")
     
     # Test queries
     test_queries = [

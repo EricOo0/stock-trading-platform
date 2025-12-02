@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2 } from 'lucide-react';
+import { Home, BarChart2, LineChart, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2 } from 'lucide-react';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -136,6 +136,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </button>
             );
           })}
+
         </nav>
       </div>
 

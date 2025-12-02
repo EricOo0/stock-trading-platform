@@ -16,6 +16,9 @@ const MarketQueryPage: React.FC = () => {
   const [useSimpleChart, setUseSimpleChart] = useState(false);
   const [chartError, setChartError] = useState<string>('');
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+  const [webSearchQuery, setWebSearchQuery] = useState('');
+  const [webSearchResults, setWebSearchResults] = useState<Array<{ title: string; href: string; body: string }>>([]);
+  const [webSearchLoading, setWebSearchLoading] = useState(false);
 
   const [timeRange, setTimeRange] = useState<number>(30);
 
@@ -29,9 +32,10 @@ const MarketQueryPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    loadHotStocks();
-  }, []);
+  // Remove default hot stocks loading
+  // useEffect(() => {
+  //   loadHotStocks();
+  // }, []);
 
   // 当时间范围改变时，重新获取数据
   useEffect(() => {
@@ -113,6 +117,28 @@ const MarketQueryPage: React.FC = () => {
   const toggleAIChat = () => setIsAIChatOpen(!isAIChatOpen);
   const closeAIChat = () => setIsAIChatOpen(false);
 
+  const handleWebSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!webSearchQuery.trim()) return;
+
+    setWebSearchLoading(true);
+    setError('');
+
+    try {
+      const response = await stockAPI.webSearch(webSearchQuery);
+
+      if (response.status === 'success' && response.results) {
+        setWebSearchResults(response.results);
+      } else {
+        setError(response.message || '搜索失败');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '搜索失败，请稍后重试');
+    } finally {
+      setWebSearchLoading(false);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col gap-6 max-w-7xl mx-auto w-full">
       {/* Page Title */}
@@ -173,6 +199,62 @@ const MarketQueryPage: React.FC = () => {
           <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-blue-600 text-sm flex items-center gap-2">
             <Loader2 size={16} className="animate-spin" />
             正在搜索股票数据...
+          </div>
+        )}
+      </div>
+
+      {/* Web Search Section */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2 mb-4">
+          <Search size={18} className="text-green-500" />
+          新闻资讯搜索
+        </h3>
+
+        <form onSubmit={handleWebSearch} className="flex gap-3 items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              value={webSearchQuery}
+              onChange={(e) => setWebSearchQuery(e.target.value)}
+              placeholder="输入关键词搜索新闻资讯 (例如: NVIDIA 最新新闻)"
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={webSearchLoading}
+            className="bg-green-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors shadow-sm shadow-green-600/20"
+          >
+            {webSearchLoading ? '搜索中...' : '搜索'}
+          </button>
+        </form>
+
+        {webSearchResults.length > 0 && (
+          <div className="mt-4 space-y-3 max-h-[500px] overflow-y-auto">
+            {webSearchResults.map((result, index) => (
+              <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <a
+                  href={result.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-base font-semibold text-blue-600 hover:text-blue-800 hover:underline mb-2 block"
+                >
+                  {result.title}
+                </a>
+                <p className="text-sm text-gray-600 line-clamp-3">{result.body}</p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+                  <span className="truncate">{result.href}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {webSearchLoading && (
+          <div className="mt-3 p-3 bg-green-50 border border-green-100 rounded-lg text-green-600 text-sm flex items-center gap-2">
+            <Loader2 size={16} className="animate-spin" />
+            正在搜索新闻资讯...
           </div>
         )}
       </div>
