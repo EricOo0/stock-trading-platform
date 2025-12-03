@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, RefreshCw, AlertCircle } from 'lucide-react';
-import StockChart from '../components/TechnicalAnalysis/StockChart';
+import { Search, AlertCircle } from 'lucide-react';
+import StockChart, { type StockData } from '../components/TechnicalAnalysis/StockChart';
 import AnalysisPanel from '../components/TechnicalAnalysis/AnalysisPanel';
 import IndicatorSelector from '../components/TechnicalAnalysis/IndicatorSelector';
 
@@ -8,7 +8,7 @@ const TechnicalAnalysisPage: React.FC = () => {
     const [symbol, setSymbol] = useState('AAPL');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [data, setData] = useState<any[]>([]);
+    const [data, setData] = useState<StockData[]>([]);
     const [period, setPeriod] = useState('1y');
 
     // 指标状态
@@ -27,7 +27,7 @@ const TechnicalAnalysisPage: React.FC = () => {
             } else {
                 setError(result.message || '获取数据失败');
             }
-        } catch (err) {
+        } catch {
             setError('网络请求失败');
         } finally {
             setLoading(false);
@@ -44,8 +44,8 @@ const TechnicalAnalysisPage: React.FC = () => {
     };
 
     return (
-        <div className="p-6 max-w-[1600px] mx-auto space-y-6">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="h-full flex flex-col bg-slate-900 text-white overflow-hidden">
+            <header className="flex-none p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-white mb-2">技术面分析 (Technical Analysis)</h1>
                     <p className="text-slate-400">专业级K线图表与多维技术指标分析</p>
@@ -87,53 +87,88 @@ const TechnicalAnalysisPage: React.FC = () => {
                 </div>
             </header>
 
-            {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-center gap-3 text-red-400">
-                    <AlertCircle size={20} />
-                    <span>{error}</span>
-                </div>
-            )}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {error && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-center gap-3 text-red-400">
+                        <AlertCircle size={20} />
+                        <span>{error}</span>
+                    </div>
+                )}
 
-            {loading && !data.length ? (
-                <div className="h-96 flex items-center justify-center text-slate-400">
-                    <RefreshCw className="animate-spin mr-2" />
-                    加载数据中...
-                </div>
-            ) : (
-                <>
-                    <AnalysisPanel data={data} />
+                {loading && !data.length ? (
+                   <div className="animate-pulse space-y-6">
+                       {/* Analysis Panel Skeleton */}
+                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                           {[...Array(4)].map((_, i) => (
+                               <div key={i} className="bg-slate-800 h-24 rounded-lg border border-slate-700 p-4">
+                                   <div className="h-4 w-24 bg-slate-700 rounded mb-4"></div>
+                                   <div className="h-8 w-16 bg-slate-700 rounded"></div>
+                               </div>
+                           ))}
+                       </div>
+                       
+                       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[600px]">
+                           {/* Chart Skeleton */}
+                           <div className="lg:col-span-3 bg-slate-800 rounded-lg border border-slate-700 p-4">
+                               <div className="h-full bg-slate-900/50 rounded"></div>
+                           </div>
+                           
+                           {/* Sidebar Skeleton */}
+                           <div className="lg:col-span-1 space-y-6">
+                               <div className="bg-slate-800 h-64 rounded-lg border border-slate-700 p-4">
+                                   <div className="h-6 w-32 bg-slate-700 rounded mb-4"></div>
+                                   <div className="space-y-3">
+                                       <div className="h-8 w-full bg-slate-700 rounded"></div>
+                                       <div className="h-8 w-full bg-slate-700 rounded"></div>
+                                   </div>
+                               </div>
+                               <div className="bg-slate-800 h-48 rounded-lg border border-slate-700 p-4">
+                                   <div className="h-6 w-24 bg-slate-700 rounded mb-4"></div>
+                                   <div className="space-y-2">
+                                       {[...Array(5)].map((_, i) => (
+                                           <div key={i} className="h-4 w-full bg-slate-700 rounded"></div>
+                                       ))}
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+                ) : (
+                    <>
+                        <AnalysisPanel data={data} />
 
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                        <div className="lg:col-span-3 space-y-4">
-                            <StockChart
-                                data={data}
-                                mainIndicator={mainIndicator}
-                                subIndicator={subIndicator}
-                            />
-                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                            <div className="lg:col-span-3 space-y-4">
+                                <StockChart
+                                    data={data}
+                                    mainIndicator={mainIndicator}
+                                    subIndicator={subIndicator}
+                                />
+                            </div>
 
-                        <div className="lg:col-span-1">
-                            <IndicatorSelector
-                                mainIndicator={mainIndicator}
-                                subIndicator={subIndicator}
-                                onMainChange={setMainIndicator}
-                                onSubChange={setSubIndicator}
-                            />
+                            <div className="lg:col-span-1">
+                                <IndicatorSelector
+                                    mainIndicator={mainIndicator}
+                                    subIndicator={subIndicator}
+                                    onMainChange={setMainIndicator}
+                                    onSubChange={setSubIndicator}
+                                />
 
-                            <div className="mt-6 bg-slate-800 p-4 rounded-lg border border-slate-700">
-                                <h3 className="text-white font-medium mb-2">指标说明</h3>
-                                <div className="space-y-2 text-sm text-slate-400">
-                                    <p><span className="text-yellow-400">MA</span>: 移动平均线 (5/10/20/60日)</p>
-                                    <p><span className="text-purple-400">BOLL</span>: 布林带 (20日, 2倍标准差)</p>
-                                    <p><span className="text-blue-400">MACD</span>: 指数平滑异同移动平均线</p>
-                                    <p><span className="text-green-400">RSI</span>: 相对强弱指标 (14日)</p>
-                                    <p><span className="text-orange-400">KDJ</span>: 随机指标</p>
+                                <div className="mt-6 bg-slate-800 p-4 rounded-lg border border-slate-700">
+                                    <h3 className="text-white font-medium mb-2">指标说明</h3>
+                                    <div className="space-y-2 text-sm text-slate-400">
+                                        <p><span className="text-yellow-400">MA</span>: 移动平均线 (5/10/20/60日)</p>
+                                        <p><span className="text-purple-400">BOLL</span>: 布林带 (20日, 2倍标准差)</p>
+                                        <p><span className="text-blue-400">MACD</span>: 指数平滑异同移动平均线</p>
+                                        <p><span className="text-green-400">RSI</span>: 相对强弱指标 (14日)</p>
+                                        <p><span className="text-orange-400">KDJ</span>: 随机指标</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </>
-            )}
+                    </>
+                )}
+            </div>
         </div>
     );
 };

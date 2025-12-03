@@ -13,8 +13,21 @@ class DuckDuckGoProvider(WebSearchProvider):
     def name(self) -> str:
         return "duckduckgo"
 
-    def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, max_results: int = 50, **kwargs) -> List[Dict[str, Any]]:
         logger.info(f"Searching with DuckDuckGo: {query}")
+        
+        # Map days to timelimit
+        timelimit = None
+        if 'days' in kwargs:
+            days = kwargs['days']
+            if days <= 1:
+                timelimit = 'd'
+            elif days <= 7:
+                timelimit = 'w'
+            elif days <= 31:
+                timelimit = 'm'
+            else:
+                timelimit = 'y'
         
         results = []
         max_retries = 2
@@ -26,8 +39,8 @@ class DuckDuckGoProvider(WebSearchProvider):
                     proxy = os.getenv("DDGS_PROXY", None)
                     ddgs = DDGS(proxy=proxy, timeout=20) if proxy else DDGS(timeout=20)
                     
-                    logger.info(f"Attempting search with backend: {backend}")
-                    ddgs_gen = ddgs.text(query, backend=backend, max_results=max_results)
+                    logger.info(f"Attempting search with backend: {backend}, timelimit: {timelimit}")
+                    ddgs_gen = ddgs.text(query, backend=backend, max_results=max_results, timelimit=timelimit)
                     
                     if ddgs_gen:
                         raw_results = list(ddgs_gen)

@@ -12,7 +12,7 @@ import {
     Area,
 } from 'recharts';
 
-interface StockData {
+export interface StockData {
     timestamp: string;
     open: number;
     high: number;
@@ -34,6 +34,7 @@ interface StockData {
     kdj_k?: number;
     kdj_d?: number;
     kdj_j?: number;
+    [key: string]: number | string | undefined | null | object;
 }
 
 interface StockChartProps {
@@ -42,8 +43,22 @@ interface StockChartProps {
     subIndicator: 'MACD' | 'RSI' | 'KDJ' | 'VOL' | 'NONE';
 }
 
-const CandlestickShape = (props: any) => {
-    const { x, y, width, height, low, high, open, close, yAxis } = props;
+interface ChartShapeProps {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    payload: StockData;
+    // Add specific props if needed
+    open?: number;
+    close?: number;
+    high?: number;
+    low?: number;
+    yAxis?: { scale: (v: number) => number };
+}
+
+const CandlestickShape = (props: ChartShapeProps) => {
+    const { x, width, open, close, high, low, yAxis } = props;
 
     // Safety check: if yAxis or scale is missing, or data is invalid, don't render
     if (!yAxis || !yAxis.scale || open === undefined || close === undefined || high === undefined || low === undefined) {
@@ -97,9 +112,14 @@ const StockChart: React.FC<StockChartProps> = ({ data, mainIndicator, subIndicat
     };
 
     // 计算Y轴范围
-    const prices = data.flatMap(d => [d.low, d.high, d.ma5, d.ma10, d.ma20, d.boll_upper, d.boll_lower].filter(v => v !== undefined) as number[]);
-    const minPrice = Math.min(...prices) * 0.98;
-    const maxPrice = Math.max(...prices) * 1.02;
+    const prices = data.flatMap(d => [
+        d.low, d.high, 
+        d.ma5, d.ma10, d.ma20, d.ma30, d.ma60,
+        d.boll_upper, d.boll_lower
+    ].filter(v => v !== undefined && v !== null && typeof v === 'number' && !isNaN(v)) as number[]);
+    
+    const minPrice = prices.length > 0 ? Math.min(...prices) * 0.98 : 0;
+    const maxPrice = prices.length > 0 ? Math.max(...prices) * 1.02 : 100;
 
     return (
         <div className="flex flex-col gap-2 h-[600px]">
@@ -134,9 +154,9 @@ const StockChart: React.FC<StockChartProps> = ({ data, mainIndicator, subIndicat
                         {/* 需要传入 low, high, open, close 给 shape */}
                         <Bar
                             dataKey="close" // 主要用于 tooltip，实际渲染由 shape 控制
-                            shape={(props: any) => {
-                                const { payload, x, y, width, height } = props;
-                                return <CandlestickShape {...props} open={payload.open} close={payload.close} high={payload.high} low={payload.low} />;
+                            shape={(props: unknown) => {
+                                const p = props as ChartShapeProps;
+                                return <CandlestickShape {...p} open={p.payload.open} close={p.payload.close} high={p.payload.high} low={p.payload.low} />;
                             }}
                             isAnimationActive={false}
                         />
@@ -184,8 +204,8 @@ const StockChart: React.FC<StockChartProps> = ({ data, mainIndicator, subIndicat
                                     dataKey="volume"
                                     fill="#38bdf8"
                                     name="Volume"
-                                    shape={(props: any) => {
-                                        const { payload, x, y, width, height } = props;
+                                    shape={(props: unknown) => {
+                                        const { payload, x, y, width, height } = props as ChartShapeProps;
                                         const isRising = payload.close > payload.open;
                                         return <rect x={x} y={y} width={width} height={height} fill={isRising ? '#ef4444' : '#22c55e'} />;
                                     }}
@@ -197,9 +217,9 @@ const StockChart: React.FC<StockChartProps> = ({ data, mainIndicator, subIndicat
                                 <>
                                     <Line type="monotone" dataKey="macd_dif" stroke="#fbbf24" dot={false} strokeWidth={1} name="DIF" />
                                     <Line type="monotone" dataKey="macd_dea" stroke="#38bdf8" dot={false} strokeWidth={1} name="DEA" />
-                                    <Bar dataKey="macd_bar" name="MACD" shape={(props: any) => {
-                                        const { x, y, width, height, payload } = props;
-                                        const fill = payload.macd_bar > 0 ? '#ef4444' : '#22c55e';
+                                    <Bar dataKey="macd_bar" name="MACD" shape={(props: unknown) => {
+                                        const { x, y, width, height, payload } = props as ChartShapeProps;
+                                        const fill = payload.macd_bar !== undefined && payload.macd_bar > 0 ? '#ef4444' : '#22c55e';
                                         return <rect x={x} y={y} width={width} height={height} fill={fill} />;
                                     }} />
                                 </>

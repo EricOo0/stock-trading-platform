@@ -3,8 +3,6 @@ import { Layout } from './components/Layout';
 import { MarketQueryPage, HomePage, StockSearchPage } from './pages';
 import TechnicalAnalysisPage from './pages/TechnicalAnalysisPage';
 import MacroDataPage from './pages/MacroDataPage';
-import TestPage from './pages/TestPage';
-import DebugPage from './pages/DebugPage';
 
 import CouncilRoom from './components/Council/CouncilRoom';
 
@@ -63,10 +61,6 @@ function App() {
         );
       case 'macro-data':
         return <MacroDataPage />;
-      case 'test':
-        return <TestPage />;
-      case 'debug':
-        return <DebugPage />;
       default:
         return <HomePage onNavigate={handleTabChange} />;
     }

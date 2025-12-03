@@ -1,23 +1,26 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import type { StockData } from './StockChart';
 
 interface AnalysisPanelProps {
-    data: any[];
+    data: StockData[];
 }
 
 const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ data }) => {
     if (!data || data.length === 0) return null;
 
     const latest = data[data.length - 1];
-    const prev = data[data.length - 2];
-
+    
     // 简单的趋势判断
-    const isBullish = latest.close > latest.ma20;
-    const rsi = latest.rsi14 || 50;
+    const hasMa20 = latest.ma20 !== null && latest.ma20 !== undefined;
+    const isBullish = hasMa20 ? latest.close > (latest.ma20 as number) : false;
+    
+    const rsi = latest.rsi14 ?? 50;
 
     // 支撑压力位 (简单估算)
-    const high20 = Math.max(...data.slice(-20).map((d: any) => d.high));
-    const low20 = Math.min(...data.slice(-20).map((d: any) => d.low));
+    const last20 = data.slice(-20);
+    const high20 = last20.length > 0 ? Math.max(...last20.map(d => d.high)) : 0;
+    const low20 = last20.length > 0 ? Math.min(...last20.map(d => d.low)) : 0;
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -25,9 +28,9 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ data }) => {
             <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 flex items-center justify-between">
                 <div>
                     <p className="text-slate-400 text-sm">趋势信号 (Trend)</p>
-                    <p className={`text-xl font-bold flex items-center gap-2 ${isBullish ? 'text-red-500' : 'text-green-500'}`}>
-                        {isBullish ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
-                        {isBullish ? '看多 (Bullish)' : '看空 (Bearish)'}
+                    <p className={`text-xl font-bold flex items-center gap-2 ${hasMa20 ? (isBullish ? 'text-red-500' : 'text-green-500') : 'text-slate-400'}`}>
+                        {hasMa20 ? (isBullish ? <TrendingUp size={24} /> : <TrendingDown size={24} />) : <Minus size={24} />}
+                        {hasMa20 ? (isBullish ? '看多 (Bullish)' : '看空 (Bearish)') : '中性 (Neutral)'}
                     </p>
                 </div>
             </div>

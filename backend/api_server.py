@@ -362,8 +362,9 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             df['kdj_d'] = df['kdj_k'].ewm(com=2, adjust=False).mean()
             df['kdj_j'] = 3 * df['kdj_k'] - 2 * df['kdj_d']
 
-            # 处理NaN和无穷大
-            df = df.fillna(0)
+            # 处理NaN: 将NaN转换为None，以便前端JSON序列化为null
+            # Recharts等图表库通常能更好地处理null(断点)而不是0
+            df = df.where(pd.notnull(df), None)
             
             # 转换回字典列表
             # datetime需要转回字符串
@@ -424,7 +425,15 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             logger.info(f"执行网络搜索: {query}")
             
             # 初始化WebSearchSkill
-            web_search_skill = WebSearchSkill(tavily_api_key="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")
+            # 配置为新闻搜索模式，限制最近7天，确保获取相关性强且即时的新闻
+            web_search_skill = WebSearchSkill(
+                tavily_api_key="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",
+                search_kwargs={
+                    "topic": "news",
+                    "days": 7,
+                    "max_results": 30
+                }
+            )
             
             # 执行搜索
             result = web_search_skill._run(query)

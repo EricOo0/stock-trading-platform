@@ -26,11 +26,13 @@ class WebSearchSkill(BaseTool):
     _providers: List[WebSearchProvider] = []
     _tavily_key: Optional[str] = PrivateAttr(default=None)
     _serpapi_key: Optional[str] = PrivateAttr(default=None)
+    _search_kwargs: Dict[str, Any] = PrivateAttr(default_factory=dict)
 
-    def __init__(self, tavily_api_key: Optional[str] = None, serpapi_api_key: Optional[str] = None):
+    def __init__(self, tavily_api_key: Optional[str] = None, serpapi_api_key: Optional[str] = None, search_kwargs: Optional[Dict[str, Any]] = None):
         super().__init__()
         self._tavily_key = tavily_api_key
         self._serpapi_key = serpapi_api_key
+        self._search_kwargs = search_kwargs or {}
         self._initialize_providers()
         logger.info("Web Search Skill initialized with providers: " + ", ".join([p.name for p in self._providers]))
 
@@ -72,7 +74,7 @@ class WebSearchSkill(BaseTool):
         for provider in self._providers:
             try:
                 logger.info(f"Attempting search with provider: {provider.name}")
-                results = provider.search(query)
+                results = provider.search(query, **self._search_kwargs)
                 
                 if results:
                     logger.info(f"Found {len(results)} results using {provider.name}")
