@@ -5,6 +5,7 @@ from loguru import logger
 import edgar
 from edgar import set_identity, Company
 import re
+import requests
 import akshare as ak
 
 class FinancialReportSkill:
@@ -222,27 +223,147 @@ class FinancialReportSkill:
             logger.error(f"Error fetching HK report for {symbol}: {e}")
             return {"status": "error", "message": str(e), "market": "HK"}
 
-    def _get_ashare_report(self, symbol: str) -> Dict[str, Any]:
-        """Get A-share stock report via direct links"""
+    def _get_cninfo_org_id(self, symbol: str) -> Optional[str]:
+        """Get OrgID from cninfo for a given symbol"""
         try:
-            # For now, provide direct links to cninfo
-            # Future: Can implement AkShare API when stable
-            
-            cninfo_url = f"http://www.cninfo.com.cn/new/disclosure/stock?stockCode={symbol}&orgId="
-            
-            return {
-                "status": "success",
-                "market": "A-SHARE",
-                "symbol": symbol,
-                "message": "请访问巨潮资讯网查看财报",
-                "cninfo_url": cninfo_url,
-                "download_url": cninfo_url,
-                "title": "巨潮资讯网 - 公司公告",
-                "suggestions": [
-                    f"访问巨潮资讯网: {cninfo_url}",
-                    "在页面中筛选'定期报告'查看年报"
-                ]
+            search_url = "http://www.cninfo.com.cn/new/information/topSearch/query"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
             }
+            payload = {"keyWord": symbol}
+            resp = requests.post(search_url, data=payload, headers=headers, timeout=5)
+            data = resp.json()
+            for item in data:
+                if item.get("code") == symbol:
+                    return item.get("orgId")
+            return data[0].get("orgId") if data else None
+        except Exception as e:
+            logger.warning(f"Failed to get OrgID for {symbol}: {e}")
+            return None
+
+    def _fetch_cninfo_pdf(self, symbol: str, target: str = "latest") -> Dict[str, Any]:
+        """
+        Fetch PDF link from cninfo
+        target: "latest" (any report), "annual" (annual report), "quarter" (quarterly)
+        """
+        try:
+            clean_symbol = re.sub(r"\D", "", symbol)
+            org_id = self._get_cninfo_org_id(clean_symbol)
+            if not org_id:
+                return {"status": "error", "message": "Stock not found"}
+
+            query_url = "http://www.cninfo.com.cn/new/hisAnnouncement/query"
+            base_file_url = "http://static.cninfo.com.cn/"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+            }
+
+            # Category mapping
+            category_map = {
+                "annual": "category_ndbg_szsh;category_ndbg_shmb;category_ndbg_bj;",
+                "quarter": "category_sjdbg_szsh;category_sjdbg_shmb;category_sjdbg_bj;",
+                "semi": "category_bndbg_szsh;category_bndbg_shmb;category_bndbg_bj;",
+                "latest": "category_ndbg_szsh;category_bndbg_szsh;category_sjdbg_szsh;category_ndbg_shmb;category_bndbg_shmb;category_sjdbg_shmb;category_ndbg_bj;category_bndbg_bj;category_sjdbg_bj;"
+            }
+            
+            selected_category = category_map.get(target, category_map["latest"])
+
+            payload = {
+                "pageNum": 1,
+                "pageSize": 30,
+                "column": "szse",
+                "tabName": "fulltext",
+                "plate": "",
+                "stock": f"{clean_symbol},{org_id}",
+                "category": selected_category,
+                "isHLtitle": "true"
+            }
+
+            resp = requests.post(query_url, data=payload, headers=headers, timeout=10)
+            data = resp.json()
+            
+            if not data.get("announcements"):
+                return {"status": "error", "message": "No announcements found"}
+
+            # Filter logic
+            found_report = None
+            for item in data["announcements"]:
+                title = item["announcementTitle"]
+                
+                # Exclude summary, cancellation, english version
+                if "摘要" in title or "取消" in title or "英文版" in title:
+                    continue
+                
+                if item.get("adjunctUrl"):
+                    found_report = item
+                    break
+
+            if found_report:
+                raw_title = found_report["announcementTitle"]
+                clean_title = re.sub(r'<[^>]+>', '', raw_title)
+                
+                report_type_str = "定期报告"
+                if "年度" in clean_title: report_type_str = "年报"
+                elif "半年度" in clean_title: report_type_str = "半年报"
+                elif "季" in clean_title: report_type_str = "季报"
+
+                return {
+                    "status": "success",
+                    "symbol": clean_symbol,
+                    "title": clean_title,
+                    "form_type": report_type_str,
+                    "filing_date": pd.to_datetime(found_report['announcementTime'], unit='ms').strftime('%Y-%m-%d'),
+                    "download_url": base_file_url + found_report["adjunctUrl"]
+                }
+            else:
+                return {"status": "fail", "message": "未找到有效的 PDF 文件"}
+
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _get_ashare_report(self, symbol: str) -> Dict[str, Any]:
+        """Get A-share stock report via cninfo API (PDF) or fallback to search page"""
+        try:
+            # 1. Try to fetch PDF directly using cninfo API
+            logger.info(f"Fetching A-share report PDF for {symbol} via cninfo API")
+            pdf_result = self._fetch_cninfo_pdf(symbol, target="latest")
+            
+            cninfo_search_url = f"http://www.cninfo.com.cn/new/disclosure/stock?stockCode={symbol}&orgId="
+
+            if pdf_result.get("status") == "success":
+                return {
+                    "status": "success",
+                    "market": "A-SHARE",
+                    "symbol": symbol,
+                    "title": pdf_result["title"],
+                    "form_type": pdf_result["form_type"],
+                    "filing_date": pdf_result["filing_date"],
+                    "download_url": pdf_result["download_url"],
+                    "url": pdf_result["download_url"],
+                    "cninfo_url": cninfo_search_url,
+                    "suggestions": [
+                        f"已找到: {pdf_result['title']}",
+                        "点击上方按钮直接下载 PDF",
+                        "如需其他报告，请访问巨潮资讯网"
+                    ]
+                }
+            else:
+                logger.warning(f"Cninfo PDF fetch failed: {pdf_result.get('message')}, falling back to search page")
+                # Fallback to search page
+                return {
+                    "status": "partial",
+                    "market": "A-SHARE",
+                    "symbol": symbol,
+                    "message": "未找到最新财报PDF，请访问巨潮资讯网查看",
+                    "cninfo_url": cninfo_search_url,
+                    "download_url": cninfo_search_url,
+                    "suggestions": [
+                        f"访问巨潮资讯网: {cninfo_search_url}",
+                        "在页面中筛选'定期报告'查看年报"
+                    ]
+                }
             
         except Exception as e:
             logger.error(f"Error fetching A-share report for {symbol}: {e}")
@@ -257,88 +378,6 @@ class FinancialReportSkill:
                 "suggestions": [
                     f"访问巨潮资讯网: {cninfo_url}",
                     "手动搜索年度报告"
-                ]
-            }
-
-    def _get_ashare_report(self, symbol: str) -> Dict[str, Any]:
-        """
-        Get A-share stock latest annual report PDF link via AkShare.
-        """
-        # 1. 基础清洗：确保 symbol 是 6 位数字 (去掉可能的 sh/sz 前缀)
-        clean_symbol = re.sub(r"\D", "", symbol)
-        
-        # 构造兜底的通用搜索链接 (万一 API 挂了，用户还能手动点)
-        # 巨潮的新版链接通常不需要 orgId 也能模糊搜，但最好只传 stockCode
-        fallback_url = f"http://www.cninfo.com.cn/new/disclosure/stock?stockCode={clean_symbol}&orgId="
-
-        try:
-            # 2. 调用 AkShare 获取个股公告列表
-            # 这是一个网络请求，可能会有延迟，生产环境建议加 cache 或异步处理
-            print(f"Fetching report list for {clean_symbol}...")
-            df = ak.stock_notice_report(symbol=clean_symbol)
-            print(df)
-            # 3. 筛选逻辑：找到最新的“年度报告”
-            # 这里的筛选非常关键：
-            # - 必须包含 "年年度报告" (匹配 2023年年度报告)
-            # - 不能包含 "摘要" (我们不要只有几页的 Summary)
-            # - 不能包含 "取消" (防止撤回的公告)
-            mask = (
-                df['公告标题'].str.contains('年年度报告', na=False) & 
-                ~df['公告标题'].str.contains('摘要', na=False) &
-                ~df['公告标题'].str.contains('取消', na=False)
-            )
-            
-            target_df = df[mask]
-
-            if target_df.empty:
-                raise ValueError("未找到年度报告 PDF")
-
-            # 4. 按时间倒序排序，取第一条（最新的）
-            # AkShare 返回的数据通常已经是时间倒序，但为了保险起见强制转 datetime 排序
-            target_df['公告时间'] = pd.to_datetime(target_df['公告时间'])
-            latest_report = target_df.sort_values(by='公告时间', ascending=False).iloc[0]
-
-            title = latest_report['公告标题']
-            pdf_url = latest_report['公告URL']
-            publish_date = str(latest_report['公告时间'].date())
-
-            # 处理 URL 前缀 (AkShare 有时返回相对路径，有时返回绝对路径，视源而定)
-            # 巨潮资讯的 PDF 链接通常需要拼接前缀，如果已经是 http 开头则不用
-            if not pdf_url.startswith("http"):
-                # 这里的 base url 可能会变，目前巨潮常用的是这个
-                final_pdf_url = f"http://static.cninfo.com.cn/{pdf_url}"
-            else:
-                final_pdf_url = pdf_url
-
-            return {
-                "status": "success",
-                "market": "A-SHARE",
-                "symbol": clean_symbol,
-                "message": f"成功获取 {clean_symbol} 最新年报",
-                "report_title": title,
-                "publish_date": publish_date,
-                "download_url": final_pdf_url, # 这是直接的 PDF 下载/预览链接
-                "cninfo_url": fallback_url,    # 这是原来的跳转页
-                "suggestions": [
-                    f"已找到: {title}",
-                    "点击 download_url 直接下载 PDF",
-                    "如果下载失败，请访问 cninfo_url 手动查找"
-                ]
-            }
-
-        except Exception as e:
-            logger.error(f"Error fetching A-share report for {symbol}: {e}")
-            # 发生任何错误（API 挂了、没找到数据），回退到原来的逻辑
-            return {
-                "status": "partial",
-                "message": f"自动拉取失败，请手动访问: {str(e)}",
-                "market": "A-SHARE",
-                "symbol": clean_symbol,
-                "download_url": fallback_url, # 回退到搜索页
-                "cninfo_url": fallback_url,
-                "suggestions": [
-                    f"访问巨潮资讯网: {fallback_url}",
-                    "在页面中筛选 '定期报告' -> '年报'"
                 ]
             }
 if __name__ == "__main__":
