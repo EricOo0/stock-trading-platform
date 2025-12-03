@@ -59,6 +59,8 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             self.handle_technical_analysis(path, query_params)
         elif path == '/api/web-search':
             self.handle_web_search(query_params)
+        elif path.startswith('/api/financial-report/'):
+            self.handle_financial_report(path)
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
@@ -457,6 +459,49 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             }
             self._set_headers(500)
             self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+
+    def handle_financial_report(self, path: str):
+        """处理财报分析请求 /api/financial-report/{symbol}"""
+        try:
+            # Extract symbol from path
+            # Path format: /api/financial-report/AAPL
+            symbol = path.split('/')[-1]
+            
+            if not symbol:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({'status': 'error', 'message': 'Symbol is required'}).encode())
+                return
+
+            logger.info(f"获取财报数据: {symbol}")
+            
+            # Import here to avoid circular dependency if any, or just convenience
+            from skills.financial_report_tool.skill import FinancialReportSkill
+            
+            skill = FinancialReportSkill()
+            
+            # 1. Get Metrics
+            metrics_result = skill.get_financial_metrics(symbol)
+            
+            # 2. Get Latest Report Metadata
+            report_result = skill.get_latest_report(symbol)
+            
+            response = {
+                'status': 'success',
+                'symbol': symbol,
+                'metrics': metrics_result.get('metrics', []) if metrics_result.get('status') == 'success' else [],
+                'latest_report': report_result if report_result.get('status') in ['success', 'partial'] else None,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self._set_headers(200)
+            self.wfile.write(json.dumps(response, ensure_ascii=False, default=str).encode())
+
+        except Exception as e:
+            logger.error(f"处理财报请求失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            self._set_headers(500)
+            self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
 
     def handle_macro_historical_data(self, path: str, query_params: Dict[str, List[str]]):
         """处理宏观数据历史查询"""

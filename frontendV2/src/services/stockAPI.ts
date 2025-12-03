@@ -212,6 +212,40 @@ class StockAPIService {
     }
   }
 
+  // Get financial report data
+  async getFinancialReport(symbol: string): Promise<{
+    status: string;
+    symbol?: string;
+    metrics?: Array<{
+      date: string;
+      revenue: number;
+      net_income: number;
+      gross_profit: number;
+      operating_income: number;
+    }>;
+    latest_report?: {
+      status: string;
+      symbol?: string;
+      form_type?: string;
+      filing_date?: string;
+      accession_number?: string;
+      url?: string;
+      search_query?: string;
+      message?: string;
+    };
+    message?: string;
+  }> {
+    try {
+      const response = await fetch(`${this.baseURL}/financial-report/${symbol}`);
+      return response.json();
+    } catch (error) {
+      console.error('获取财报数据失败:', error);
+      return {
+        status: 'error',
+        message: '获取财报数据失败'
+      };
+    }
+  }
 
 }
 export const stockAPI = new StockAPIService();
