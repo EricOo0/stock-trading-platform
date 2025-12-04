@@ -33,7 +33,6 @@ class FinancialReportSkill:
         except ImportError:
             # Fallback for direct execution
             import sys
-            import os
             current_dir = os.path.dirname(os.path.abspath(__file__))
             sys.path.insert(0, current_dir)
             from utils.cache_manager import CacheManager
