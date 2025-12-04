@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { stockAPI } from '../services/stockAPI';
 import type { StockData } from '../services/stockAPI';
+import { FinancialService } from '../services/financialService';
+import type { FinancialIndicatorsResponse } from '../types/financial';
+import { FinancialIndicatorsDisplay } from '../components/Financial';
 import TradingViewKLineChart from '../components/KLineChart/TradingViewKLineChart';
 import SimpleKLineChart from '../components/KLineChart/SimpleKLineChart';
 import AIChatSidebar from '../components/AIChat/AIChatSidebar';
-import { Search, BarChart2, TrendingUp, DollarSign, Activity, Bot, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, BarChart2, TrendingUp, DollarSign, Activity, Bot, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
 const MarketQueryPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,6 +25,9 @@ const MarketQueryPage: React.FC = () => {
   const [financialData, setFinancialData] = useState<any>(null);
   const [financialLoading, setFinancialLoading] = useState(false);
   const [financialSearchQuery, setFinancialSearchQuery] = useState('');
+  const [financialIndicators, setFinancialIndicators] = useState<FinancialIndicatorsResponse | null>(null);
+  const [financialIndicatorsLoading, setFinancialIndicatorsLoading] = useState(false);
+  const [financialIndicatorsError, setFinancialIndicatorsError] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'market' | 'financial' | 'web'>('market');
 
   const [timeRange, setTimeRange] = useState<number>(30);
@@ -165,7 +171,47 @@ const MarketQueryPage: React.FC = () => {
   const handleFinancialSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!financialSearchQuery.trim()) return;
-    await fetchFinancialReport(financialSearchQuery.trim());
+    await fetchFinancialIndicators(financialSearchQuery.trim());
+  };
+
+  const fetchFinancialIndicators = async (symbol: string) => {
+    setFinancialIndicatorsLoading(true);
+    setFinancialIndicatorsError('');
+
+    try {
+      const response = await FinancialService.getFinancialIndicators({
+        symbol,
+        years: 3
+      });
+
+      setFinancialIndicators(response);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '获取财务指标失败';
+      setFinancialIndicatorsError(errorMessage);
+      setFinancialIndicators(null);
+    } finally {
+      setFinancialIndicatorsLoading(false);
+    }
+  };
+
+  const handleRefreshIndicators = async () => {
+    if (!financialSearchQuery.trim()) return;
+
+    setFinancialIndicatorsLoading(true);
+    setFinancialIndicatorsError('');
+
+    try {
+      const response = await FinancialService.refreshFinancialIndicators(
+        financialSearchQuery.trim(),
+        3
+      );
+      setFinancialIndicators(response);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '刷新财务指标失败';
+      setFinancialIndicatorsError(errorMessage);
+    } finally {
+      setFinancialIndicatorsLoading(false);
+    }
   };
 
   return (
@@ -290,7 +336,7 @@ const MarketQueryPage: React.FC = () => {
               智能财报分析
             </h2>
             <p className="text-gray-600 mb-8">
-              获取即时的、AI驱动的季度财报、年度报告和财务健康检查
+              获取详细的财务指标分析,包括收入、利润、现金流、负债和股东回报
             </p>
 
             <form onSubmit={handleFinancialSearch} className="max-w-xl mx-auto">
@@ -300,202 +346,55 @@ const MarketQueryPage: React.FC = () => {
                   type="text"
                   value={financialSearchQuery}
                   onChange={(e) => setFinancialSearchQuery(e.target.value)}
-                  placeholder="搜索公司 (例如: Tesla 2023 Q4 或 腾讯 2024 财报)"
+                  placeholder="输入股票代码 (例如: 600036, AAPL, 0700.HK)"
                   className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
                 />
               </div>
-              <button
-                type="submit"
-                disabled={financialLoading}
-                className="mt-4 w-full bg-blue-600 text-white px-6 py-4 rounded-xl text-base font-medium hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2"
-              >
-                {financialLoading ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    分析中...
-                  </>
-                ) : (
-                  '开始分析'
+              <div className="flex gap-3 mt-4">
+                <button
+                  type="submit"
+                  disabled={financialIndicatorsLoading}
+                  className="flex-1 bg-blue-600 text-white px-6 py-4 rounded-xl text-base font-medium hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2"
+                >
+                  {financialIndicatorsLoading ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      分析中...
+                    </>
+                  ) : (
+                    '开始分析'
+                  )}
+                </button>
+                {financialIndicators && (
+                  <button
+                    type="button"
+                    onClick={handleRefreshIndicators}
+                    disabled={financialIndicatorsLoading}
+                    className="px-6 py-4 bg-gray-100 text-gray-700 rounded-xl text-base font-medium hover:bg-gray-200 disabled:opacity-70 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  >
+                    <RefreshCw size={20} className={financialIndicatorsLoading ? 'animate-spin' : ''} />
+                    刷新
+                  </button>
                 )}
-              </button>
+              </div>
             </form>
 
-            {error && (
+            {financialIndicatorsError && (
               <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm flex items-center justify-center gap-2">
                 <AlertCircle size={16} />
-                {error}
+                {financialIndicatorsError}
               </div>
             )}
           </div>
 
-          {/* Financial Report Display */}
-          {financialData && (
+          {/* Financial Indicators Display */}
+          {financialIndicators && (
             <div className="mt-8 border-t border-gray-200 pt-8">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <BarChart2 size={20} className="text-blue-500" />
-                  <h4 className="text-lg font-bold text-gray-800">财报数据 - {financialData.symbol}</h4>
-                </div>
-                <button
-                  onClick={() => setFinancialData(null)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Financial Metrics Table */}
-              {financialData.metrics && financialData.metrics.length > 0 && (
-                <div className="overflow-x-auto mb-6">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b-2 border-gray-200">
-                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">日期</th>
-                        <th className="text-right py-3 px-4 text-gray-700 font-semibold">营收</th>
-                        <th className="text-right py-3 px-4 text-gray-700 font-semibold">净利润</th>
-                        <th className="text-right py-3 px-4 text-gray-700 font-semibold">毛利润</th>
-                        <th className="text-right py-3 px-4 text-gray-700 font-semibold">营业利润</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {financialData.metrics.map((metric: any, index: number) => (
-                        <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="py-4 px-4 font-mono text-gray-700 font-medium">{metric.date}</td>
-                          <td className="py-4 px-4 text-right font-mono text-gray-900">
-                            {metric.revenue > 0 ? `$${(metric.revenue / 1e9).toFixed(2)}B` : '--'}
-                          </td>
-                          <td className="py-4 px-4 text-right font-mono text-gray-900">
-                            {metric.net_income > 0 ? `$${(metric.net_income / 1e9).toFixed(2)}B` : '--'}
-                          </td>
-                          <td className="py-4 px-4 text-right font-mono text-gray-900">
-                            {metric.gross_profit > 0 ? `$${(metric.gross_profit / 1e9).toFixed(2)}B` : '--'}
-                          </td>
-                          <td className="py-4 px-4 text-right font-mono text-gray-900">
-                            {metric.operating_income > 0 ? `$${(metric.operating_income / 1e9).toFixed(2)}B` : '--'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Latest Report Link */}
-              {financialData.latest_report && (
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                      <BarChart2 size={20} className="text-white" />
-                    </div>
-                    <div>
-                      <h5 className="text-base font-bold text-gray-900">财报文档</h5>
-                      <p className="text-xs text-gray-600">
-                        {financialData.latest_report.market === 'US' && 'SEC EDGAR 官方文件'}
-                        {financialData.latest_report.market === 'HK' && '港股披露易/公司IR'}
-                        {financialData.latest_report.market === 'A-SHARE' && '巨潮资讯网'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {financialData.latest_report.status === 'success' || financialData.latest_report.status === 'partial' ? (
-                    <div className="space-y-3">
-                      {/* Title and Date */}
-                      {financialData.latest_report.title && (
-                        <p className="text-sm text-gray-700">
-                          <span className="font-medium">标题:</span> {financialData.latest_report.title}
-                        </p>
-                      )}
-                      {financialData.latest_report.form_type && (
-                        <p className="text-sm text-gray-700">
-                          <span className="font-medium">类型:</span> {financialData.latest_report.form_type}
-                        </p>
-                      )}
-                      {financialData.latest_report.filing_date && (
-                        <p className="text-sm text-gray-700">
-                          <span className="font-medium">日期:</span> {financialData.latest_report.filing_date}
-                        </p>
-                      )}
-                      {financialData.latest_report.date && (
-                        <p className="text-sm text-gray-700">
-                          <span className="font-medium">日期:</span> {financialData.latest_report.date}
-                        </p>
-                      )}
-
-                      {/* Message */}
-                      {financialData.latest_report.message && (
-                        <p className="text-sm text-gray-600 bg-white/50 rounded-lg p-3">
-                          {financialData.latest_report.message}
-                        </p>
-                      )}
-
-                      {/* Download Button */}
-                      {financialData.latest_report.download_url && (
-                        <a
-                          href={financialData.latest_report.download_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block w-full mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-all shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 text-center"
-                        >
-                          📄 查看/下载财报 →
-                        </a>
-                      )}
-
-                      {/* Additional Links */}
-                      <div className="flex gap-2 mt-3">
-                        {financialData.latest_report.ir_url && (
-                          <a
-                            href={financialData.latest_report.ir_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 px-4 py-2 bg-white hover:bg-gray-50 text-blue-600 rounded-lg text-xs font-medium transition-colors border border-blue-200 text-center"
-                          >
-                            公司IR页面
-                          </a>
-                        )}
-                        {financialData.latest_report.hkexnews_url && (
-                          <a
-                            href={financialData.latest_report.hkexnews_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 px-4 py-2 bg-white hover:bg-gray-50 text-blue-600 rounded-lg text-xs font-medium transition-colors border border-blue-200 text-center"
-                          >
-                            披露易搜索
-                          </a>
-                        )}
-                        {financialData.latest_report.cninfo_url && (
-                          <a
-                            href={financialData.latest_report.cninfo_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 px-4 py-2 bg-white hover:bg-gray-50 text-blue-600 rounded-lg text-xs font-medium transition-colors border border-blue-200 text-center"
-                          >
-                            巨潮资讯网
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Suggestions */}
-                      {financialData.latest_report.suggestions && financialData.latest_report.suggestions.length > 0 && (
-                        <div className="mt-4 p-3 bg-white/70 rounded-lg">
-                          <p className="text-xs font-medium text-gray-700 mb-2">💡 使用提示:</p>
-                          <ul className="text-xs text-gray-600 space-y-1">
-                            {financialData.latest_report.suggestions.map((suggestion: string, idx: number) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <span className="text-blue-500 mt-0.5">•</span>
-                                <span>{suggestion}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-600">
-                      {financialData.latest_report.message || '暂无报告数据'}
-                    </p>
-                  )}
-                </div>
-              )}
+              <FinancialIndicatorsDisplay
+                indicators={financialIndicators.indicators}
+                symbol={financialIndicators.symbol}
+                market={financialIndicators.market}
+              />
             </div>
           )}
         </div>

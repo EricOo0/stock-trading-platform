@@ -72,6 +72,8 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
         
         if path == '/api/market-data':
             self.handle_market_data()
+        elif path == '/api/financial/indicators':
+            self.handle_financial_indicators()
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
@@ -503,6 +505,55 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             self._set_headers(500)
             self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
 
+    def handle_financial_indicators(self):
+        """处理财务指标请求 POST /api/financial/indicators"""
+        try:
+            # 读取请求体
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            symbol = request_data.get('symbol', '')
+            years = request_data.get('years', 3)
+            use_cache = request_data.get('use_cache', True)
+            
+            if not symbol:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({
+                    'status': 'error',
+                    'message': 'Symbol is required'
+                }).encode())
+                return
+            
+            logger.info(f"获取财务指标: {symbol}, years={years}, use_cache={use_cache}")
+            
+            # 导入财务报告skill
+            from skills.financial_report_tool.skill import FinancialReportSkill
+            
+            skill = FinancialReportSkill()
+            
+            # 调用get_financial_indicators方法
+            result = skill.get_financial_indicators(symbol, years=years, use_cache=use_cache)
+            
+            if result.get('status') == 'success':
+                self._set_headers(200)
+                self.wfile.write(json.dumps(result, ensure_ascii=False, default=str).encode())
+            else:
+                self._set_headers(200)  # 仍然返回200，但包含错误状态
+                self.wfile.write(json.dumps(result, ensure_ascii=False).encode())
+                
+        except Exception as e:
+            logger.error(f"处理财务指标请求失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            error_response = {
+                'status': 'error',
+                'message': f'服务器错误: {str(e)}',
+                'timestamp': datetime.now().isoformat()
+            }
+            self._set_headers(500)
+            self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+
     def handle_macro_historical_data(self, path: str, query_params: Dict[str, List[str]]):
         """处理宏观数据历史查询"""
         try:
@@ -556,6 +607,7 @@ def run_server(port=8000):
     logger.info(f"市场数据API服务器启动，端口: {port}")
     logger.info(f"API端点:")
     logger.info(f"  POST /api/market-data - 查询股票数据")
+    logger.info(f"  POST /api/financial/indicators - 获取财务指标")
     logger.info(f"  GET  /api/market-data/hot - 获取热门股票")
     logger.info(f"  GET  /api/market/historical/<symbol> - 获取历史数据")
     logger.info(f"  GET  /api/market/technical/<symbol> - 获取技术分析数据(含指标)")

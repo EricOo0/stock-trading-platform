@@ -1,0 +1,3 @@
+llama-cloud-services
+llama-index-core
+PyMuPDF
