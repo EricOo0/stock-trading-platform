@@ -109,6 +109,131 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
         logger.error(f"Error fetching financial metrics for {symbol}: {e}")
         return {"status": "error", "message": str(e), "market": "unknown"}
 
+def get_financial_indicators(symbol: str, years: int = 3) -> Dict[str, Any]:
+    """
+    获取财务指标数据 (5大类指标)
+    
+    Args:
+        symbol: 股票代码
+        years: 获取年数 (默认3年)
+    
+    Returns:
+        财务指标数据字典
+    """
+    try:
+        # 检测市场类型
+        market, normalized_symbol = detect_market(symbol)
+        logger.info(f"Fetching financial indicators for {symbol} (Market: {market})")
+        
+        indicators = {}
+        data_source = "unknown"
+        
+        # 根据市场选择数据源
+        if market == 'A-SHARE':
+            try:
+                from ..data_sources.akshare_financial import AkShareFinancialSource
+            except ImportError:
+                # Fallback for direct execution or different path structure
+                try:
+                    from skills.financial_report_tool.data_sources.akshare_financial import AkShareFinancialSource
+                except ImportError:
+                    from data_sources.akshare_financial import AkShareFinancialSource
+            
+            source = AkShareFinancialSource()
+            # AkShare uses 6 digit code
+            ak_symbol = normalized_symbol
+            if '.' in ak_symbol:
+                ak_symbol = ak_symbol.split('.')[0]
+                
+            indicators = source.get_financial_indicators(ak_symbol, years)
+            
+            # 如果AkShare没有数据，尝试使用yfinance作为fallback
+            if not indicators or all(
+                indicators.get(cat, {}).get(key) in [None, 0, 0.0] 
+                for cat in ['revenue', 'profit', 'cashflow', 'debt', 'shareholder_return']
+                for key in indicators.get(cat, {}).keys()
+            ):
+                logger.warning(f"AkShare returned no data for {normalized_symbol}, trying yfinance fallback")
+                try:
+                    from ..data_sources.yfinance_financial import YFinanceFinancialSource
+                except ImportError:
+                    try:
+                        from skills.financial_report_tool.data_sources.yfinance_financial import YFinanceFinancialSource
+                    except ImportError:
+                        from data_sources.yfinance_financial import YFinanceFinancialSource
+                
+                # 确定交易所后缀
+                if normalized_symbol.startswith('6'):
+                    yf_symbol = f"{normalized_symbol}.SS"  # 上海
+                else:
+                    yf_symbol = f"{normalized_symbol}.SZ"  # 深圳
+                
+                yf_source = YFinanceFinancialSource()
+                indicators = yf_source.get_financial_indicators(yf_symbol, years)
+                data_source = "yfinance (fallback)"
+            else:
+                data_source = "AkShare"
+            
+        elif market in ['US', 'HK']:
+            try:
+                from ..data_sources.yfinance_financial import YFinanceFinancialSource
+            except ImportError:
+                try:
+                    from skills.financial_report_tool.data_sources.yfinance_financial import YFinanceFinancialSource
+                except ImportError:
+                    from data_sources.yfinance_financial import YFinanceFinancialSource
+                    
+            source = YFinanceFinancialSource()
+            
+            # Get yfinance symbol
+            yf_symbol = normalized_symbol
+            if market == 'HK' and not yf_symbol.endswith('.HK'):
+                yf_symbol = f"{yf_symbol}.HK"
+                
+            indicators = source.get_financial_indicators(yf_symbol, years)
+            data_source = "yfinance"
+            
+        else:
+            logger.error(f"Unknown market type: {market}")
+            return {
+                "status": "error",
+                "message": f"Unsupported market type: {market}",
+                "symbol": symbol,
+                "market": market
+            }
+        
+        # 验证数据是否有效（不为空）
+        if not indicators or not any(indicators.values()):
+            logger.warning(f"No valid indicators data for {symbol}")
+            return {
+                "status": "error",
+                "message": "No financial indicators data available",
+                "symbol": symbol,
+                "market": market,
+                "data_source": data_source
+            }
+        
+        # 构建响应
+        from datetime import datetime
+        response = {
+            "status": "success",
+            "symbol": symbol,
+            "market": market,
+            "data_source": data_source,
+            "indicators": indicators,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error fetching financial indicators for {symbol}: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "symbol": symbol
+        }
+
 def fetch_financial_data_as_text(symbol: str, market: str) -> str:
     """
     Fetches financial data from yfinance and formats it as text for LLM analysis.

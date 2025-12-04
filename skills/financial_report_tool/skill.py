@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 
 # Import sub-skills
 from .modules.market import detect_market
-from .modules.metrics import get_financial_metrics, fetch_financial_data_as_text
+from .modules.metrics import get_financial_metrics, fetch_financial_data_as_text, get_financial_indicators
 from .modules.report_finder import get_latest_report_metadata
 from .modules.content_extractor import (
     download_and_parse_pdf, 
@@ -25,6 +25,19 @@ class FinancialReportSkill:
             set_identity("StockAnalysisAgent <agent@example.com>")
         except Exception as e:
             logger.warning(f"Failed to set edgar identity: {e}")
+
+        # Initialize cache manager
+        try:
+            from skills.financial_report_tool.utils.cache_manager import CacheManager
+            self.cache = CacheManager(cache_dir=".cache/financial_data", ttl_hours=24)
+        except ImportError:
+            # Fallback for direct execution
+            import sys
+            import os
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            sys.path.insert(0, current_dir)
+            from utils.cache_manager import CacheManager
+            self.cache = CacheManager(cache_dir=".cache/financial_data", ttl_hours=24)
 
         # Try to load config from agent/config.yaml
         try:
@@ -74,6 +87,44 @@ class FinancialReportSkill:
         Delegates to metrics module.
         """
         return get_financial_metrics(symbol)
+
+    def get_financial_indicators(self, symbol: str, years: int = 3, use_cache: bool = True) -> Dict[str, Any]:
+        """
+        获取财务指标数据 (5大类指标)
+        
+        Args:
+            symbol: 股票代码
+            years: 获取年数 (默认3年)
+            use_cache: 是否使用缓存 (默认True)
+        
+        Returns:
+            财务指标数据字典
+        """
+        try:
+            # 检查缓存
+            cache_key = f"{symbol}_indicators_{years}y"
+            if use_cache:
+                cached_data = self.cache.get(cache_key)
+                if cached_data:
+                    logger.info(f"Using cached financial indicators for {symbol}")
+                    return cached_data
+            
+            # 调用metrics模块获取数据
+            response = get_financial_indicators(symbol, years)
+            
+            # 只缓存成功的结果
+            if use_cache and response.get("status") == "success":
+                self.cache.set(cache_key, response)
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error fetching financial indicators for {symbol}: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+                "symbol": symbol
+            }
 
     def get_latest_report(self, symbol: str) -> Dict[str, Any]:
         """
