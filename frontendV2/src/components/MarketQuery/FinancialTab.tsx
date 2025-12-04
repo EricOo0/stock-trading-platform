@@ -225,7 +225,7 @@ const FinancialTab: React.FC = () => {
       />
 
       {/* Main Content Area - Flex Container */}
-      <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-y-auto">
 
         {/* Financial Indicators Section */}
         {financialIndicators && (
@@ -238,7 +238,8 @@ const FinancialTab: React.FC = () => {
           </div>
         )}
 
-        <div className="flex-1 flex gap-6 min-h-0 overflow-hidden">
+        {/* Analysis Section - Always visible */}
+        <div className="flex-1 flex gap-6 min-h-[500px]">
           {/* Left Column: Analysis Result */}
           <FinancialAnalysisPanel
             financialData={financialData}
