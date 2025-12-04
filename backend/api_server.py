@@ -27,6 +27,8 @@ from skills.web_search_tool.skill import WebSearchSkill
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+import mimetypes
+
 class MarketDataAPIHandler(BaseHTTPRequestHandler):
     """市场数据API处理器"""
     
@@ -49,6 +51,38 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
         path = parsed_path.path
         query_params = parse_qs(parsed_path.query)
         
+        # Static file serving for reports
+        if path.startswith('/static/reports/'):
+            try:
+                # Security check: prevent directory traversal
+                file_name = os.path.basename(path)
+                file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'reports', file_name)
+                
+                if os.path.exists(file_path) and os.path.isfile(file_path):
+                    # Guess MIME type
+                    mime_type, _ = mimetypes.guess_type(file_path)
+                    if mime_type is None:
+                        mime_type = 'application/octet-stream'
+                        
+                    with open(file_path, 'rb') as f:
+                        content = f.read()
+                        
+                    self.send_response(200)
+                    self.send_header('Content-Type', mime_type)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.send_header('Content-Length', str(len(content)))
+                    self.end_headers()
+                    self.wfile.write(content)
+                    return
+                else:
+                    self._set_headers(404)
+                    self.wfile.write(json.dumps({'error': 'File not found'}).encode())
+                    return
+            except Exception as e:
+                logger.error(f"Error serving static file: {e}")
+                self._set_headers(500)
+                return
+
         if path == '/api/market-data/hot':
             self.handle_hot_stocks()
         elif path.startswith('/api/market/historical/'):
@@ -472,9 +506,24 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
     def handle_financial_report(self, path: str):
         """处理财报分析请求 /api/financial-report/{symbol}"""
         try:
+            path_parts = path.split('/')
+            
+            # Check for analyze request: /api/financial-report/analyze/{symbol}
+            if len(path_parts) >= 5 and path_parts[3] == 'analyze':
+                symbol = path_parts[4]
+                logger.info(f"分析财报数据: {symbol}")
+                
+                from skills.financial_report_tool.skill import FinancialReportSkill
+                skill = FinancialReportSkill()
+                result = skill.analyze_report(symbol)
+                
+                self._set_headers(200)
+                self.wfile.write(json.dumps(result, ensure_ascii=False, default=str).encode())
+                return
+
             # Extract symbol from path
             # Path format: /api/financial-report/AAPL
-            symbol = path.split('/')[-1]
+            symbol = path_parts[-1]
             
             if not symbol:
                 self._set_headers(400)

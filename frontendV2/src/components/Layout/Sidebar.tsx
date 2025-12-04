@@ -70,7 +70,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     <div
       className={`
         h-screen bg-slate-900 border-r border-slate-700 flex flex-col shadow-xl transition-all duration-300 ease-in-out
-        ${isCollapsed ? 'w-20' : 'w-72'}
+        ${isCollapsed ? 'w-20' : 'w-60'}
       `}
     >
       {/* Header */}

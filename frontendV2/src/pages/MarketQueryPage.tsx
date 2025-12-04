@@ -24,7 +24,7 @@ const MarketQueryPage: React.FC = () => {
         <div className="flex">
           <button
             onClick={() => setActiveTab('market')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors rounded-lg ${activeTab === 'market'
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors rounded-lg ${activeTab === 'market'
               ? 'text-blue-400 bg-slate-700'
               : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
@@ -36,7 +36,7 @@ const MarketQueryPage: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('financial')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors rounded-lg ${activeTab === 'financial'
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors rounded-lg ${activeTab === 'financial'
               ? 'text-blue-400 bg-slate-700'
               : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
@@ -48,7 +48,7 @@ const MarketQueryPage: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('web')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors rounded-lg ${activeTab === 'web'
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors rounded-lg ${activeTab === 'web'
               ? 'text-blue-400 bg-slate-700'
               : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}

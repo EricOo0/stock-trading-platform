@@ -1,12 +1,20 @@
-import yfinance as yf
-import pandas as pd
+import os
 from typing import Dict, Any, List, Optional, Tuple
 from loguru import logger
-import edgar
 from edgar import set_identity, Company
-import re
-import requests
-import akshare as ak
+from langchain_openai import ChatOpenAI
+
+# Import sub-skills
+from .modules.market import detect_market
+from .modules.metrics import get_financial_metrics, fetch_financial_data_as_text
+from .modules.report_finder import get_latest_report_metadata
+from .modules.content_extractor import (
+    download_and_parse_pdf, 
+    get_html_content, 
+    save_html_content, 
+    extract_sec_report_url
+)
+from .modules.analyst import analyze_report_content
 
 class FinancialReportSkill:
     def __init__(self):
@@ -18,383 +26,259 @@ class FinancialReportSkill:
         except Exception as e:
             logger.warning(f"Failed to set edgar identity: {e}")
 
+        # Try to load config from agent/config.yaml
+        try:
+            # Ensure project root is in path to import agent
+            import sys
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+            if project_root not in sys.path:
+                sys.path.append(project_root)
+                
+            from agent.core.config import get_config
+            config = get_config()
+            llm_config = config.llm
+            
+            # Use config values, falling back to defaults or env vars if necessary
+            api_key = llm_config.api_key or os.getenv("SILICONFLOW_API_KEY") or os.getenv("OPENAI_API_KEY")
+            api_base = llm_config.api_base or "https://api.siliconflow.cn/v1"
+            model = llm_config.model or "deepseek-ai/DeepSeek-V3.1-Terminus"
+            temperature = llm_config.temperature
+            
+        except Exception as e:
+            logger.warning(f"Could not load agent configuration: {e}. Falling back to environment variables.")
+            api_key = os.getenv("SILICONFLOW_API_KEY") or os.getenv("OPENAI_API_KEY")
+            api_base = "https://api.siliconflow.cn/v1"
+            model = "deepseek-ai/DeepSeek-V3.1-Terminus"
+            temperature = 0
+
+        if not api_key:
+            logger.warning("No API key found for SiliconFlow/OpenAI. Please set SILICONFLOW_API_KEY or OPENAI_API_KEY.")
+            
+        self.llm = ChatOpenAI(
+            model=model,
+            temperature=temperature,
+            base_url=api_base,
+            api_key=api_key
+        )
+
     def detect_market(self, symbol: str) -> Tuple[str, str]:
         """
         Detect which market the stock belongs to based on symbol format.
-        Returns: (market, normalized_symbol)
-        
-        Markets:
-        - 'US': American stocks (e.g., AAPL, TSLA)
-        - 'HK': Hong Kong stocks (e.g., 0700.HK, 9988.HK)
-        - 'A-SHARE': Chinese A-shares (e.g., 600036.SS, 000001.SZ)
+        Delegates to market module.
         """
-        symbol_upper = symbol.upper()
-        
-        # Hong Kong stocks
-        if '.HK' in symbol_upper:
-            return ('HK', symbol_upper)
-        
-        # A-shares (Shanghai/Shenzhen)
-        if '.SS' in symbol_upper or '.SZ' in symbol_upper:
-            # Extract the base code for AkShare (e.g., 600036.SS -> 600036)
-            base_code = symbol_upper.split('.')[0]
-            return ('A-SHARE', base_code)
-        
-        # Check if it's a pure number (likely Chinese stock without suffix)
-        if symbol.isdigit():
-            if len(symbol) == 6:
-                # Could be A-share or HK
-                if symbol.startswith('6'):
-                    return ('A-SHARE', symbol)  # Shanghai
-                elif symbol.startswith(('0', '3')):
-                    return ('A-SHARE', symbol)  # Shenzhen
-                else:
-                    return ('HK', f"{symbol}.HK")  # Hong Kong
-        
-        # Default to US stock
-        return ('US', symbol_upper)
+        return detect_market(symbol)
 
     def get_financial_metrics(self, symbol: str) -> Dict[str, Any]:
         """
-        Fetches key financial metrics (Revenue, Net Income, etc.) for the last few years.
-        Supports US, HK, and A-share stocks via yfinance.
+        Fetches key financial metrics.
+        Delegates to metrics module.
         """
-        try:
-            market, normalized_symbol = self.detect_market(symbol)
-            logger.info(f"Fetching financial metrics for {symbol} (Market: {market}, Normalized: {normalized_symbol})")
-            
-            # For yfinance, we need the proper suffix
-            if market == 'A-SHARE':
-                # Determine exchange (Shanghai or Shenzhen)
-                if normalized_symbol.startswith('6'):
-                    yf_symbol = f"{normalized_symbol}.SS"
-                else:
-                    yf_symbol = f"{normalized_symbol}.SZ"
-            elif market == 'HK':
-                yf_symbol = normalized_symbol if '.HK' in normalized_symbol else f"{normalized_symbol}.HK"
-            else:
-                yf_symbol = normalized_symbol
-            
-            ticker = yf.Ticker(yf_symbol)
-            
-            # Get Financials (Income Statement)
-            financials = ticker.financials
-            if financials.empty:
-                logger.warning(f"No financial data found for {yf_symbol}")
-                return {
-                    "status": "error", 
-                    "message": "No financial data found",
-                    "market": market
-                }
-
-            # Extract key metrics
-            metrics = []
-            financials_T = financials.T
-            financials_T.sort_index(inplace=True)
-            
-            for date, row in financials_T.iterrows():
-                item = {
-                    "date": date.strftime("%Y-%m-%d"),
-                    "revenue": row.get("Total Revenue", 0),
-                    "net_income": row.get("Net Income", 0),
-                    "gross_profit": row.get("Gross Profit", 0),
-                    "operating_income": row.get("Operating Income", 0)
-                }
-                # Handle NaN
-                for k, v in item.items():
-                    if pd.isna(v):
-                        item[k] = 0
-                metrics.append(item)
-
-            return {
-                "status": "success",
-                "symbol": symbol,
-                "market": market,
-                "normalized_symbol": yf_symbol,
-                "currency": ticker.info.get("currency", "USD"),
-                "metrics": metrics
-            }
-
-        except Exception as e:
-            logger.error(f"Error fetching financial metrics for {symbol}: {e}")
-            return {"status": "error", "message": str(e), "market": "unknown"}
+        return get_financial_metrics(symbol)
 
     def get_latest_report(self, symbol: str) -> Dict[str, Any]:
         """
         Fetches metadata about the latest financial report.
-        Different strategies for different markets:
-        - US: SEC EDGAR (edgartools)
-        - HK: Web search for IR page
-        - A-Share: AkShare announcement API
+        Delegates to report_finder module.
+        """
+        return get_latest_report_metadata(symbol)
+
+    def get_report_content(self, symbol: str) -> Dict[str, Any]:
+        """
+        Fetches the content of the latest financial report.
+        Returns text content directly or parses PDF if necessary.
+        Orchestrates fetching and parsing using sub-skills.
         """
         try:
-            market, normalized_symbol = self.detect_market(symbol)
-            logger.info(f"Fetching latest report for {symbol} (Market: {market})")
+            # 1. Get report metadata
+            report_info = self.get_latest_report(symbol)
+            if report_info.get("status") != "success":
+                return report_info
             
+            market = report_info.get("market")
+            download_url = report_info.get("download_url")
+            content = ""
+            pdf_url = "" # Can be PDF or HTML proxy URL
+            anchor_map = {} # Map of anchor_id -> metadata (coords/DOM id)
+            
+            # 2. Fetch content based on market/type
             if market == 'US':
-                # Use SEC EDGAR for US stocks
-                return self._get_us_report(normalized_symbol)
-            elif market == 'HK':
-                # Hong Kong stocks - use web search
-                return self._get_hk_report(normalized_symbol)
+                # Re-fetch filing object to get content
+                try:
+                    company = Company(symbol)
+                    filings = company.get_filings(form=["10-K", "10-Q"]).latest(1)
+                    if filings:
+                        # Try markdown first (better structure), then text
+                        try:
+                            content = filings.markdown()
+                        except:
+                            content = filings.text()
+                        
+                        # For US stocks, handle URL extraction and proxying
+                        # Try to get HTML content directly from edgartools first
+                        html_content = None
+                        try:
+                            html_content = filings.html()
+                        except Exception as e:
+                            logger.warning(f"Could not get HTML from edgartools: {e}")
+
+                        if html_content:
+                             # If we have the HTML, save it directly
+                             logger.info(f"Got HTML content from edgartools for {symbol}")
+                             
+                             # Fix: filings.url is often the index page (e.g. ...-index.html), 
+                             # but the content is the actual report in a subdirectory.
+                             # We need to resolve the correct URL to set the correct <base> tag.
+                             real_url = filings.url
+                             if "index.html" in real_url or "index.htm" in real_url:
+                                 try:
+                                     resolved = extract_sec_report_url(real_url)
+                                     if resolved != real_url:
+                                         real_url = resolved
+                                         logger.info(f"Resolved real report URL: {real_url}")
+                                 except Exception as e:
+                                     logger.warning(f"Failed to resolve real URL from index: {e}")
+
+                             full_text, local_url, html_anchor_map = save_html_content(html_content, symbol, real_url)
+                             pdf_url = local_url
+                             # Use the full text with anchors for analysis
+                             content = full_text
+                             # Merge anchor maps if needed, but for now just use the one from HTML
+                             anchor_map = html_anchor_map
+                        elif hasattr(filings, 'url'):
+                             original_url = filings.url
+                             logger.info(f"Processing US report URL: {original_url}")
+                             
+                             # 1. Check if it's an index page and extract actual report URL
+                             target_url = original_url
+                             if "index.html" in original_url:
+                                 target_url = extract_sec_report_url(original_url)
+                                 logger.info(f"Extracted SEC target URL: {target_url}")
+                             
+                             # 2. Download and save content locally (proxy)
+                             # US SEC reports often block iframe via X-Frame-Options, so we must proxy
+                             if target_url:
+                                 full_text, local_url, html_anchor_map = get_html_content(target_url, symbol)
+                                 if local_url:
+                                     pdf_url = local_url
+                                     anchor_map = html_anchor_map
+                                     content = full_text
+                                     logger.info(f"Proxied US report to: {pdf_url}")
+                                 else:
+                                     # Fallback to original if proxy fails (though likely to be blocked)
+                                     pdf_url = target_url
+                             else:
+                                 pdf_url = original_url
+                                 
+                except Exception as e:
+                    logger.error(f"Error extracting US report content: {e}")
+                    return {"status": "error", "message": f"Failed to extract US report content: {e}"}
+
+            elif download_url:
+                if download_url.lower().endswith('.pdf'):
+                    # PDF URL
+                    logger.info(f"Downloading and parsing PDF from {download_url}")
+                    content, local_url, anchor_map = download_and_parse_pdf(download_url, symbol)
+                    pdf_url = local_url
+                else:
+                    # HTML URL (e.g. HK/A-Share announcement page)
+                    logger.info(f"Fetching HTML content from {download_url}")
+                    content, local_url, anchor_map = get_html_content(download_url, symbol)
+                    if local_url:
+                        pdf_url = local_url # Point to our local proxy
+            
             elif market == 'A-SHARE':
-                # A-share stocks - use AkShare
-                return self._get_ashare_report(normalized_symbol)
+                 # Should have been caught by download_url check, but just in case
+                 pass
+
             else:
+                # Fallback: Use yfinance data as content for analysis
+                logger.info(f"Fetching structured financial data from yfinance as fallback content for {symbol}")
+                content = fetch_financial_data_as_text(symbol, market)
+                if not content:
+                    return {
+                        "status": "partial",
+                        "message": "Content extraction not supported and financial data unavailable",
+                        "report_info": report_info
+                    }
+            
+            if content:
+                truncated = len(content) > 300000
+                return {
+                    "status": "success",
+                    "symbol": report_info.get("symbol", symbol),
+                    "market": market,
+                    "content": content[:300000],
+                    "content_truncated": truncated,
+                    "report_info": report_info,
+                    "pdf_url": pdf_url, # Return the URL for frontend display
+                    "anchor_map": anchor_map # Return anchor mapping
+                }
+            else:
+                 return {
+                    "status": "error",
+                    "message": "No content extracted",
+                    "report_info": report_info,
+                    "symbol": report_info.get("symbol", symbol)
+                }
+
+        except Exception as e:
+            logger.error(f"Error getting report content for {symbol}: {e}")
+            return {"status": "error", "message": str(e), "symbol": symbol}
+
+    def analyze_report(self, symbol: str) -> Dict[str, Any]:
+        """
+        Analyzes the financial report using LLM.
+        Returns a markdown report.
+        """
+        try:
+            # 1. Get Content
+            content_res = self.get_report_content(symbol)
+            if content_res.get("status") != "success":
                 return {
                     "status": "error",
-                    "message": "Unknown market type",
-                    "market": market
-                }
-
-        except Exception as e:
-            logger.error(f"Error fetching report for {symbol}: {e}")
-            return {"status": "error", "message": str(e)}
-
-    def _get_us_report(self, symbol: str) -> Dict[str, Any]:
-        """Get US stock report from SEC EDGAR"""
-        try:
-            company = Company(symbol)
-            filings = company.get_filings(form=["10-K", "10-Q"]).latest(1)
-            
-            if not filings:
-                return {"status": "error", "message": "No filings found", "market": "US"}
-            
-            filing = filings
-            
-            return {
-                "status": "success",
-                "market": "US",
-                "symbol": symbol,
-                "form_type": filing.form,
-                "filing_date": filing.filing_date,
-                "accession_number": filing.accession_number,
-                "url": filing.url,
-                "download_url": filing.url  # SEC page URL
-            }
-        except Exception as e:
-            logger.error(f"Error fetching US report for {symbol}: {e}")
-            return {"status": "error", "message": str(e), "market": "US"}
-
-    def _get_hk_report(self, symbol: str) -> Dict[str, Any]:
-        """Get HK stock report via web search"""
-        try:
-            # Extract stock code (remove .HK suffix)
-            stock_code = symbol.replace('.HK', '')
-            
-            # Common HK company IR pages (Top companies)
-            ir_pages = {
-                '0700': 'https://www.tencent.com/zh-cn/investors.html',
-                '9988': 'https://www.alibabagroup.com/cn/ir/home',
-                '0941': 'https://www.cmhk.com/tc/ir/',
-                '0388': 'https://www.hkex.com.hk/Investor-Relations',
-                '0939': 'https://www.ccbintl.com/investor_relations/',
-            }
-            
-            result = {
-                "status": "partial",
-                "market": "HK",
-                "symbol": symbol,
-                "message": "港股财报需要从公司投资者关系页面或披露易获取"
-            }
-            
-            # If we have a known IR page, provide it
-            if stock_code in ir_pages:
-                result["ir_url"] = ir_pages[stock_code]
-                result["download_url"] = ir_pages[stock_code]
-                result["status"] = "success"
-            
-            # Always provide HKEXnews search link
-            hkex_search_url = f"https://www1.hkexnews.hk/search/titlesearch.xhtml?lang=zh&searchtype=1&code={stock_code}"
-            result["hkexnews_url"] = hkex_search_url
-            
-            # If no direct IR, use HKEXnews as download URL
-            if "download_url" not in result:
-                result["download_url"] = hkex_search_url
-            
-            result["suggestions"] = [
-                f"访问披露易搜索: {hkex_search_url}",
-                "在搜索结果中查找'年度报告'或'Annual Report'"
-            ]
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error fetching HK report for {symbol}: {e}")
-            return {"status": "error", "message": str(e), "market": "HK"}
-
-    def _get_cninfo_org_id(self, symbol: str) -> Optional[str]:
-        """Get OrgID from cninfo for a given symbol"""
-        try:
-            search_url = "http://www.cninfo.com.cn/new/information/topSearch/query"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
-            }
-            payload = {"keyWord": symbol}
-            resp = requests.post(search_url, data=payload, headers=headers, timeout=5)
-            data = resp.json()
-            for item in data:
-                if item.get("code") == symbol:
-                    return item.get("orgId")
-            return data[0].get("orgId") if data else None
-        except Exception as e:
-            logger.warning(f"Failed to get OrgID for {symbol}: {e}")
-            return None
-
-    def _fetch_cninfo_pdf(self, symbol: str, target: str = "latest") -> Dict[str, Any]:
-        """
-        Fetch PDF link from cninfo
-        target: "latest" (any report), "annual" (annual report), "quarter" (quarterly)
-        """
-        try:
-            clean_symbol = re.sub(r"\D", "", symbol)
-            org_id = self._get_cninfo_org_id(clean_symbol)
-            if not org_id:
-                return {"status": "error", "message": "Stock not found"}
-
-            query_url = "http://www.cninfo.com.cn/new/hisAnnouncement/query"
-            base_file_url = "http://static.cninfo.com.cn/"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
-            }
-
-            # Category mapping
-            category_map = {
-                "annual": "category_ndbg_szsh;category_ndbg_shmb;category_ndbg_bj;",
-                "quarter": "category_sjdbg_szsh;category_sjdbg_shmb;category_sjdbg_bj;",
-                "semi": "category_bndbg_szsh;category_bndbg_shmb;category_bndbg_bj;",
-                "latest": "category_ndbg_szsh;category_bndbg_szsh;category_sjdbg_szsh;category_ndbg_shmb;category_bndbg_shmb;category_sjdbg_shmb;category_ndbg_bj;category_bndbg_bj;category_sjdbg_bj;"
-            }
-            
-            selected_category = category_map.get(target, category_map["latest"])
-
-            payload = {
-                "pageNum": 1,
-                "pageSize": 30,
-                "column": "szse",
-                "tabName": "fulltext",
-                "plate": "",
-                "stock": f"{clean_symbol},{org_id}",
-                "category": selected_category,
-                "isHLtitle": "true"
-            }
-
-            resp = requests.post(query_url, data=payload, headers=headers, timeout=10)
-            data = resp.json()
-            
-            if not data.get("announcements"):
-                return {"status": "error", "message": "No announcements found"}
-
-            # Filter logic
-            found_report = None
-            for item in data["announcements"]:
-                title = item["announcementTitle"]
-                
-                # Exclude summary, cancellation, english version
-                if "摘要" in title or "取消" in title or "英文版" in title:
-                    continue
-                
-                if item.get("adjunctUrl"):
-                    found_report = item
-                    break
-
-            if found_report:
-                raw_title = found_report["announcementTitle"]
-                clean_title = re.sub(r'<[^>]+>', '', raw_title)
-                
-                report_type_str = "定期报告"
-                if "年度" in clean_title: report_type_str = "年报"
-                elif "半年度" in clean_title: report_type_str = "半年报"
-                elif "季" in clean_title: report_type_str = "季报"
-
-                return {
-                    "status": "success",
-                    "symbol": clean_symbol,
-                    "title": clean_title,
-                    "form_type": report_type_str,
-                    "filing_date": pd.to_datetime(found_report['announcementTime'], unit='ms').strftime('%Y-%m-%d'),
-                    "download_url": base_file_url + found_report["adjunctUrl"]
-                }
-            else:
-                return {"status": "fail", "message": "未找到有效的 PDF 文件"}
-
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-
-    def _get_ashare_report(self, symbol: str) -> Dict[str, Any]:
-        """Get A-share stock report via cninfo API (PDF) or fallback to search page"""
-        try:
-            # 1. Try to fetch PDF directly using cninfo API
-            logger.info(f"Fetching A-share report PDF for {symbol} via cninfo API")
-            pdf_result = self._fetch_cninfo_pdf(symbol, target="latest")
-            
-            cninfo_search_url = f"http://www.cninfo.com.cn/new/disclosure/stock?stockCode={symbol}&orgId="
-
-            if pdf_result.get("status") == "success":
-                return {
-                    "status": "success",
-                    "market": "A-SHARE",
-                    "symbol": symbol,
-                    "title": pdf_result["title"],
-                    "form_type": pdf_result["form_type"],
-                    "filing_date": pdf_result["filing_date"],
-                    "download_url": pdf_result["download_url"],
-                    "url": pdf_result["download_url"],
-                    "cninfo_url": cninfo_search_url,
-                    "suggestions": [
-                        f"已找到: {pdf_result['title']}",
-                        "点击上方按钮直接下载 PDF",
-                        "如需其他报告，请访问巨潮资讯网"
-                    ]
-                }
-            else:
-                logger.warning(f"Cninfo PDF fetch failed: {pdf_result.get('message')}, falling back to search page")
-                # Fallback to search page
-                return {
-                    "status": "partial",
-                    "market": "A-SHARE",
-                    "symbol": symbol,
-                    "message": "未找到最新财报PDF，请访问巨潮资讯网查看",
-                    "cninfo_url": cninfo_search_url,
-                    "download_url": cninfo_search_url,
-                    "suggestions": [
-                        f"访问巨潮资讯网: {cninfo_search_url}",
-                        "在页面中筛选'定期报告'查看年报"
-                    ]
+                    "message": f"Failed to fetch report content: {content_res.get('message')}",
+                    "symbol": symbol
                 }
             
+            content = content_res.get("content", "")
+            market = content_res.get("market", "Unknown")
+            real_symbol = content_res.get("symbol", symbol)
+            report_info = content_res.get("report_info", {})
+            
+            # Use the pdf_url from content_res if available
+            pdf_url = content_res.get("pdf_url")
+            anchor_map = content_res.get("anchor_map", {})
+
+            # 2. Delegate to analyst module
+            return analyze_report_content(
+                llm=self.llm,
+                content=content,
+                symbol=real_symbol,
+                market=market,
+                report_info=report_info,
+                pdf_url=pdf_url,
+                anchor_map=anchor_map
+            )
+
         except Exception as e:
-            logger.error(f"Error fetching A-share report for {symbol}: {e}")
-            cninfo_url = f"http://www.cninfo.com.cn/new/disclosure/stock?stockCode={symbol}"
-            return {
-                "status": "partial",
-                "message": f"获取失败: {str(e)}",
-                "market": "A-SHARE",
-                "symbol": symbol,
-                "cninfo_url": cninfo_url,
-                "download_url": cninfo_url,
-                "suggestions": [
-                    f"访问巨潮资讯网: {cninfo_url}",
-                    "手动搜索年度报告"
-                ]
-            }
+            logger.error(f"Error analyzing report for {symbol}: {e}")
+            return {"status": "error", "message": str(e), "symbol": symbol}
+
 if __name__ == "__main__":
     # Test
     skill = FinancialReportSkill()
     
     # Test US stock
     print("=== US Stock (AAPL) ===")
-    print(skill.get_financial_metrics("AAPL"))
-    print(skill.get_latest_report("AAPL"))
+    # print(skill.get_financial_metrics("AAPL"))
+    # print(skill.get_latest_report("AAPL"))
     
     # Test HK stock
     print("\n=== HK Stock (0700.HK) ===")
-    print(skill.get_financial_metrics("0700.HK"))
-    print(skill.get_latest_report("0700.HK"))
+    # print(skill.get_financial_metrics("0700.HK"))
+    # print(skill.get_latest_report("0700.HK"))
     
     # Test A-share
     print("\n=== A-Share (600036.SS) ===")
-    print(skill.get_financial_metrics("600036.SS"))
-    print(skill.get_latest_report("600036.SS"))
+    # print(skill.get_financial_metrics("600036.SS"))
+    # print(skill.get_latest_report("600036.SS"))
