@@ -15,8 +15,11 @@
     "framer-motion": "^12.23.24",
     "lightweight-charts": "^5.0.9",
     "lucide-react": "^0.553.0",
+    "pdfjs-dist": "^5.4.296",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "react-pdf": "^10.2.0",
     "react-redux": "^9.2.0",
     "recharts": "^3.5.1"
   },

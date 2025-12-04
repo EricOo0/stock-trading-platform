@@ -15,32 +15,42 @@ class TavilyProvider(WebSearchProvider):
     def name(self) -> str:
         return "tavily"
 
-    def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, max_results: int = 50, **kwargs) -> List[Dict[str, Any]]:
         try:
-            logger.info(f"Searching with Tavily: {query}")
-            response = self.client.search(
-                query=query,
-                search_depth="advanced",
-                max_results=max_results,
-                include_answer=True
-            )
+            topic = kwargs.get('topic', 'general')
+            days = kwargs.get('days', 15)
+            
+            logger.info(f"Searching with Tavily: {query}, topic={topic}, days={days}")
+            
+            search_params = {
+                "query": query,
+                "search_depth": "advanced",
+                "max_results": max_results,
+                "include_answer": True
+            }
+            
+            if topic == 'news':
+                search_params['topic'] = 'news'
+                search_params['days'] = days
+            
+            response = self.client.search(**search_params)
             
             results = []
             
-            # Add the generated answer as the first result if available
-            if response.get('answer'):
-                results.append({
-                    'title': 'Tavily AI Answer',
-                    'href': '',
-                    'body': response['answer']
-                })
-
             for res in response.get('results', []):
+                score = res.get('score', 0)
+                if score < 0.3:
+                    continue
+                    
                 results.append({
                     'title': res.get('title', 'No Title'),
                     'href': res.get('url', ''),
-                    'body': res.get('content', 'No Content')
+                    'body': res.get('content', 'No Content'),
+                    'score': score
                 })
+            
+            # Sort by score descending
+            results.sort(key=lambda x: x['score'], reverse=True)
             
             return results
         except Exception as e:

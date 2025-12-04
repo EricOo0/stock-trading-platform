@@ -14,7 +14,7 @@ class SerpApiProvider(WebSearchProvider):
     def name(self) -> str:
         return "serpapi"
 
-    def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, max_results: int = 50, **kwargs) -> List[Dict[str, Any]]:
         try:
             logger.info(f"Searching with SerpApi: {query}")
             params = {
@@ -24,6 +24,22 @@ class SerpApiProvider(WebSearchProvider):
                 "engine": "google"
             }
             
+            # Handle time limit
+            if 'days' in kwargs:
+                days = kwargs['days']
+                if days <= 1:
+                    params["tbs"] = "qdr:d"
+                elif days <= 7:
+                    params["tbs"] = "qdr:w"
+                elif days <= 31:
+                    params["tbs"] = "qdr:m"
+                else:
+                    params["tbs"] = "qdr:y"
+
+            # Handle topic (Google News tab) if topic='news'
+            if kwargs.get('topic') == 'news':
+                 params["tbm"] = "nws"
+
             search = GoogleSearch(params)
             results = search.get_dict()
             

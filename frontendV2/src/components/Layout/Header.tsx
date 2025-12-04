@@ -7,22 +7,22 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ title }) => {
   return (
-    <div className="h-16 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-10">
+    <div className="h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-700 flex items-center justify-between px-6 sticky top-0 z-10">
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white">
           <TrendingUp size={20} />
         </div>
-        <h1 className="text-xl font-bold text-slate-800 tracking-tight">
+        <h1 className="text-xl font-bold text-white tracking-tight">
           {title}
         </h1>
       </div>
 
       <div className="flex items-center gap-4">
-        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 hover:border-gray-300 transition-all flex items-center justify-center">
+        <button className="w-10 h-10 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white hover:border-slate-600 transition-all flex items-center justify-center">
           <Bell size={18} />
         </button>
 
-        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 hover:border-gray-300 transition-all flex items-center justify-center">
+        <button className="w-10 h-10 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white hover:border-slate-600 transition-all flex items-center justify-center">
           <Settings size={18} />
         </button>
 

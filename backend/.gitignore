@@ -71,3 +71,4 @@ test-results/
 .temp/
 cache/
 .session/
+backend/static/reports/*

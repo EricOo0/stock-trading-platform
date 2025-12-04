@@ -1,0 +1,9 @@
+edgartools>=4.34.1
+yfinance
+akshare
+pandas
+loguru
+requests
+pypdf
+langchain-openai
+langchain-core

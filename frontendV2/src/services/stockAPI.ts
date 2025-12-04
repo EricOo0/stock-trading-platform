@@ -17,6 +17,26 @@ export interface StockData {
   status: string;
 }
 
+export interface HistoricalCandle {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  date: string;
+  data_source: string;
+}
+
+interface RawCandle {
+  timestamp: string | number;
+  open: string | number;
+  high: string | number;
+  low: string | number;
+  close: string | number;
+  volume: string | number;
+}
+
 export interface MarketResponse {
   status: 'success' | 'error' | 'partial';
   symbol: string;
@@ -97,7 +117,7 @@ class StockAPIService {
 
 
   // 获取历史K线数据（仅使用真实数据，默认30天）
-  async getHistoricalData(symbol: string, period: string = '30d', count: number = 30): Promise<any[]> {
+  async getHistoricalData(symbol: string, period: string = '30d', count: number = 30): Promise<HistoricalCandle[]> {
     try {
       console.log(`开始获取历史数据: ${symbol}, 周期: ${period}, 数量: ${count}`);
 
@@ -120,7 +140,7 @@ class StockAPIService {
 
       if (result.status === 'success' && result.data && Array.isArray(result.data) && result.data.length > 0) {
         // 转换数据格式以匹配前端需求
-        const historicalData = result.data.map((candle: any) => {
+        const historicalData = result.data.map((candle: RawCandle) => {
           try {
             // 验证时间戳
             if (!candle.timestamp) return null;
@@ -142,7 +162,7 @@ class StockAPIService {
             console.warn('Skipping invalid candle data:', candle, e);
             return null;
           }
-        }).filter((item: any) => item !== null); // 过滤掉无效数据
+        }).filter((item: HistoricalCandle | null): item is HistoricalCandle => item !== null); // 过滤掉无效数据
 
         console.log(`成功获取 ${historicalData.length} 条真实历史数据`);
         return historicalData;
@@ -243,6 +263,44 @@ class StockAPIService {
       return {
         status: 'error',
         message: '获取财报数据失败'
+      };
+    }
+  }
+
+  // Analyze financial report
+  async analyzeFinancialReport(symbol: string): Promise<{
+    status: string;
+    symbol?: string;
+    report?: string;
+    report_date?: string;
+    citations?: Array<{
+      id: string;
+      content: string;
+      page_num: number;
+      file_name?: string;
+      rect?: [number, number, number, number];
+      type?: 'pdf' | 'html';
+    }>;
+    pdf_url?: string;
+    anchor_map?: {
+      [key: string]: {
+        type: 'pdf' | 'html';
+        page?: number;
+        rect?: [number, number, number, number];
+        id?: string;
+        content?: string;
+      }
+    };
+    message?: string;
+  }> {
+    try {
+      const response = await fetch(`${this.baseURL}/financial-report/analyze/${symbol}`);
+      return response.json();
+    } catch (error) {
+      console.error('财报分析失败:', error);
+      return {
+        status: 'error',
+        message: '财报分析失败'
       };
     }
   }
