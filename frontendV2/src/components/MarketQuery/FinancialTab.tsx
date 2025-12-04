@@ -7,7 +7,7 @@ import type { FinancialReport, AnchorMap, Citation } from './components/types';
 
 import { FinancialIndicatorsDisplay } from '../Financial';
 import { getFinancialIndicators } from '../../services/financialService';
-import type { FinancialIndicatorsData } from '../../types/financial';
+import type { FinancialIndicators } from '../../types/financial';
 
 const FinancialTab: React.FC = () => {
   const [financialSearchQuery, setFinancialSearchQuery] = useState('');
@@ -17,8 +17,10 @@ const FinancialTab: React.FC = () => {
   const [error, setError] = useState('');
 
   // Indicators State
-  const [financialIndicators, setFinancialIndicators] = useState<FinancialIndicatorsData | null>(null);
+  const [financialIndicators, setFinancialIndicators] = useState<FinancialIndicators | null>(null);
   const [indicatorsLoading, setIndicatorsLoading] = useState(false);
+  const [indicatorSymbol, setIndicatorSymbol] = useState<string>('');
+  const [indicatorMarket, setIndicatorMarket] = useState<string>('');
 
   // Analysis States
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -86,6 +88,8 @@ const FinancialTab: React.FC = () => {
         const response = indicatorsResponse.value;
         if (response.status === 'success') {
           setFinancialIndicators(response.indicators);
+          setIndicatorSymbol(response.symbol);
+          setIndicatorMarket(response.market);
         }
       }
 
@@ -227,8 +231,9 @@ const FinancialTab: React.FC = () => {
         {financialIndicators && (
           <div className="flex-shrink-0">
             <FinancialIndicatorsDisplay
-              data={financialIndicators}
-              isLoading={indicatorsLoading}
+              indicators={financialIndicators}
+              symbol={indicatorSymbol}
+              market={indicatorMarket}
             />
           </div>
         )}

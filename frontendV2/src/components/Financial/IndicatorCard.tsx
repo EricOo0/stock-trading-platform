@@ -1,60 +1,86 @@
-import React from 'react';
+/**
+ * 财务指标卡片组件
+ * 用于显示单个类别的财务指标
+ */
 
-interface IndicatorCardProps {
-    title: string;
-    value: string | number | null;
-    subValue?: string | number | null;
-    subLabel?: string;
+import React from 'react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+interface MetricItemProps {
+    label: string;
+    value: number | null | undefined;
+    unit?: string;
     trend?: 'up' | 'down' | 'neutral';
-    tooltip?: string;
-    className?: string;
+    format?: 'number' | 'percent' | 'currency';
 }
 
-const IndicatorCard: React.FC<IndicatorCardProps> = ({
-    title,
+const MetricItem: React.FC<MetricItemProps> = ({
+    label,
     value,
-    subValue,
-    subLabel,
+    unit = '',
     trend,
-    tooltip,
-    className = '',
+    format = 'number'
 }) => {
-    const formatValue = (val: string | number | null) => {
-        if (val === null || val === undefined) return 'N/A';
-        return val;
+    const getTrendIcon = () => {
+        if (!trend) return null;
+        if (trend === 'up') return <TrendingUp className="text-green-500" size={16} />;
+        if (trend === 'down') return <TrendingDown className="text-red-500" size={16} />;
+        return <Minus className="text-gray-400" size={16} />;
     };
 
-    const getTrendColor = (t?: 'up' | 'down' | 'neutral') => {
-        if (t === 'up') return 'text-green-500';
-        if (t === 'down') return 'text-red-500';
-        return 'text-gray-400';
+    const formatValue = (val: number) => {
+        if (format === 'percent') return `${val.toFixed(2)}%`;
+        if (format === 'currency') return `¥${(val / 100000000).toFixed(2)}亿`;
+        return val.toFixed(2);
     };
+
+    const displayValue = value !== null && value !== undefined ? formatValue(value) : 'N/A';
 
     return (
-        <div className={`bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-xl p-4 hover:border-blue-500/30 transition-all duration-300 ${className}`}>
-            <div className="flex justify-between items-start mb-2">
-                <h3 className="text-gray-400 text-sm font-medium" title={tooltip}>
-                    {title}
-                </h3>
-                {trend && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full bg-opacity-10 ${getTrendColor(trend).replace('text-', 'bg-')} ${getTrendColor(trend)}`}>
-                        {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '-'}
-                    </span>
-                )}
-            </div>
-
-            <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-white tracking-tight">
-                    {formatValue(value)}
+        <div className="flex justify-between items-center py-2">
+            <span className="text-sm text-gray-600">{label}</span>
+            <div className="flex items-center gap-2">
+                <span className="text-base font-semibold text-gray-900 font-mono">
+                    {displayValue}{unit}
                 </span>
-                {subValue && (
-                    <span className="text-xs text-gray-500">
-                        {subValue} {subLabel}
-                    </span>
-                )}
+                {getTrendIcon()}
             </div>
         </div>
     );
 };
 
-export default IndicatorCard;
+interface IndicatorCardProps {
+    title: string;
+    icon: LucideIcon;
+    iconColor: string;
+    iconBgColor: string;
+    metrics: MetricItemProps[];
+    borderColor?: string;
+}
+
+export const IndicatorCard: React.FC<IndicatorCardProps> = ({
+    title,
+    icon: Icon,
+    iconColor,
+    iconBgColor,
+    metrics,
+    borderColor = 'border-gray-200'
+}) => {
+    return (
+        <div className={`bg-white rounded-xl shadow-sm border ${borderColor} p-6 hover:shadow-md transition-all duration-300`}>
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
+                <div className={`w-12 h-12 ${iconBgColor} rounded-lg flex items-center justify-center`}>
+                    <Icon className={iconColor} size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+            </div>
+
+            <div className="space-y-1">
+                {metrics.map((metric, index) => (
+                    <MetricItem key={index} {...metric} />
+                ))}
+            </div>
+        </div>
+    );
+};

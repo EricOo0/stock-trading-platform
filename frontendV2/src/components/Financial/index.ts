@@ -1,3 +1,3 @@
-export { default as IndicatorCard } from './IndicatorCard';
-export { default as TrendChart } from './TrendChart';
-export { default as FinancialIndicatorsDisplay } from './FinancialIndicatorsDisplay';
+export { IndicatorCard } from './IndicatorCard';
+export { TrendChart } from './TrendChart';
+export { FinancialIndicatorsDisplay } from './FinancialIndicatorsDisplay';

@@ -1,3 +1,8 @@
+/**
+ * 财务指标趋势图表组件
+ * 使用 Recharts 显示多指标折线图
+ */
+
 import React from 'react';
 import {
     LineChart,
@@ -6,83 +11,105 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    ResponsiveContainer,
-    Legend
+    Legend,
+    ResponsiveContainer
 } from 'recharts';
-import type { HistoryItem } from '../../types/financial';
+import type { HistoricalDataPoint } from '../../types/financial';
 
 interface TrendChartProps {
-    data: HistoryItem[];
-    title: string;
+    data: HistoricalDataPoint[];
+    height?: number;
 }
 
-const TrendChart: React.FC<TrendChartProps> = ({ data, title }) => {
-    // Sort data by date ascending for the chart
-    const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+export const TrendChart: React.FC<TrendChartProps> = ({ data, height = 400 }) => {
+    if (!data || data.length === 0) {
+        return (
+            <div className="flex items-center justify-center h-64 text-gray-400">
+                <div className="text-center">
+                    <p className="text-sm">暂无历史数据</p>
+                </div>
+            </div>
+        );
+    }
+
+    // 反转数据以按时间正序显示
+    const chartData = [...data].reverse();
 
     return (
-        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-xl p-4 w-full h-[300px]">
-            <h3 className="text-gray-300 text-sm font-medium mb-4">{title}</h3>
-            <div className="w-full h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={sortedData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-                        <XAxis
-                            dataKey="date"
-                            stroke="#9CA3AF"
-                            tick={{ fontSize: 12 }}
-                            tickLine={false}
-                            axisLine={false}
-                        />
-                        <YAxis
-                            stroke="#9CA3AF"
-                            tick={{ fontSize: 12 }}
-                            tickLine={false}
-                            axisLine={false}
-                            unit="%"
-                        />
-                        <Tooltip
-                            contentStyle={{
-                                backgroundColor: '#1F2937',
-                                borderColor: '#374151',
-                                borderRadius: '0.5rem',
-                                color: '#F3F4F6'
-                            }}
-                            itemStyle={{ color: '#F3F4F6' }}
-                        />
-                        <Legend />
-                        <Line
-                            type="monotone"
-                            dataKey="roe"
-                            name="ROE"
-                            stroke="#8B5CF6"
-                            strokeWidth={2}
-                            dot={{ r: 4, fill: '#8B5CF6' }}
-                            activeDot={{ r: 6 }}
-                        />
-                        <Line
-                            type="monotone"
-                            dataKey="gross_margin"
-                            name="Gross Margin"
-                            stroke="#10B981"
-                            strokeWidth={2}
-                            dot={{ r: 4, fill: '#10B981' }}
-                            activeDot={{ r: 6 }}
-                        />
-                        <Line
-                            type="monotone"
-                            dataKey="net_margin"
-                            name="Net Margin"
-                            stroke="#3B82F6"
-                            strokeWidth={2}
-                            dot={{ r: 4, fill: '#3B82F6' }}
-                            activeDot={{ r: 6 }}
-                        />
-                    </LineChart>
-                </ResponsiveContainer>
-            </div>
-        </div>
+        <ResponsiveContainer width="100%" height={height}>
+            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12 }}
+                    stroke="#9ca3af"
+                />
+                <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 12 }}
+                    stroke="#9ca3af"
+                    label={{ value: '百分比 (%)', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }}
+                />
+                <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 12 }}
+                    stroke="#9ca3af"
+                />
+                <Tooltip
+                    contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '12px'
+                    }}
+                />
+                <Legend
+                    wrapperStyle={{ fontSize: '12px' }}
+                    iconType="line"
+                />
+
+                <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="roe"
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                    name="ROE"
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                />
+                <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="gross_margin"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                    name="毛利率"
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                />
+                <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="net_margin"
+                    stroke="#8B5CF6"
+                    strokeWidth={2}
+                    name="净利率"
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                />
+                <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="asset_liability_ratio"
+                    stroke="#F59E0B"
+                    strokeWidth={2}
+                    name="资产负债率"
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                />
+            </LineChart>
+        </ResponsiveContainer>
     );
 };
-
-export default TrendChart;
