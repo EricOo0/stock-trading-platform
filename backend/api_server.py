@@ -106,6 +106,8 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
         
         if path == '/api/market-data':
             self.handle_market_data()
+        elif path == '/api/tools/financial_report_tool/get_financial_indicators':
+            self.handle_financial_indicators()
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
@@ -556,6 +558,39 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"处理财报请求失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            self._set_headers(500)
+            self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
+
+    def handle_financial_indicators(self):
+        """处理财务指标请求 POST /api/tools/financial_report_tool/get_financial_indicators"""
+        try:
+            # 读取请求体
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            symbol = request_data.get('symbol', '')
+            years = request_data.get('years', 3)
+            use_cache = request_data.get('use_cache', True)
+            
+            if not symbol:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({'status': 'error', 'message': 'Symbol is required'}).encode())
+                return
+
+            logger.info(f"获取财务指标: {symbol}, years={years}")
+            
+            from skills.financial_report_tool.skill import FinancialReportSkill
+            skill = FinancialReportSkill()
+            result = skill.get_financial_indicators(symbol, years, use_cache)
+            
+            self._set_headers(200)
+            self.wfile.write(json.dumps(result, ensure_ascii=False, default=str).encode())
+
+        except Exception as e:
+            logger.error(f"处理财务指标请求失败: {str(e)}")
             import traceback
             traceback.print_exc()
             self._set_headers(500)
