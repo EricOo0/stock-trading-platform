@@ -400,7 +400,7 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
 
             # 处理NaN: 将NaN转换为None，以便前端JSON序列化为null
             # Recharts等图表库通常能更好地处理null(断点)而不是0
-            df = df.where(pd.notnull(df), None)
+            df = df.replace({float('nan'): None, float('inf'): None, float('-inf'): None})
             
             # 转换回字典列表
             # datetime需要转回字符串
