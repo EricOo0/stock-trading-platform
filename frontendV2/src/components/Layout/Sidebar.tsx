@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2 } from 'lucide-react';
+import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2, FileText } from 'lucide-react';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -39,6 +39,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: '行情查询',
       icon: <TrendingUp size={20} />,
       color: 'text-blue-500'
+    },
+    {
+      id: 'financial-analysis',
+      label: '新财报分析',
+      icon: <FileText size={20} />,
+      color: 'text-indigo-400'
     },
     {
       id: 'technical-analysis',

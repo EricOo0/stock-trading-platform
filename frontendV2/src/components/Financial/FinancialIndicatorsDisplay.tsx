@@ -22,6 +22,7 @@ interface FinancialIndicatorsDisplayProps {
     indicators: FinancialIndicators;
     symbol: string;
     market: string;
+    compact?: boolean;
 }
 
 interface LatestReport {
@@ -42,7 +43,8 @@ interface LatestReport {
 export const FinancialIndicatorsDisplay: React.FC<FinancialIndicatorsDisplayProps> = ({
     indicators,
     symbol,
-    market
+    market,
+    compact = false
 }) => {
     const { revenue, profit, cashflow, debt, shareholder_return, history } = indicators;
     const [latestReport, setLatestReport] = useState<LatestReport | null>(null);
@@ -71,17 +73,19 @@ export const FinancialIndicatorsDisplay: React.FC<FinancialIndicatorsDisplayProp
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h3 className="text-xl font-bold text-gray-900">财务指标分析</h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                        {symbol} • {market === 'A-SHARE' ? 'A股' : market === 'US' ? '美股' : '港股'}
-                    </p>
+            {!compact && (
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-900">财务指标分析</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                            {symbol} • {market === 'A-SHARE' ? 'A股' : market === 'US' ? '美股' : '港股'}
+                        </p>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Indicator Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className={`grid gap-6 ${compact ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
                 {/* 收入端 */}
                 <IndicatorCard
                     title="收入端指标"

@@ -4,6 +4,8 @@ import { MarketQueryPage, HomePage, StockSearchPage } from './pages';
 import TechnicalAnalysisPage from './pages/TechnicalAnalysisPage';
 import MacroDataPage from './pages/MacroDataPage';
 
+import FinancialAnalysisPage from './pages/FinancialAnalysisPage';
+
 import CouncilRoom from './components/Council/CouncilRoom';
 
 function App() {
@@ -25,6 +27,8 @@ function App() {
         return '调试页面';
       case 'market-query':
         return '行情查询';
+      case 'financial-analysis':
+        return '新财报分析';
       case 'technical-analysis':
         return '技术分析';
       case 'stock-search':
@@ -46,6 +50,8 @@ function App() {
         return <CouncilRoom />;
       case 'market-query':
         return <MarketQueryPage />;
+      case 'financial-analysis':
+        return <FinancialAnalysisPage />;
       case 'technical-analysis':
         return <TechnicalAnalysisPage />;
       case 'stock-search':

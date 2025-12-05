@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import Dict, Any, List, Optional, Tuple
 from loguru import logger
 from edgar import set_identity, Company
@@ -32,8 +33,6 @@ class FinancialReportSkill:
             self.cache = CacheManager(cache_dir=".cache/financial_data", ttl_hours=24)
         except ImportError:
             # Fallback for direct execution
-            import sys
-            import os
             current_dir = os.path.dirname(os.path.abspath(__file__))
             sys.path.insert(0, current_dir)
             from utils.cache_manager import CacheManager
@@ -42,7 +41,6 @@ class FinancialReportSkill:
         # Try to load config from agent/config.yaml
         try:
             # Ensure project root is in path to import agent
-            import sys
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
             if project_root not in sys.path:
                 sys.path.append(project_root)
