@@ -5,17 +5,21 @@ import { ArrowUp, ArrowDown, Activity, Globe } from 'lucide-react';
 import { ChartComponent } from '../components/ChartComponent';
 import { FedWatchTable } from '../components/FedWatchTable';
 
-interface IndicatorData {
+interface IndicatorConfig {
     id: string;
     name: string;
     region: 'US' | 'CN' | 'Global';
     category: 'Growth' | 'Inflation' | 'Employment' | 'Monetary' | 'Market';
+    unit?: string;
+}
+
+interface IndicatorData extends IndicatorConfig {
     unit: string;
     history: MacroDataPoint[];
     latest?: MacroDataPoint;
 }
 
-const INDICATORS_CONFIG = [
+const INDICATORS_CONFIG: IndicatorConfig[] = [
     { id: 'GDP', name: 'US GDP', region: 'US', category: 'Growth' },
     { id: 'CPI', name: 'US CPI', region: 'US', category: 'Inflation' },
     { id: 'UNEMPLOYMENT_RATE', name: 'US Unemployment', region: 'US', category: 'Employment' },
@@ -28,8 +32,46 @@ const INDICATORS_CONFIG = [
     { id: 'CPI', name: 'China CPI', region: 'CN', category: 'Inflation' },
 ];
 
+const normalizeDate = (dateStr: string): string | null => {
+    // Standard YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+
+    // 2025年10月份 -> 2025-10-01
+    const monthMatch = dateStr.match(/^(\d{4})年(\d{1,2})月份$/);
+    if (monthMatch) {
+        const year = monthMatch[1];
+        const month = monthMatch[2].padStart(2, '0');
+        return `${year}-${month}-01`;
+    }
+
+    // 2025年第1-3季度 -> 2025-09-30 (End of Q3)
+    // 2025年第3季度 -> 2025-09-30
+    const quarterMatch = dateStr.match(/^(\d{4})年第(\d)(?:-(\d))?季度$/);
+    if (quarterMatch) {
+        const year = parseInt(quarterMatch[1]);
+        const startQ = parseInt(quarterMatch[2]);
+        const endQ = quarterMatch[3] ? parseInt(quarterMatch[3]) : startQ;
+        
+        // Map quarter end month: Q1->3, Q2->6, Q3->9, Q4->12
+        const monthIdx = endQ * 3; // 1-based month index
+        // Get last day of that month
+        const lastDayDate = new Date(year, monthIdx, 0);
+        const monthStr = monthIdx.toString().padStart(2, '0');
+        const dayStr = lastDayDate.getDate().toString().padStart(2, '0');
+        return `${year}-${monthStr}-${dayStr}`;
+    }
+
+    // Try basic parsing as fallback
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+         return d.toISOString().split('T')[0];
+    }
+
+    return null;
+};
+
 // Helper to map config to API calls
-const fetchIndicator = async (config: any) => {
+const fetchIndicator = async (config: IndicatorConfig) => {
     // For China data, we might need a different ID or handle it in the API
     // The API currently uses the same ID for US and China (e.g. GDP) but different services?
     // Wait, my MacroDataSkill.get_historical_data uses the indicator name to route.
@@ -57,6 +99,12 @@ const fetchIndicator = async (config: any) => {
         // Special handling for Fed Funds Futures to convert price to rate
         let history = data.data;
         let unit = data.units || config.unit || '';
+
+        // Normalize dates
+        history = history.map((item: MacroDataPoint) => {
+            const normalized = normalizeDate(item.date);
+            return normalized ? { ...item, date: normalized } : null;
+        }).filter((item: MacroDataPoint | null): item is MacroDataPoint => item !== null);
 
         if (config.id === 'FED_FUNDS_FUTURES') {
             history = history.map((item: MacroDataPoint) => ({
@@ -104,7 +152,56 @@ const MacroDataPage: React.FC = () => {
     }, []);
 
     if (loading) {
-        return <div className="p-8 text-center text-slate-400">Loading macro data...</div>;
+        return (
+            <div className="h-full flex flex-col bg-slate-900 text-white p-6 overflow-hidden">
+                <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-slate-800 animate-pulse" />
+                        <div className="w-48 h-8 bg-slate-800 rounded animate-pulse" />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-12 gap-6 h-[calc(100vh-140px)] overflow-hidden">
+                    {/* Table Skeleton */}
+                    <div className="col-span-5 bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden">
+                        <div className="p-3 border-b border-slate-700/50 bg-slate-900/50 flex justify-between">
+                            <div className="w-20 h-4 bg-slate-700/50 rounded animate-pulse" />
+                            <div className="w-16 h-4 bg-slate-700/50 rounded animate-pulse" />
+                        </div>
+                        <div className="p-2 space-y-2">
+                            {[...Array(10)].map((_, i) => (
+                                <div key={i} className="flex justify-between items-center p-2">
+                                    <div className="space-y-2">
+                                        <div className="w-32 h-4 bg-slate-700/50 rounded animate-pulse" />
+                                        <div className="w-20 h-3 bg-slate-700/30 rounded animate-pulse" />
+                                    </div>
+                                    <div className="space-y-2 flex flex-col items-end">
+                                        <div className="w-24 h-4 bg-slate-700/50 rounded animate-pulse" />
+                                        <div className="w-16 h-3 bg-slate-700/30 rounded animate-pulse" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Chart Skeleton */}
+                    <div className="col-span-7 flex flex-col gap-6 overflow-hidden">
+                        <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 flex-1 flex flex-col">
+                            <div className="mb-6 space-y-3">
+                                <div className="w-48 h-6 bg-slate-700/50 rounded animate-pulse" />
+                                <div className="w-64 h-4 bg-slate-700/30 rounded animate-pulse" />
+                            </div>
+                            <div className="flex-1 bg-slate-900/50 rounded-lg border border-slate-700/50 animate-pulse" />
+                        </div>
+
+                        <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 h-1/3 shrink-0">
+                            <div className="w-40 h-6 bg-slate-700/50 rounded animate-pulse mb-4" />
+                            <div className="w-full h-4 bg-slate-700/30 rounded animate-pulse" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     // Helper to get current Fed Funds Rate

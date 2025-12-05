@@ -4,6 +4,16 @@ import type { StockData } from '../services/stockAPI';
 import TradingViewKLineChart from '../components/KLineChart/TradingViewKLineChart';
 import SimpleKLineChart from '../components/KLineChart/SimpleKLineChart';
 import type { UTCTimestamp } from 'lightweight-charts';
+import { Search, TrendingUp, AlertCircle, Loader2, BarChart2, Activity } from 'lucide-react';
+
+interface KLineData {
+  time: UTCTimestamp;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
 const StockSearchPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -11,7 +21,7 @@ const StockSearchPage: React.FC = () => {
   const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [klineData, setKlineData] = useState<any[]>([]);
+  const [klineData, setKlineData] = useState<KLineData[]>([]);
   const [useSimpleChart, setUseSimpleChart] = useState(false); // 备用图表开关
   const [chartError, setChartError] = useState<string>(''); // 图表错误信息
 
@@ -118,7 +128,7 @@ const StockSearchPage: React.FC = () => {
         setKlineData(kData);
         setSelectedStock(response.data);
       }
-    } catch (err) {
+    } catch {
       setError('快速搜索失败');
     } finally {
       setLoading(false);
@@ -136,189 +146,69 @@ const StockSearchPage: React.FC = () => {
   ];
 
   return (
-    <div style={{
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '16px'
-    }}>
+    <div className="h-full flex flex-col gap-4 max-w-7xl mx-auto w-full p-6">
       {/* 页面标题 */}
-      <div style={{
-        flex: '0 0 10%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        padding: '0 20px'
-      }}>
-        <h1 style={{
-          fontSize: 'clamp(1.3rem, 2.5vw, 1.8rem)',
-          fontWeight: '700',
-          color: '#1f2937',
-          margin: 0
-        }}>
+      <div className="flex flex-col justify-center py-2">
+        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
           股票搜索
         </h1>
-        <p style={{
-          fontSize: '0.9rem',
-          color: '#6b7280',
-          margin: '4px 0 0 0'
-        }}>
+        <p className="text-sm text-slate-400 mt-1">
           支持A股、美股、港股实时查询
         </p>
       </div>
 
       {/* 搜索区域 */}
-      <div style={{
-        flex: '0 0 15%',
-        background: 'white',
-        borderRadius: '12px',
-        padding: '16px 20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center'
-      }}>
-        <form onSubmit={handleSearch} style={{
-          display: 'flex',
-          gap: '12px',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            position: 'relative',
-            flex: 1
-          }}>
-            <span style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#9ca3af',
-              fontSize: '16px'
-            }}>
-              🔍
-            </span>
+      <div className="bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-700 flex flex-col justify-center">
+        <form onSubmit={handleSearch} className="flex gap-3 items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="输入股票代码或名称，如：000001、AAPL、腾讯"
-              style={{
-                width: '100%',
-                padding: '10px 10px 10px 40px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'all 0.2s ease'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#3b82f6';
-                e.target.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#e5e7eb';
-                e.target.style.boxShadow = 'none';
-              }}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            style={{
-              background: loading ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
-            }}
-            onMouseOver={(e) => {
-              if (!loading) {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (!loading) {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)';
-              }
-            }}
+            className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors shadow-sm shadow-blue-600/20 flex items-center gap-2"
           >
-            {loading ? '搜索中...' : '搜索'}
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                搜索中...
+              </>
+            ) : (
+              '搜索'
+            )}
           </button>
         </form>
 
         {/* 错误提示 */}
         {error && (
-          <div style={{
-            marginTop: '8px',
-            padding: '8px 12px',
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '6px',
-            color: '#dc2626',
-            fontSize: '0.8rem'
-          }}>
-            ⚠️ {error}
+          <div className="mt-3 p-3 bg-red-900/20 border border-red-800/50 rounded-lg text-red-400 text-sm flex items-center gap-2">
+            <AlertCircle size={16} />
+            {error}
           </div>
         )}
       </div>
 
       {/* 热门股票快速搜索 */}
-      <div style={{
-        flex: '0 0 10%',
-        background: 'white',
-        borderRadius: '12px',
-        padding: '12px 16px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '8px'
-        }}>
-          <span style={{ fontSize: '14px' }}>🔥</span>
-          <span style={{
-            fontSize: '0.85rem',
-            fontWeight: '500',
-            color: '#1f2937'
-          }}>
+      <div className="bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-700">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg">🔥</span>
+          <span className="text-sm font-medium text-white">
             热门股票
           </span>
         </div>
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          flexWrap: 'wrap'
-        }}>
+        <div className="flex gap-2 flex-wrap">
           {hotStocks.map((stock) => (
             <button
               key={stock.symbol}
               onClick={() => quickSearch(stock.symbol)}
-              style={{
-                padding: '4px 8px',
-                background: '#f3f4f6',
-                border: '1px solid #e5e7eb',
-                borderRadius: '4px',
-                fontSize: '0.75rem',
-                color: '#374151',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#e5e7eb';
-                e.currentTarget.style.borderColor = '#d1d5db';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#f3f4f6';
-                e.currentTarget.style.borderColor = '#e5e7eb';
-              }}
+              className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded text-xs text-slate-300 hover:text-white transition-all duration-200"
             >
               {stock.symbol} - {stock.name}
             </button>
@@ -327,76 +217,31 @@ const StockSearchPage: React.FC = () => {
       </div>
 
       {/* 搜索结果和K线图 */}
-      <div style={{
-        flex: '1',
-        display: 'grid',
-        gridTemplateColumns: selectedStock ? '1fr 1fr' : '1fr',
-        gap: '16px',
-        minHeight: 0
-      }}>
+      <div className={`flex-1 grid gap-4 min-h-0 ${selectedStock ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
         {/* 搜索结果列表 */}
-        <div style={{
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <div style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #f3f4f6',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span style={{ fontSize: '14px' }}>📊</span>
+        <div className="bg-slate-800 rounded-xl shadow-sm border border-slate-700 overflow-hidden flex flex-col">
+          <div className="p-3 border-b border-slate-700 bg-slate-900/30 flex items-center gap-2">
+            <BarChart2 size={16} className="text-slate-400" />
             <div>
-              <h3 style={{
-                fontSize: '0.95rem',
-                fontWeight: '600',
-                color: '#1f2937',
-                margin: 0
-              }}>
+              <h3 className="text-sm font-semibold text-white">
                 搜索结果
               </h3>
-              <p style={{
-                color: '#6b7280',
-                margin: '2px 0 0 0',
-                fontSize: '0.75rem'
-              }}>
+              <p className="text-xs text-slate-500">
                 点击股票查看K线图
               </p>
             </div>
           </div>
 
-          <div style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: '8px'
-          }}>
+          <div className="flex-1 overflow-y-auto p-2">
             {searchResults.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: '#9ca3af'
-              }}>
-                <div style={{
-                  fontSize: '32px',
-                  marginBottom: '12px'
-                }}>
-                  🔍
-                </div>
-                <p style={{
-                  fontSize: '0.9rem',
-                  margin: 0
-                }}>
-                  请输入股票代码或名称开始搜索
-                </p>
+              <div className="h-full flex flex-col items-center justify-center text-slate-500 text-sm p-10 text-center">
+                <Search size={32} className="mb-3 text-slate-600" />
+                <p>请输入股票代码或名称开始搜索</p>
               </div>
             ) : (
               searchResults.filter(stock => stock && stock.symbol).map((stock) => {
                 const isPositive = stock.change_amount >= 0;
+                const isSelected = selectedStock?.symbol === stock.symbol;
 
                 return (
                   <div
@@ -406,98 +251,45 @@ const StockSearchPage: React.FC = () => {
                       const kData = generateKLineData(stock.current_price);
                       setKlineData(kData);
                     }}
-                    style={{
-                      padding: '10px 12px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      background: selectedStock?.symbol === stock.symbol ? '#eff6ff' : 'transparent',
-                      borderLeft: selectedStock?.symbol === stock.symbol ? '3px solid #3b82f6' : '3px solid transparent',
-                      borderRadius: '6px',
-                      marginBottom: '4px'
-                    }}
-                    onMouseOver={(e) => {
-                      if (selectedStock?.symbol !== stock.symbol) {
-                        e.currentTarget.style.background = '#f9fafb';
+                    className={`
+                      p-3 mb-1 rounded-lg cursor-pointer transition-all duration-200 border-l-4
+                      ${isSelected
+                        ? 'bg-blue-900/20 border-l-blue-500'
+                        : 'bg-transparent border-l-transparent hover:bg-slate-700/50'
                       }
-                    }}
-                    onMouseOut={(e) => {
-                      if (selectedStock?.symbol !== stock.symbol) {
-                        e.currentTarget.style.background = 'transparent';
-                      }
-                    }}
+                    `}
                   >
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}>
+                    <div className="flex items-center justify-between">
                       <div>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          marginBottom: '2px'
-                        }}>
-                          <span style={{
-                            fontSize: '0.9rem',
-                            fontWeight: '600',
-                            color: '#1f2937'
-                          }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-bold text-white">
                             {stock.symbol}
                           </span>
-                          <span style={{
-                            fontSize: '0.7rem',
-                            padding: '2px 6px',
-                            background: stock.market === 'A-share' ? '#dbeafe' :
-                              stock.market === 'US' ? '#dcfce7' : '#f3e8ff',
-                            color: stock.market === 'A-share' ? '#1d4ed8' :
-                              stock.market === 'US' ? '#166534' : '#7c3aed',
-                            borderRadius: '3px',
-                            fontWeight: '500'
-                          }}>
+                          <span className={`
+                            text-[10px] px-1.5 py-0.5 rounded font-medium
+                            ${stock.market === 'A-share' ? 'bg-blue-900/40 text-blue-400' :
+                              stock.market === 'US' ? 'bg-green-900/40 text-green-400' : 'bg-purple-900/40 text-purple-400'}
+                          `}>
                             {stock.market === 'A-share' ? 'A股' :
                               stock.market === 'US' ? '美股' : '港股'}
                           </span>
                         </div>
-                        <h3 style={{
-                          fontWeight: '500',
-                          color: '#374151',
-                          margin: 0,
-                          fontSize: '0.8rem'
-                        }}>
+                        <h3 className="text-xs font-medium text-slate-400">
                           {stock.name}
                         </h3>
                       </div>
 
-                      <div style={{
-                        textAlign: 'right'
-                      }}>
-                        <div style={{
-                          fontSize: '1rem',
-                          fontWeight: '700',
-                          color: '#1f2937',
-                          marginBottom: '2px'
-                        }}>
+                      <div className="text-right">
+                        <div className="text-base font-bold text-white mb-0.5 font-mono">
                           {stock.currency === 'CNY' ? '¥' : stock.currency === 'USD' ? '$' : 'HK$'}{stock.current_price?.toFixed(2) || '--'}
                         </div>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                          gap: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          color: isPositive ? '#10b981' : '#ef4444'
-                        }}>
-                          <span>
-                            {isPositive ? '📈' : '📉'}
-                          </span>
-                          <span>
-                            {isPositive ? '+' : ''}{stock.change_amount?.toFixed(2) || '--'}
-                          </span>
-                          <span>
-                            ({isPositive ? '+' : ''}{stock.change_percent?.toFixed(2) || '--'}%)
-                          </span>
+                        <div className={`
+                          flex items-center justify-end gap-1 text-xs font-medium
+                          ${isPositive ? 'text-red-500' : 'text-green-500'}
+                        `}>
+                          {isPositive ? <TrendingUp size={12} /> : <TrendingUp size={12} className="rotate-180" />}
+                          <span>{isPositive ? '+' : ''}{stock.change_amount?.toFixed(2) || '--'}</span>
+                          <span>({isPositive ? '+' : ''}{stock.change_percent?.toFixed(2) || '--'}%)</span>
                         </div>
                       </div>
                     </div>
@@ -510,84 +302,58 @@ const StockSearchPage: React.FC = () => {
 
         {/* K线图 */}
         {selectedStock && (
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            padding: '16px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '12px',
-              paddingBottom: '8px',
-              borderBottom: '1px solid #f3f4f6'
-            }}>
-              <span style={{ fontSize: '16px' }}>📈</span>
+          <div className="bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-700 flex flex-col">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-700">
+              <Activity size={18} className="text-blue-500" />
               <div>
-                <h3 style={{
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  margin: 0
-                }}>
+                <h3 className="text-sm font-semibold text-white">
                   {selectedStock.symbol} - K线图
                 </h3>
-                <p style={{
-                  color: '#6b7280',
-                  margin: '2px 0 0 0',
-                  fontSize: '0.75rem'
-                }}>
+                <p className="text-xs text-slate-400">
                   {selectedStock.name}
                 </p>
               </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: '200px' }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '8px'
-              }}>
-                <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>K线图预览</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="flex-1 min-h-[300px] flex flex-col">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs text-slate-500">K线图预览</span>
+                <div className="flex items-center gap-2">
                   {chartError && (
-                    <span style={{ fontSize: '0.7rem', color: '#dc2626' }}>高级图表加载失败</span>
+                    <span className="text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle size={12} /> 高级图表加载失败
+                    </span>
                   )}
                   <button
                     onClick={() => setUseSimpleChart(!useSimpleChart)}
-                    style={{
-                      padding: '4px 8px',
-                      fontSize: '0.7rem',
-                      background: useSimpleChart ? '#dbeafe' : '#f3f4f6',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      color: useSimpleChart ? '#2563eb' : '#374151'
-                    }}
+                    className={`
+                      px-2 py-1 text-xs rounded transition-colors border
+                      ${useSimpleChart
+                        ? 'bg-blue-900/30 text-blue-400 border-blue-800'
+                        : 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600'
+                      }
+                    `}
                   >
                     {useSimpleChart ? '使用高级图表' : '使用简单图表'}
                   </button>
                 </div>
               </div>
-              {useSimpleChart ? (
-                <SimpleKLineChart
-                  data={klineData}
-                  width={600}
-                  height={200}
-                />
-              ) : (
-                <TradingViewKLineChart
-                  data={klineData}
-                  width={600}
-                  height={200}
-                  onError={handleChartError}
-                />
-              )}
+              <div className="flex-1 bg-slate-900 rounded-lg border border-slate-700 overflow-hidden relative">
+                {useSimpleChart ? (
+                  <SimpleKLineChart
+                    data={klineData}
+                    width={600}
+                    height={300}
+                  />
+                ) : (
+                  <TradingViewKLineChart
+                    data={klineData}
+                    width={600}
+                    height={300}
+                    onError={handleChartError}
+                  />
+                )}
+              </div>
             </div>
           </div>
         )}

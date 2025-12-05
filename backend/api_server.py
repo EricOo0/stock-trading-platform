@@ -27,6 +27,8 @@ from skills.web_search_tool.skill import WebSearchSkill
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+import mimetypes
+
 class MarketDataAPIHandler(BaseHTTPRequestHandler):
     """市场数据API处理器"""
     
@@ -49,6 +51,38 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
         path = parsed_path.path
         query_params = parse_qs(parsed_path.query)
         
+        # Static file serving for reports
+        if path.startswith('/static/reports/'):
+            try:
+                # Security check: prevent directory traversal
+                file_name = os.path.basename(path)
+                file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'reports', file_name)
+                
+                if os.path.exists(file_path) and os.path.isfile(file_path):
+                    # Guess MIME type
+                    mime_type, _ = mimetypes.guess_type(file_path)
+                    if mime_type is None:
+                        mime_type = 'application/octet-stream'
+                        
+                    with open(file_path, 'rb') as f:
+                        content = f.read()
+                        
+                    self.send_response(200)
+                    self.send_header('Content-Type', mime_type)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.send_header('Content-Length', str(len(content)))
+                    self.end_headers()
+                    self.wfile.write(content)
+                    return
+                else:
+                    self._set_headers(404)
+                    self.wfile.write(json.dumps({'error': 'File not found'}).encode())
+                    return
+            except Exception as e:
+                logger.error(f"Error serving static file: {e}")
+                self._set_headers(500)
+                return
+
         if path == '/api/market-data/hot':
             self.handle_hot_stocks()
         elif path.startswith('/api/market/historical/'):
@@ -72,7 +106,7 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
         
         if path == '/api/market-data':
             self.handle_market_data()
-        elif path == '/api/financial/indicators':
+        elif path == '/api/tools/financial_report_tool/get_financial_indicators':
             self.handle_financial_indicators()
         else:
             self._set_headers(404)
@@ -364,8 +398,9 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             df['kdj_d'] = df['kdj_k'].ewm(com=2, adjust=False).mean()
             df['kdj_j'] = 3 * df['kdj_k'] - 2 * df['kdj_d']
 
-            # 处理NaN和无穷大
-            df = df.fillna(0)
+            # 处理NaN: 将NaN转换为None，以便前端JSON序列化为null
+            # Recharts等图表库通常能更好地处理null(断点)而不是0
+            df = df.replace({float('nan'): None, float('inf'): None, float('-inf'): None})
             
             # 转换回字典列表
             # datetime需要转回字符串
@@ -426,7 +461,15 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             logger.info(f"执行网络搜索: {query}")
             
             # 初始化WebSearchSkill
-            web_search_skill = WebSearchSkill(tavily_api_key="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")
+            # 配置为新闻搜索模式，限制最近7天，确保获取相关性强且即时的新闻
+            web_search_skill = WebSearchSkill(
+                tavily_api_key="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",
+                search_kwargs={
+                    "topic": "news",
+                    "days": 7,
+                    "max_results": 30
+                }
+            )
             
             # 执行搜索
             result = web_search_skill._run(query)
@@ -465,9 +508,24 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
     def handle_financial_report(self, path: str):
         """处理财报分析请求 /api/financial-report/{symbol}"""
         try:
+            path_parts = path.split('/')
+            
+            # Check for analyze request: /api/financial-report/analyze/{symbol}
+            if len(path_parts) >= 5 and path_parts[3] == 'analyze':
+                symbol = path_parts[4]
+                logger.info(f"分析财报数据: {symbol}")
+                
+                from skills.financial_report_tool.skill import FinancialReportSkill
+                skill = FinancialReportSkill()
+                result = skill.analyze_report(symbol)
+                
+                self._set_headers(200)
+                self.wfile.write(json.dumps(result, ensure_ascii=False, default=str).encode())
+                return
+
             # Extract symbol from path
             # Path format: /api/financial-report/AAPL
-            symbol = path.split('/')[-1]
+            symbol = path_parts[-1]
             
             if not symbol:
                 self._set_headers(400)
@@ -506,7 +564,7 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
 
     def handle_financial_indicators(self):
-        """处理财务指标请求 POST /api/financial/indicators"""
+        """处理财务指标请求 POST /api/tools/financial_report_tool/get_financial_indicators"""
         try:
             # 读取请求体
             content_length = int(self.headers.get('Content-Length', 0))
@@ -519,40 +577,24 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             
             if not symbol:
                 self._set_headers(400)
-                self.wfile.write(json.dumps({
-                    'status': 'error',
-                    'message': 'Symbol is required'
-                }).encode())
+                self.wfile.write(json.dumps({'status': 'error', 'message': 'Symbol is required'}).encode())
                 return
+
+            logger.info(f"获取财务指标: {symbol}, years={years}")
             
-            logger.info(f"获取财务指标: {symbol}, years={years}, use_cache={use_cache}")
-            
-            # 导入财务报告skill
             from skills.financial_report_tool.skill import FinancialReportSkill
-            
             skill = FinancialReportSkill()
+            result = skill.get_financial_indicators(symbol, years, use_cache)
             
-            # 调用get_financial_indicators方法
-            result = skill.get_financial_indicators(symbol, years=years, use_cache=use_cache)
-            
-            if result.get('status') == 'success':
-                self._set_headers(200)
-                self.wfile.write(json.dumps(result, ensure_ascii=False, default=str).encode())
-            else:
-                self._set_headers(200)  # 仍然返回200，但包含错误状态
-                self.wfile.write(json.dumps(result, ensure_ascii=False).encode())
-                
+            self._set_headers(200)
+            self.wfile.write(json.dumps(result, ensure_ascii=False, default=str).encode())
+
         except Exception as e:
             logger.error(f"处理财务指标请求失败: {str(e)}")
             import traceback
             traceback.print_exc()
-            error_response = {
-                'status': 'error',
-                'message': f'服务器错误: {str(e)}',
-                'timestamp': datetime.now().isoformat()
-            }
             self._set_headers(500)
-            self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+            self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
 
     def handle_macro_historical_data(self, path: str, query_params: Dict[str, List[str]]):
         """处理宏观数据历史查询"""
@@ -607,7 +649,6 @@ def run_server(port=8000):
     logger.info(f"市场数据API服务器启动，端口: {port}")
     logger.info(f"API端点:")
     logger.info(f"  POST /api/market-data - 查询股票数据")
-    logger.info(f"  POST /api/financial/indicators - 获取财务指标")
     logger.info(f"  GET  /api/market-data/hot - 获取热门股票")
     logger.info(f"  GET  /api/market/historical/<symbol> - 获取历史数据")
     logger.info(f"  GET  /api/market/technical/<symbol> - 获取技术分析数据(含指标)")

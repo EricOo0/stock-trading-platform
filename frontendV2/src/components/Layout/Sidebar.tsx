@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BarChart2, LineChart, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2 } from 'lucide-react';
+import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2, FileText } from 'lucide-react';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -41,6 +41,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       color: 'text-blue-500'
     },
     {
+      id: 'financial-analysis',
+      label: '新财报分析',
+      icon: <FileText size={20} />,
+      color: 'text-indigo-400'
+    },
+    {
       id: 'technical-analysis',
       label: '技术分析',
       icon: <BarChart2 size={20} />,
@@ -69,12 +75,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div
       className={`
-        h-screen bg-slate-900 border-r border-slate-800 flex flex-col shadow-xl transition-all duration-300 ease-in-out
-        ${isCollapsed ? 'w-20' : 'w-72'}
+        h-screen bg-slate-900 border-r border-slate-700 flex flex-col shadow-xl transition-all duration-300 ease-in-out
+        ${isCollapsed ? 'w-20' : 'w-60'}
       `}
     >
       {/* Header */}
-      <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+      <div className="p-6 border-b border-slate-700 flex items-center justify-between">
         {!isCollapsed && (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 text-white">
@@ -106,30 +112,30 @@ const Sidebar: React.FC<SidebarProps> = ({
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={`
-                  w-full flex items-center p-3 rounded-xl transition-all duration-200 group relative overflow-hidden
+                  w-full flex items-center p-3 rounded-2xl transition-all duration-300 group relative overflow-hidden outline-none
                   ${isCollapsed ? 'justify-center' : 'justify-start'}
                   ${isActive
-                    ? 'bg-gradient-to-r from-slate-800 to-slate-800/50 text-white shadow-md border border-slate-700/50'
-                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                    ? 'bg-gradient-to-r from-slate-800/80 to-slate-800/40 text-white shadow-lg border border-slate-700/30'
+                    : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
                   }
                 `}
                 title={isCollapsed ? item.label : ''}
               >
                 {isActive && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-xl" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-r-full shadow-[0_0_12px_rgba(59,130,246,0.5)]" />
                 )}
 
                 <div className={`
-                  transition-transform duration-200
-                  ${isActive ? item.color : 'text-slate-400 group-hover:text-white'}
-                  ${!isCollapsed && 'mr-3'}
-                  ${isActive && 'scale-110'}
+                  transition-all duration-300
+                  ${isActive ? item.color : 'text-slate-500 group-hover:text-slate-300'}
+                  ${!isCollapsed && 'mr-3.5'}
+                  ${isActive && 'scale-110 drop-shadow-md'}
                 `}>
                   {item.icon}
                 </div>
 
                 {!isCollapsed && (
-                  <span className="font-medium tracking-wide text-sm">
+                  <span className={`font-medium tracking-wide text-sm transition-colors duration-300 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
                     {item.label}
                   </span>
                 )}
@@ -141,7 +147,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Footer */}
-      <div className="p-5 border-t border-slate-800 text-center">
+      <div className="p-5 border-t border-slate-700 text-center">
         {!isCollapsed ? (
           <div className="text-xs text-slate-500 leading-relaxed">
             <div className="font-medium text-slate-400">v1.0.0</div>
