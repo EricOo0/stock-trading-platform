@@ -35,7 +35,7 @@ const FloatingAIAssistant: React.FC = () => {
         }
     }, [isOpen]);
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!input.trim()) return;
 
         // If chat is not open, open it
@@ -44,14 +44,56 @@ const FloatingAIAssistant: React.FC = () => {
             setIsOpen(false); // Close the input bar as we move to chat window
         }
 
-        setMessages(prev => [...prev, { role: 'user', content: input }]);
-        const currentInput = input;
+        const userMessage = input;
+        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
         setInput('');
 
-        // Simulate AI response
-        setTimeout(() => {
-            setMessages(prev => [...prev, { role: 'ai', content: `针对"${currentInput}"的分析：\n这是一个演示回复。在实际版本中，我将结合财报内容为您提供深度解答。` }]);
-        }, 1000);
+        // Create a placeholder for AI response
+        setMessages(prev => [...prev, { role: 'ai', content: '' }]);
+
+        try {
+            const response = await fetch('http://localhost:9000/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: userMessage }),
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+            if (!response.body) throw new Error('No response body');
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let aiResponse = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                aiResponse += chunk;
+
+                setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMessage = newMessages[newMessages.length - 1];
+                    if (lastMessage.role === 'ai') {
+                        lastMessage.content = aiResponse;
+                    }
+                    return newMessages;
+                });
+            }
+        } catch (error) {
+            console.error('Error calling AI agent:', error);
+            setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage.role === 'ai') {
+                    lastMessage.content = '抱歉，我遇到了一些问题，请稍后再试。';
+                }
+                return newMessages;
+            });
+        }
     };
 
     const handleInputSubmit = (e: React.KeyboardEvent) => {

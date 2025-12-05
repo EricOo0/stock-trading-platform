@@ -14,6 +14,16 @@ load_dotenv("google_agent/.env")
 
 app = FastAPI()
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Initialize session service globally to persist sessions in memory
 session_service = InMemorySessionService()
 
