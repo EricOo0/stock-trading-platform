@@ -13,7 +13,7 @@ class TavilyTool:
     def __init__(self, api_key: str):
         self.client = TavilyClient(api_key=api_key)
 
-    def search(self, query: str, max_results: int = 5, topic: str = "general", days: int = 3) -> List[Dict[str, Any]]:
+    def search(self, query: str, max_results: int = 10, topic: str = "general", days: int = 3) -> List[Dict[str, Any]]:
         """
         Search the web using Tavily.
         """
@@ -46,6 +46,7 @@ class TavilyTool:
                 })
             
             results.sort(key=lambda x: x['score'], reverse=True)
+            print(response)
             return results
             
         except Exception as e:

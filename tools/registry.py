@@ -80,10 +80,137 @@ class Tools:
         return {"error": f"Could not fetch price for {symbol} in {market}"}
 
     def get_financial_metrics(self, symbol: str) -> Dict[str, Any]:
-        """Get financial indicators."""
+        """
+        Get financial metrics as an array (revenue, net_income, etc. by date).
+        This method returns metrics in the format expected by the frontend.
+        For categorized indicators, use get_financial_indicators().
+        """
+        import yfinance as yf
+        import pandas as pd
+        
         market = self._detect_market(symbol)
-        if market == "A-share": return self.akshare.get_financial_indicators(symbol)
-        return self.yahoo.get_financial_indicators(symbol, market=market)
+        metrics = []
+        currency = "USD"
+        
+        try:
+            # Convert symbol for yfinance
+            if market == "A-share":
+                if symbol.startswith('6'):
+                    yf_symbol = f"{symbol}.SS"
+                else:
+                    yf_symbol = f"{symbol}.SZ"
+            elif market == "HK":
+                yf_symbol = symbol if '.HK' in symbol else f"{symbol}.HK"
+            else:
+                yf_symbol = symbol
+            
+            # Get data from yfinance
+            ticker = yf.Ticker(yf_symbol)
+            financials = ticker.financials
+            
+            if not financials.empty:
+                currency = ticker.info.get("currency", "USD") if hasattr(ticker, 'info') else "USD"
+                financials_T = financials.T
+                financials_T.sort_index(inplace=True)
+                
+                for date, row in financials_T.iterrows():
+                    item = {
+                        "date": date.strftime("%Y-%m-%d"),
+                        "revenue": float(row.get("Total Revenue", 0)) if not pd.isna(row.get("Total Revenue", 0)) else 0,
+                        "net_income": float(row.get("Net Income", 0)) if not pd.isna(row.get("Net Income", 0)) else 0,
+                        "gross_profit": float(row.get("Gross Profit", 0)) if not pd.isna(row.get("Gross Profit", 0)) else 0,
+                        "operating_income": float(row.get("Operating Income", 0)) if not pd.isna(row.get("Operating Income", 0)) else 0
+                    }
+                    metrics.append(item)
+            
+            # HK fallback to AkShare if no data
+            if not metrics and market == "HK":
+                try:
+                    import akshare as ak
+                    code = symbol.replace('.HK', '').strip()
+                    if len(code) == 4 and code.isdigit():
+                        code = '0' + code
+                    
+                    df = ak.stock_financial_hk_analysis_indicator_em(symbol=code)
+                    if not df.empty:
+                        currency = "HKD"
+                        df = df.head(5)
+                        
+                        for _, row in df.iterrows():
+                            r_date = pd.to_datetime(row['REPORT_DATE'])
+                            item = {
+                                "date": r_date.strftime("%Y-%m-%d"),
+                                "revenue": float(row['OPERATE_INCOME']) if not pd.isna(row['OPERATE_INCOME']) else 0,
+                                "net_income": float(row['HOLDER_PROFIT']) if not pd.isna(row['HOLDER_PROFIT']) else 0,
+                                "gross_profit": 0,
+                                "operating_income": 0
+                            }
+                            metrics.append(item)
+                except Exception as e:
+                    logger.error(f"AkShare HK metrics fallback failed: {e}")
+            
+            if not metrics:
+                return {
+                    "status": "error",
+                    "message": "No financial data found",
+                    "market": market,
+                    "symbol": symbol
+                }
+            
+            return {
+                "status": "success",
+                "symbol": symbol,
+                "market": market,
+                "currency": currency,
+                "metrics": metrics
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching financial metrics for {symbol}: {e}")
+            return {"status": "error", "message": str(e), "market": market}
+
+
+    def get_financial_indicators(self, symbol: str, years: int = 3) -> Dict[str, Any]:
+        """
+        Get financial indicators with fallback strategy.
+        Strategy:
+        - A-share: AkShare -> Yahoo (if AkShare returns empty/invalid data)
+        - US/HK: Yahoo
+        """
+        market = self._detect_market(symbol)
+        print("market:",market)
+        print("symbol:",symbol)
+        if market == "A-share":
+            # 1. Try AkShare
+            indicators = self.akshare.get_financial_indicators(symbol, years)
+            
+            # Check if data is valid (not empty)
+            # Logic adapted from skills/financial_report_tool/modules/metrics.py
+            is_valid = False
+            if indicators and "error" not in indicators:
+                # Check if we have actual data in key fields
+                # We check if all main categories have valid data, or at least some.
+                # A stricter check: if all categories are effectively empty, it's invalid.
+                has_data = any(
+                    indicators.get(cat, {}).get(key) not in [None, 0, 0.0]
+                    for cat in ['revenue', 'profit', 'cashflow', 'debt']
+                    for key in indicators.get(cat, {}).keys()
+                )
+                if has_data:
+                    is_valid = True
+            
+            if is_valid:
+                return indicators
+                
+            logger.warning(f"AkShare returned insufficient data for {symbol}, falling back to Yahoo")
+            
+            # 2. Fallback to Yahoo
+            return self.yahoo.get_financial_indicators(symbol, market="A-share", years=years)
+            
+        else:
+            # US / HK -> Yahoo
+            return self.yahoo.get_financial_indicators(symbol, market=market, years=years)
+
             
     def get_company_report(self, symbol: str) -> Dict[str, Any]:
         """Get the latest financial report metadata."""
@@ -182,6 +309,47 @@ class Tools:
         except Exception as e:
              logger.error(f"Analysis failed: {e}")
              return {"error": str(e)}
+
+    def extract_symbols(self, text: str) -> List[str]:
+        """Extract stock symbols from text."""
+        from tools.utils.nlu import extract_symbols
+        return extract_symbols(text)
+
+    def get_historical_data(self, symbol: str, period: str = "30d", interval: str = "1d") -> List[Dict[str, Any]]:
+        """Get historical data with market routing."""
+        market = self._detect_market(symbol)
+        if market == "A-share":
+            # Sina is preferred for A-share kline? Or AkShare?
+            # Source api_server used MarketDataSkill which used Sina or AkShare.
+            # SinaFinanceTool.get_historical_data works well for A-share.
+            res = self.sina.get_historical_data(symbol, market="A-share", period=period, interval=interval)
+            if res: return res
+            return self.akshare.get_historical_data(symbol, period=period)
+            
+        elif market in ["US", "HK"]:
+            return self.yahoo.get_historical_data(symbol, market=market, period=period, interval=interval)
+            
+        return []
+
+    def get_macro_history(self, query: str, period: str = "1y") -> Dict[str, Any]:
+        """Get historical macro data."""
+        query = query.lower()
+        if "china" in query or "cn" in query:
+             if "gdp" in query: return self.akshare.get_macro_history("gdp")
+             if "cpi" in query: return self.akshare.get_macro_history("cpi")
+             if "pmi" in query: return self.akshare.get_macro_history("pmi")
+        
+        # Yahoo macro
+        indicator = None
+        if "vix" in query: indicator = "VIX"
+        elif "dxy" in query: indicator = "DXY"
+        elif "yield" in query or "us10y" in query: indicator = "US10Y"
+        elif "fed" in query: indicator = "FED_FUNDS_FUTURES"
+        
+        if indicator:
+            return self.yahoo.get_macro_history(indicator, period)
+            
+        return {"error": "Unknown macro indicator requested"}
 
     def get_macro_data(self, query: str) -> Dict[str, Any]:
         """Get macro economic data based on query."""

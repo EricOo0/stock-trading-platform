@@ -76,6 +76,7 @@ class ConfigLoader:
 
         cls._config = config
         cls._loaded = True
+        print(file_paths,config)
         return config
 
     @staticmethod

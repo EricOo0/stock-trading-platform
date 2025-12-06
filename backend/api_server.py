@@ -18,10 +18,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 添加agent目录到Python路径 (for utils.logging)
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'agent'))
 
-# 导入market_data_tool skill
-from skills.market_data_tool.skill import main_handle
-from skills.macro_data_tool.skill import MacroDataSkill
-from skills.web_search_tool.skill import WebSearchSkill
+# 导入 Tool Registry
+from tools.registry import Tools
+
+# 初始化全局 Tools 实例
+tools = Tools()
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -123,70 +124,72 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             query = request_data.get('query', '')
             logger.info(f"收到查询请求: {query}")
             
-            # 调用skill获取数据
-            result = main_handle(query)
-            logger.info(f"Skill返回结果: {json.dumps(result, default=str, ensure_ascii=False)}")
+            # 使用 Tools 解析和获取数据
+            symbols = tools.extract_symbols(query)
             
-            # 处理skill返回的结果
-            if result.get('status') == 'success' and result.get('data'):
-                # 单个股票查询成功
-                data = result.get('data')
-                # 处理datetime对象
-                if 'timestamp' in data and hasattr(data['timestamp'], 'isoformat'):
-                    data['timestamp'] = data['timestamp'].isoformat()
-                
-                response = {
-                    'status': 'success',
-                    'symbol': result.get('symbol', ''),
-                    'data': data,
-                    'timestamp': result.get('timestamp', datetime.now().isoformat()),
-                    'data_source': 'real',
-                    'cache_hit': result.get('cache_hit', False),
-                    'response_time_ms': result.get('response_time_ms', 0)
-                }
-            elif result.get('status') in ['partial', 'success'] and result.get('results'):
-                # 批量查询结果，提取第一个成功的结果
-                successful_results = [r for r in result.get('results', []) if r.get('status') == 'success']
-                if successful_results:
-                    first_result = successful_results[0]
-                    data = first_result.get('data')
-                    # 处理datetime对象
-                    if data and 'timestamp' in data and hasattr(data['timestamp'], 'isoformat'):
-                        data['timestamp'] = data['timestamp'].isoformat()
-                    
-                    response = {
-                        'status': 'success',
-                        'symbol': first_result.get('symbol', ''),
-                        'data': data,
-                        'timestamp': first_result.get('timestamp', datetime.now().isoformat()),
-                        'data_source': 'real',
-                        'cache_hit': first_result.get('cache_hit', False),
-                        'response_time_ms': first_result.get('response_time_ms', 0)
-                    }
-                else:
-                    # 没有成功的结果
-                    failed_result = result.get('results', [{}])[0]
-                    response = {
-                        'status': 'error',
-                        'symbol': query,
-                        'message': failed_result.get('error_message', '查询失败'),
-                        'timestamp': datetime.now().isoformat(),
-                        'data_source': 'real',
-                        'cache_hit': False,
-                        'response_time_ms': 0
-                    }
-            else:
-                # 查询失败
+            if not symbols:
+                 # 没找到代码，返回错误
                 response = {
                     'status': 'error',
                     'symbol': query,
-                    'message': result.get('message', '查询失败'),
+                    'message': '未能识别股票代码',
                     'timestamp': datetime.now().isoformat(),
                     'data_source': 'real',
                     'cache_hit': False,
                     'response_time_ms': 0
                 }
-            
+            else:
+                results = []
+                for symbol in symbols:
+                    res = tools.get_stock_price(symbol)
+                    if res and "error" not in res:
+                        results.append({
+                            "status": "success",
+                            "symbol": symbol,
+                            "data": res,
+                            "timestamp": datetime.now().isoformat(),
+                            "cache_hit": False,
+                            "response_time_ms": 0
+                        })
+                    else:
+                        results.append({
+                            "status": "error",
+                            "symbol": symbol,
+                            "error_message": res.get("error", "查询失败") if res else "查询失败"
+                        })
+                
+                # 构造响应
+                if len(results) == 1:
+                    # 单个结果
+                    first = results[0]
+                    if first["status"] == "success":
+                        response = {
+                            'status': 'success',
+                            'symbol': first['symbol'],
+                            'data': first['data'],
+                            'timestamp': datetime.now().isoformat(),
+                            'data_source': 'real',
+                            'cache_hit': False,
+                            'response_time_ms': 0
+                        }
+                    else:
+                        response = {
+                            'status': 'error',
+                            'symbol': first['symbol'],
+                            'message': first.get('error_message'),
+                            'timestamp': datetime.now().isoformat(),
+                            'data_source': 'real'
+                        }
+                else:
+                    # 多个结果
+                    success_count = sum(1 for r in results if r["status"] == "success")
+                    response = {
+                        'status': 'success' if success_count == len(results) else 'partial',
+                        'results': results,
+                        'timestamp': datetime.now().isoformat(),
+                        'data_source': 'real'
+                    }
+
             self._set_headers(200)
             self.wfile.write(json.dumps(response, ensure_ascii=False).encode())
             
@@ -213,9 +216,9 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             
             for symbol in hot_stocks:
                 try:
-                    result = main_handle(f"获取{symbol}的行情数据")
-                    if result.get('status') == 'success' and result.get('data'):
-                        results.append(result['data'])
+                    result = tools.get_stock_price(symbol)
+                    if result and "error" not in result:
+                        results.append(result)
                 except Exception as e:
                     logger.warning(f"获取{symbol}数据失败: {str(e)}")
                     continue
@@ -268,16 +271,16 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             
             # 调用skill获取历史数据
             # 导入skill实例
-            from skills.market_data_tool.skill import MarketDataSkill
-            skill = MarketDataSkill()
+            # from skills.market_data_tool.skill import MarketDataSkill
+            # skill = MarketDataSkill()
             
             # 获取历史数据
-            result = skill.get_historical_data(symbol, period, '1d')
+            result_data = tools.get_historical_data(symbol, period, '1d')
             
             # 处理结果
-            if result.get('status') == 'success' and result.get('data'):
+            if result_data:
                 # 限制返回的数据条数
-                historical_data = result.get('data', [])[:count]
+                historical_data = result_data[:count]
                 
                 response = {
                     'status': 'success',
@@ -296,7 +299,7 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
                 error_response = {
                     'status': 'error',
                     'symbol': symbol,
-                    'message': result.get('message', '获取历史数据失败'),
+                    'message': '获取历史数据失败',
                     'timestamp': datetime.now().isoformat(),
                     'data_source': 'real'
                 }
@@ -333,19 +336,19 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             logger.info(f"收到技术分析请求: {symbol}, 周期: {period}")
             
             # 获取历史数据
-            from skills.market_data_tool.skill import MarketDataSkill
-            skill = MarketDataSkill()
+            # from skills.market_data_tool.skill import MarketDataSkill
+            # skill = MarketDataSkill()
             # 强制使用日线数据进行指标计算
-            result = skill.get_historical_data(symbol, period, '1d')
+            data = tools.get_historical_data(symbol, period, '1d')
             
-            if result.get('status') != 'success' or not result.get('data'):
+            if not data:
                 self._set_headers(404)
                 self.wfile.write(json.dumps({'error': 'No data found'}).encode())
                 return
 
             # 转换为DataFrame并计算指标
             import pandas as pd
-            df = pd.DataFrame(result['data'])
+            df = pd.DataFrame(data)
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
                 df = df.sort_values('timestamp')
@@ -462,31 +465,24 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             
             # 初始化WebSearchSkill
             # 配置为新闻搜索模式，限制最近7天，确保获取相关性强且即时的新闻
-            web_search_skill = WebSearchSkill(
-                tavily_api_key="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",
-                search_kwargs={
-                    "topic": "news",
-                    "days": 7,
-                    "max_results": 30
-                }
-            )
+            # web_search_skill = WebSearchSkill(...)
             
             # 执行搜索
-            result = web_search_skill._run(query)
+            results = tools.search_market_news(query, provider='auto') # Implicitly topic=news
             
-            if result.get('status') == 'success':
+            if results:
                 response = {
                     'status': 'success',
                     'query': query,
-                    'results': result.get('raw_results', []),  # Return structured array
-                    'provider': result.get('provider', 'unknown'),
+                    'results': results,  # Return structured array
+                    'provider': 'auto',
                     'timestamp': datetime.now().isoformat()
                 }
                 self._set_headers(200)
             else:
                 response = {
                     'status': 'error',
-                    'message': result.get('message', '搜索失败'),
+                    'message': '搜索失败或无结果',
                     'timestamp': datetime.now().isoformat()
                 }
                 self._set_headers(500)
@@ -515,9 +511,9 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
                 symbol = path_parts[4]
                 logger.info(f"分析财报数据: {symbol}")
                 
-                from skills.financial_report_tool.skill import FinancialReportSkill
-                skill = FinancialReportSkill()
-                result = skill.analyze_report(symbol)
+                # from skills.financial_report_tool.skill import FinancialReportSkill
+                # skill = FinancialReportSkill()
+                result = tools.analyze_report(symbol)
                 
                 self._set_headers(200)
                 self.wfile.write(json.dumps(result, ensure_ascii=False, default=str).encode())
@@ -535,20 +531,25 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             logger.info(f"获取财报数据: {symbol}")
             
             # Import here to avoid circular dependency if any, or just convenience
-            from skills.financial_report_tool.skill import FinancialReportSkill
+            # from skills.financial_report_tool.skill import FinancialReportSkill
             
-            skill = FinancialReportSkill()
+            # skill = FinancialReportSkill()
             
             # 1. Get Metrics
-            metrics_result = skill.get_financial_metrics(symbol)
+            metrics_result = tools.get_financial_metrics(symbol)
             
             # 2. Get Latest Report Metadata
-            report_result = skill.get_latest_report(symbol)
+            report_result = tools.get_company_report(symbol)
+            
+            # Extract metrics array from metrics_result
+            metrics_array = []
+            if metrics_result.get("status") == "success":
+                metrics_array = metrics_result.get("metrics", [])
             
             response = {
                 'status': 'success',
                 'symbol': symbol,
-                'metrics': metrics_result.get('metrics', []) if metrics_result.get('status') == 'success' else [],
+                'metrics': metrics_array,  # Array format for frontend
                 'latest_report': report_result if report_result.get('status') in ['success', 'partial'] else None,
                 'timestamp': datetime.now().isoformat()
             }
@@ -582,12 +583,24 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
 
             logger.info(f"获取财务指标: {symbol}, years={years}")
             
-            from skills.financial_report_tool.skill import FinancialReportSkill
-            skill = FinancialReportSkill()
-            result = skill.get_financial_indicators(symbol, years, use_cache)
+            # Call unified registry method which handles fallback
+            indicators_data = tools.get_financial_indicators(symbol, years=years)
+            
+            # Detect market for response
+            market = tools._detect_market(symbol)
+            
+            # Wrap in proper response format for frontend
+            response = {
+                'status': 'success',
+                'symbol': symbol,
+                'market': market,
+                'data_source': 'registry',  # Could be enhanced to track actual source
+                'indicators': indicators_data,  # Wrap the indicators
+                'timestamp': datetime.now().isoformat()
+            }
             
             self._set_headers(200)
-            self.wfile.write(json.dumps(result, ensure_ascii=False, default=str).encode())
+            self.wfile.write(json.dumps(response, ensure_ascii=False, default=str).encode())
 
         except Exception as e:
             logger.error(f"处理财务指标请求失败: {str(e)}")
@@ -613,8 +626,11 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             
             logger.info(f"收到宏观历史数据查询请求: {indicator}, 周期: {period}")
             
-            skill = MacroDataSkill()
-            result = skill.get_historical_data(indicator, period)
+            logger.info(f"收到宏观历史数据查询请求: {indicator}, 周期: {period}")
+            
+            # skill = MacroDataSkill()
+            # result = skill.get_historical_data(indicator, period)
+            result = tools.get_macro_history(indicator, period)
             
             if 'error' not in result:
                 response = {

@@ -107,12 +107,18 @@ class AkShareTool:
             logger.error(f"AkShare get_stock_history failed for {symbol}: {e}")
             return []
 
+    def get_historical_data(self, symbol: str, period: str = "30d", interval: str = "1d") -> List[Dict[str, Any]]:
+        """Alias for get_stock_history to match SinaFinanceTool interface."""
+        # AkShare mostly supports daily, ignore interval for now or map it
+        return self.get_stock_history(symbol, period)
+
     # ========================== Financial Data ==========================
 
     def get_financial_indicators(self, symbol: str, years: int = 3) -> Dict[str, Any]:
         """Get financial indicators for A-shares."""
         try:
             df = ak.stock_financial_analysis_indicator(symbol=symbol)
+            print("df:",symbol,df)
             if df.empty: return self._empty_indicators()
             
             # AkShare data is reversed (oldest first)
@@ -125,7 +131,7 @@ class AkShareTool:
              # The source code skipped row 0 if it was 1900-01-01.
             if df.iloc[0].get('日期') == '1900-01-01':
                  df = df.iloc[1:].reset_index(drop=True)
-            
+            print(df)
             return {
                 "revenue": self._extract_revenue(df),
                 "profit": self._extract_profit(df),

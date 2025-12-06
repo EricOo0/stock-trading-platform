@@ -134,6 +134,10 @@ class YahooFinanceTool:
             logger.error(f"Yahoo get_stock_history failed: {e}")
             return []
 
+    def get_historical_data(self, symbol: str, market: str, period: str = "30d", interval: str = "1d") -> List[Dict[str, Any]]:
+        """Alias for get_stock_history."""
+        return self.get_stock_history(symbol, market, period, interval)
+
     # ========================== Financial Data ==========================
 
     def get_financial_indicators(self, symbol: str, market: str, years: int = 3) -> Dict[str, Any]:
@@ -186,6 +190,29 @@ class YahooFinanceTool:
              }
         except Exception as e:
             logger.error(f"Yahoo get_macro_data failed: {e}")
+            return {"error": str(e)}
+
+    def get_macro_history(self, indicator: str, period: str = "1y") -> Dict[str, Any]:
+        """Get historical macro data."""
+        try:
+             symbol = self.MACRO_SYMBOLS.get(indicator.upper(), indicator)
+             ticker = yf.Ticker(symbol)
+             # interval 1d
+             hist = ticker.history(period=period, interval="1d")
+             if hist.empty: return {"error": "No data"}
+             
+             data = []
+             for date, row in hist.iterrows():
+                 data.append({
+                     "date": date.strftime('%Y-%m-%d'),
+                     "value": float(row['Close']),
+                     "open": float(row['Open']),
+                     "high": float(row['High']),
+                     "low": float(row['Low'])
+                 })
+             return {"indicator": indicator, "symbol": symbol, "data": data}
+        except Exception as e:
+            logger.error(f"Yahoo get_macro_history failed: {e}")
             return {"error": str(e)}
 
     # ========================== Helpers ==========================
