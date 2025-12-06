@@ -85,7 +85,9 @@ def search_market_news(query: str):
     Returns:
         List of news items with title and link.
     """
-    return registry.search_market_news(query)
+    res = registry.search_market_news(query)
+    print("search:",res)
+    return res
 
 def get_macro_data(query: str):
     """

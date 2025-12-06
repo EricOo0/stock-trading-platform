@@ -9,6 +9,10 @@ import uvicorn
 import asyncio
 from dotenv import load_dotenv
 import os
+from tools.registry import Tools
+
+# Initialize the registry once
+registry = Tools()
 
 # Load env from google_agent/.env (and maybe root .env logic if needed for tools)
 load_dotenv("google_agent/.env")
@@ -57,14 +61,14 @@ async def run_agent(agent, request: ChatRequest, app_name: str):
 
     return StreamingResponse(generate(), media_type="text/plain")
 
-@app.post("/chat")
+@app.post("/test/chat")
 async def chat(request: ChatRequest):
     try:
         return await run_agent(root_agent, request, APP_NAME)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/fintech/chat")
+@app.post("/chat")
 async def fintech_chat(request: ChatRequest):
     try:
         # Use a distinct app_name/session scope or reuse
