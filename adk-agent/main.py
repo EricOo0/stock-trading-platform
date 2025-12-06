@@ -1,6 +1,5 @@
-def main():
-    print("Hello from adk-agent!")
-
+from api.receptionist import start
 
 if __name__ == "__main__":
-    main()
+    print("Starting Fintech Multi-Agent Receptionist...")
+    start()
