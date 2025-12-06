@@ -1,0 +1,16 @@
+# Stock Trading Platform Config
+# Copy this file to .config.yaml in your project root or home directory (~/.config.yaml)
+
+api_keys:
+  # Web Search (https://tavily.com/)
+  tavily: "tvly-xxxxxxxxxxxx"
+  
+  # PDF Parsing (https://cloud.llamaindex.ai/)
+  llama_cloud: "llx-xxxxxxxxxxxx"
+  
+  # LLM Providers (Optional, used by some skills)
+  openai: "sk-xxxxxxxxxxxx"
+  siliconflow: "sk-xxxxxxxxxxxx"
+
+database:
+  path: "stock_data.db"
