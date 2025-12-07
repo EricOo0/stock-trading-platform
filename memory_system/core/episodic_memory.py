@@ -66,7 +66,7 @@ class EpisodicMemory:
         
         # 格式化检索结果
         memories = []
-        if results['ids']:
+        if results['ids'] and len(results['ids']) > 0 and len(results['ids'][0]) > 0:
             for i, doc_id in enumerate(results['ids'][0]):
                 doc = results['documents'][0][i]
                 meta = results['metadatas'][0][i]
@@ -79,8 +79,7 @@ class EpisodicMemory:
                     "id": doc_id,
                     "content": doc,
                     "metadata": meta,
-                    "score": score,
-                    "timestamp": meta.get("timestamp")
+                    "score": score
                 })
         
         # TODO: 结合图检索扩展相关实体

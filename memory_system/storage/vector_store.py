@@ -1,6 +1,7 @@
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 from typing import List, Dict, Optional, Any
+import traceback
 from config import settings
 from utils.logger import logger
 from utils.embeddings import embedding_service
@@ -21,13 +22,14 @@ class VectorStore:
                 settings=ChromaSettings(allow_reset=True, anonymized_telemetry=False)
             )
             
+            # 不传递 metadata，避免 ChromaDB 配置序列化问题
             self.collection = self.client.get_or_create_collection(
-                name=collection_name,
-                metadata={"hnsw:space": "cosine"}
+                name=collection_name
             )
             logger.info(f"VectorStore initialized (Collection: {collection_name})")
         except Exception as e:
             logger.error(f"Failed to initialize ChromaDB: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             raise
 
     def add(
@@ -67,7 +69,27 @@ class VectorStore:
         查询向量库
         """
         try:
+            # 检查collection是否为空
+            if self.collection.count() == 0:
+                # 返回空结果结构 - 保持 ChromaDB 的嵌套列表格式
+                return {
+                    'ids': [[]],
+                    'documents': [[]],
+                    'metadatas': [[]],
+                    'distances': [[]]
+                }
+            
             query_embedding = embedding_service.embed_query(query_text)
+            
+            # 检查 embedding 是否有效
+            if not query_embedding or len(query_embedding) == 0:
+                logger.warning("Empty embedding generated for query")
+                return {
+                    'ids': [[]],
+                    'documents': [[]],
+                    'metadatas': [[]],
+                    'distances': [[]]
+                }
             
             results = self.collection.query(
                 query_embeddings=[query_embedding],

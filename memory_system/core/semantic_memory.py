@@ -54,15 +54,21 @@ class SemanticMemory:
         """获取格式化的核心原则"""
         return "\n".join([f"- {p['content']}" for p in self.core_principles])
         
-    def retrieve_relevant_experiences(self, query: str, top_k: int = 3) -> str:
-        """检索相关经验"""
+    def retrieve_relevant_experiences(self, query: str, top_k: int = 3) -> List[Dict]:
+        """检索相关经验，返回结构化数据"""
         results = self.experience_store.query(
             query_text=query,
             n_results=top_k
         )
         
         experiences = []
-        if results['documents']:
-            experiences = results['documents'][0]
+        if results['documents'] and len(results['documents']) > 0 and len(results['documents'][0]) > 0:
+            for i, doc in enumerate(results['documents'][0]):
+                metadata = results['metadatas'][0][i] if results.get('metadatas') and len(results['metadatas'][0]) > i else {}
+                experiences.append({
+                    "content": doc,
+                    "importance": metadata.get('importance', 0.5),
+                    "category": metadata.get('category', 'general')
+                })
             
-        return "\n".join([f"- {exp}" for exp in experiences])
+        return experiences

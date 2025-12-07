@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2, FileText } from 'lucide-react';
+import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2, FileText, Brain } from 'lucide-react';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -69,6 +69,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: '宏观数据',
       icon: <Globe size={20} />,
       color: 'text-cyan-500'
+    },
+    {
+      id: 'memory-viz',
+      label: '记忆可视化',
+      icon: <Brain size={20} />,
+      color: 'text-purple-500'
     }
   ];
 

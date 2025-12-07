@@ -5,6 +5,7 @@ import TechnicalAnalysisPage from './pages/TechnicalAnalysisPage';
 import MacroDataPage from './pages/MacroDataPage';
 
 import FinancialAnalysisPage from './pages/FinancialAnalysisPage';
+import MemoryVisualizationPage from './pages/MemoryVisualizationPage';
 
 import CouncilRoom from './components/Council/CouncilRoom';
 
@@ -37,6 +38,8 @@ function App() {
         return '自选股票';
       case 'macro-data':
         return '宏观数据';
+      case 'memory-viz':
+        return '记忆可视化';
       default:
         return '行情系统';
     }
@@ -67,6 +70,8 @@ function App() {
         );
       case 'macro-data':
         return <MacroDataPage />;
+      case 'memory-viz':
+        return <MemoryVisualizationPage />;
       default:
         return <HomePage onNavigate={handleTabChange} />;
     }

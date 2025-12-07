@@ -155,9 +155,11 @@ class MemoryManager:
         episodic_str = str(episodic_context) # 简单估算，或者遍历计算
         episodic_tokens = tokenizer.count_tokens(episodic_str)
         
-        # 4. 长期记忆 (经验检索)
+        # 4. 长期记忆 (经验检索) - 返回结构化数据
         semantic_context = sm.retrieve_relevant_experiences(query, top_k=3)
-        semantic_tokens = tokenizer.count_tokens(semantic_context)
+        # semantic_context 现在是 List[Dict]，需要格式化字符串来计算 tokens
+        semantic_str = "\n".join([exp.get("content", "") for exp in semantic_context])
+        semantic_tokens = tokenizer.count_tokens(semantic_str)
         
         total_tokens = core_tokens + working_tokens + episodic_tokens + semantic_tokens
         
@@ -165,7 +167,7 @@ class MemoryManager:
             "core_principles": core_principles,
             "working_memory": working_context,
             "episodic_memory": episodic_context,
-            "semantic_memory": semantic_context,
+            "semantic_memory": semantic_context,  # 现在是 List[Dict]
             "token_usage": {
                 "core_principles": core_tokens,
                 "working_memory": working_tokens,
