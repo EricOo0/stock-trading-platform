@@ -163,3 +163,34 @@ python verify_system.py
 python -m api.server
 # Server running at http://0.0.0.0:10000
 ```
+
+---
+
+## 📝 TODO & Roadmap
+
+### High Priority
+
+- [ ] **Graph Retrieval Expansion** (图检索扩展相关实体)
+  - Implement entity expansion in `episodic_memory.retrieve()`
+  - Add `use_graph_expansion` parameter (default: False)
+  - Extract entities from query using LLM or NER
+  - Use `GraphStore.get_related_entities()` to expand search
+  - Merge and re-rank results based on graph distance + semantic similarity
+  - **Benefit**: Automatically retrieve memories related to connected entities (e.g., searching "Tesla" also returns "Elon Musk", "EV industry")
+
+### Medium Priority
+
+- [ ] Memory visualization in frontend (✅ Completed - see `frontendV2/`)
+- [ ] Batch import/export functionality
+- [ ] Memory analytics dashboard
+- [ ] Multi-tenant memory isolation improvements
+
+### Low Priority
+
+- [ ] WebSocket real-time memory updates
+- [ ] Memory garbage collection strategies
+- [ ] Distributed memory system (Redis/Kafka)
+
+---
+
+**Last Updated**: 2025-12-07

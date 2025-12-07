@@ -31,7 +31,7 @@ class MemoryClient:
                 }
             }
             
-            response = requests.post(f"{self.base_url}/memory/add", json=payload, timeout=5)
+            response = requests.post(f"{self.base_url}/api/v1/memory/add", json=payload, timeout=5)
             response.raise_for_status()
             logger.info(f"Memory added for {self.agent_id}")
             return True
@@ -50,7 +50,7 @@ class MemoryClient:
                 "session_id": session_id
             }
             
-            response = requests.post(f"{self.base_url}/memory/context", json=payload, timeout=5)
+            response = requests.post(f"{self.base_url}/api/v1/memory/context", json=payload, timeout=5)
             response.raise_for_status()
             data = response.json()
             
@@ -64,7 +64,7 @@ class MemoryClient:
     def get_stats(self) -> Dict[str, Any]:
         """Get memory statistics."""
         try:
-            response = requests.get(f"{self.base_url}/memory/stats", params={"agent_id": self.agent_id}, timeout=5)
+            response = requests.get(f"{self.base_url}/api/v1/memory/stats", params={"agent_id": self.agent_id}, timeout=5)
             response.raise_for_status()
             return response.json().get("stats", {})
         except Exception as e:

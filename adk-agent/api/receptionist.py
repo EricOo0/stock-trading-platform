@@ -41,6 +41,10 @@ async def event_generator(runner, user_id, session_id, content):
     """
     Streams events in a JSON-based Data Bus protocol.
     """
+async def event_generator(runner, user_id, session_id, content):
+    """
+    Streams events in a JSON-based Data Bus protocol.
+    """
     events = runner.run_async(user_id=user_id, session_id=session_id, new_message=content)
     async for event in events:
         try:
