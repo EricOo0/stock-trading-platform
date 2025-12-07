@@ -33,20 +33,8 @@ def configure_environment():
     
     Call this at the very beginning of main.py, before importing api.receptionist.
     """
-    # ==== LLM Provider Configuration ====
-    # Set OpenAI API base for SiliconFlow
-    if "OPENAI_API_BASE" not in os.environ:
-        os.environ["OPENAI_API_BASE"] = "https://api.siliconflow.cn/v1"
     
-    # Set OpenAI API key (prefer env variable if set)
-    if "OPENAI_API_KEY" not in os.environ:
-        api_key = os.getenv("SILICONFLOW_API_KEY", "")
-        os.environ["OPENAI_API_KEY"] = api_key
-    
-    # ==== Tools API Keys ====
-    # 从 ConfigLoader 读取配置并设置到环境变量
-    # 这样 Tools 初始化时可以通过环境变量或 ConfigLoader 获取
-    
+    # ==== Tools API Keys & Config Loading ====
     try:
         import sys
         tools_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -59,22 +47,36 @@ def configure_environment():
         config = ConfigLoader.load_config()
         api_keys = config.get("api_keys", {})
         
-        # 将配置中的 API keys 设置到环境变量（如果环境变量中没有的话）
+        # 将配置中的 API keys 设置到环境变量
         key_mapping = {
             "TAVILY_API_KEY": "tavily",
             "LLAMA_CLOUD_API_KEY": "llama_cloud",
             "SERPAPI_API_KEY": "serpapi",
+            "SILICONFLOW_API_KEY": "siliconflow" # Add mapping for SiliconFlow
         }
         
         for env_key, config_key in key_mapping.items():
             if env_key not in os.environ:
                 value = api_keys.get(config_key)
-                if value and value != "NONE":  # 跳过占位符
+                if value and value != "NONE":
                     os.environ[env_key] = value
                     
     except Exception as e:
-        # 如果加载失败，继续运行（使用默认值）
         print(f"Warning: Failed to load API keys from config: {e}")
+
+    # ==== LLM Provider Configuration ====
+    # Set OpenAI API base for SiliconFlow
+    if "OPENAI_API_BASE" not in os.environ:
+        os.environ["OPENAI_API_BASE"] = "https://api.siliconflow.cn/v1"
+    
+    # Set OpenAI API key (prefer env variable if set, otherwise try SILICONFLOW_API_KEY)
+    if "OPENAI_API_KEY" not in os.environ:
+        # Check for placeholder 'sk-xxxxxxxxxxxx' to avoid using it
+        current_key = os.environ.get("OPENAI_API_KEY", "")
+        if not current_key or current_key.startswith("sk-xxx"):
+             api_key = os.getenv("SILICONFLOW_API_KEY", "")
+             if api_key:
+                 os.environ["OPENAI_API_KEY"] = api_key
     
     # ==== LiteLLM Configuration ====
     # Reduce LiteLLM logging to avoid clutter

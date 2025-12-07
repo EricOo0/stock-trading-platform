@@ -1,0 +1,15 @@
+# Stock Trading Platform Config
+# Copy this file to .config.yaml in your project root or home directory (~/.config.yaml)
+
+api_keys:
+  # Web Search (https://tavily.com/)
+  tavily: "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"
+  
+  # PDF Parsing (https://cloud.llamaindex.ai/)
+  llama_cloud: "llx-kWRMpVGkQWvDEk9hcByUY98DFkiqvMJroKDutKBnPBdEVIEp"
+  
+  # LLM Providers (Optional, used by some skills)
+  openai: "sk-xxxxxxxxxxxx"
+  siliconflow: "sk-xoadryhpubnvadszkevovyqrjmbjpehgkhdlewwrizjffofm"
+model: deepseek-ai/DeepSeek-V3.1-Terminus
+api_url: https://api.siliconflow.cn/v1

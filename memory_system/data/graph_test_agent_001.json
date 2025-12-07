@@ -1,0 +1,44 @@
+{
+  "directed": true,
+  "multigraph": true,
+  "graph": {},
+  "nodes": [
+    {
+      "type": "entity",
+      "id": "EntityA"
+    },
+    {
+      "type": "entity",
+      "id": "EntityB"
+    }
+  ],
+  "edges": [
+    {
+      "relation": "test_relation",
+      "event_id": "d4cd91d5-23ee-4a69-9d7a-43aa5be32477",
+      "timestamp": "2025-12-07T14:20:10.592039",
+      "weight": 0.5,
+      "source": "EntityA",
+      "target": "EntityB",
+      "key": 0
+    },
+    {
+      "relation": "test_relation",
+      "event_id": "df7c4d6c-cef7-4dfb-95fc-b20b19735bac",
+      "timestamp": "2025-12-07T14:21:29.750139",
+      "weight": 0.5,
+      "source": "EntityA",
+      "target": "EntityB",
+      "key": 1
+    },
+    {
+      "relation": "test_relation",
+      "event_id": "5082196e-0a66-4901-b98d-460dee341774",
+      "timestamp": "2025-12-07T14:22:50.629593",
+      "weight": 0.5,
+      "source": "EntityA",
+      "target": "EntityB",
+      "key": 2
+    }
+  ]
+}
