@@ -47,5 +47,8 @@ def setup_logger():
     
     logger.info(f"Logger initialized. Level: {level}")
 
+# 自动初始化logger
+setup_logger()
+
 # 导出 logger 实例
 __all__ = ["logger", "setup_logger"]

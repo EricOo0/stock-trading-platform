@@ -1,5 +1,6 @@
 import uvicorn
-from fastapi import FastAPI
+import time
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import router
 from config import settings
@@ -12,6 +13,25 @@ def create_app() -> FastAPI:
         version=settings.APP_VERSION,
         description="Multi-Agent Memory System Service"
     )
+    
+    # 请求日志中间件
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        start_time = time.time()
+        
+        # 记录请求
+        logger.info(f"📥 {request.method} {request.url.path}")
+        if request.query_params:
+            logger.debug(f"   Query params: {dict(request.query_params)}")
+        
+        # 处理请求
+        response = await call_next(request)
+        
+        # 记录响应
+        process_time = time.time() - start_time
+        logger.info(f"📤 {request.method} {request.url.path} - Status: {response.status_code} - Time: {process_time:.3f}s")
+        
+        return response
     
     # 配置 CORS
     app.add_middleware(

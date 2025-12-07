@@ -24,6 +24,9 @@ async def add_memory(request: AddMemoryRequest, background_tasks: BackgroundTask
     3. 定期 -> 聚类 & 抽象 -> Semantic Memory
     """
     try:
+        logger.info(f"💾 Adding memory for agent: {request.agent_id}, role: {request.metadata.get('role', 'user')}")
+        logger.debug(f"   Content preview: {str(request.content)[:100]}...")
+        
         # 强制使用 pipeline 模式：所有输入默认为 conversation (Working Memory)
         # 系统会自动进行 Working -> Episodic -> Semantic 的流转
         
@@ -39,7 +42,7 @@ async def add_memory(request: AddMemoryRequest, background_tasks: BackgroundTask
         if background_tasks:
             pass 
 
-        return AddMemoryResponse(**result, status="success")
+        return AddMemoryResponse(**result)
     except Exception as e:
         logger.error(f"Error adding memory: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -48,6 +51,8 @@ async def add_memory(request: AddMemoryRequest, background_tasks: BackgroundTask
 async def get_context(request: GetContextRequest):
     """获取完整上下文"""
     try:
+        logger.info(f"🔍 Getting context for agent: {request.agent_id}")
+        logger.debug(f"   Query: {request.query[:100]}..." if len(request.query) > 100 else f"   Query: {request.query}")
         context_data = manager.get_context(
             agent_id=request.agent_id,
             query=request.query,
