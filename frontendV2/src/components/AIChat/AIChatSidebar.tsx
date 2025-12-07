@@ -781,7 +781,10 @@ ${outlook === '积极乐观' ?
                 borderRadius: message.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                 fontSize: '13px',
                 lineHeight: '1.5',
-                whiteSpace: 'pre-line'
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+                wordBreak: 'break-word'
               }}>
                 {message.content}
               </div>

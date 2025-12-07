@@ -1,5 +1,5 @@
 from core.agent_factory import create_agent
-from fintech_agent.tools import get_macro_data
+from core.tools import get_macro_data
 
 macro_agent = create_agent(
     name="MacroDataInvestigator",
@@ -13,3 +13,4 @@ macro_agent = create_agent(
     """,
     tools=[get_macro_data]
 )
+

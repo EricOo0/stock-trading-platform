@@ -1,5 +1,5 @@
 from core.agent_factory import create_agent
-from fintech_agent.tools import analyze_sentiment
+from core.tools import analyze_sentiment
 
 sentiment_agent = create_agent(
     name="SentimentInvestigator",
@@ -13,3 +13,4 @@ sentiment_agent = create_agent(
     """,
     tools=[analyze_sentiment]
 )
+

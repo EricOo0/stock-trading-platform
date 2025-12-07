@@ -39,11 +39,37 @@ class ConfigLoader:
         }
 
         # 2. Load from YAML files
+        # Search paths (in ascending priority order):
+        # 1. Home directory
+        # 2. ~/.stock_trading_platform/
+        # 3. Current working directory
+        # 4. Project root (parent of tools directory)
+        
+        # Helper: Find project root by looking for .config.yaml in parent directories
+        def find_project_root():
+            """向上查找包含 .config.yaml 的目录"""
+            current = os.getcwd()
+            for _ in range(5):  # 最多向上查找5层
+                config_path = os.path.join(current, ".config.yaml")
+                if os.path.exists(config_path):
+                    return config_path
+                parent = os.path.dirname(current)
+                if parent == current:  # 已到根目录
+                    break
+                current = parent
+            return None
+        
+        project_config = find_project_root()
+        
         file_paths = [
             os.path.expanduser("~/.config.yaml"),
             os.path.expanduser("~/.stock_trading_platform/config.yaml"),
-            os.path.join(os.getcwd(), ".config.yaml") # CWD overrides Home
+            os.path.join(os.getcwd(), ".config.yaml"),  # CWD
         ]
+        
+        # 添加项目根目录的配置（如果找到）
+        if project_config and project_config not in file_paths:
+            file_paths.append(project_config)
 
         for path in file_paths:
             if os.path.exists(path):

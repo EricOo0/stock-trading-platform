@@ -1,5 +1,5 @@
 from core.agent_factory import create_agent
-from fintech_agent.tools import get_stock_price, get_financial_metrics
+from core.tools import get_stock_price, get_financial_metrics
 
 market_agent = create_agent(
     name="MarketDataInvestigator",
@@ -16,3 +16,4 @@ market_agent = create_agent(
     """,
     tools=[get_stock_price, get_financial_metrics]
 )
+

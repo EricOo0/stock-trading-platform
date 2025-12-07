@@ -46,7 +46,7 @@ class TavilyTool:
                 })
             
             results.sort(key=lambda x: x['score'], reverse=True)
-            print(response)
+            # print(response)
             return results
             
         except Exception as e:

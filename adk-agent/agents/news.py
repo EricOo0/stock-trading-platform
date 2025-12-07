@@ -1,5 +1,5 @@
 from core.agent_factory import create_agent
-from fintech_agent.tools import search_market_news
+from core.tools import search_market_news
 
 news_agent = create_agent(
     name="NewsInvestigator",
@@ -14,3 +14,4 @@ news_agent = create_agent(
     """,
     tools=[search_market_news]
 )
+

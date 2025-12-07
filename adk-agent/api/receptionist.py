@@ -9,6 +9,11 @@ import uvicorn
 import os
 import json
 import asyncio
+import warnings
+
+# Suppress Pydantic serialization warnings from google-genai when using custom LLM
+warnings.filterwarnings("ignore", message=".*Pydantic serializer warnings.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.main")
 
 # Import the Chairman Agent
 from agents.chairman import chairman_agent
@@ -58,7 +63,7 @@ async def event_generator(runner, user_id, session_id, content):
                             "type": "chunk", 
                             "content": part.text
                         }
-                        yield json.dumps(message) + "\n"
+                        yield json.dumps(message, ensure_ascii=False) + "\n"
             
             # 2. Handle Tool Calls (The "Process" Data)
             # Check for tool usage events. ADK might expose this via specific event attributes.
@@ -72,7 +77,7 @@ async def event_generator(runner, user_id, session_id, content):
                          "type": "thought",
                          "content": f"Use {tool_call.function.name}({tool_call.function.arguments})"
                      }
-                     yield json.dumps(message) + "\n"
+                     yield json.dumps(message, ensure_ascii=False) + "\n"
 
             # 3. Handle Tool Outputs
             if hasattr(event, 'tool_outputs') and event.tool_outputs:
@@ -83,7 +88,7 @@ async def event_generator(runner, user_id, session_id, content):
                          "type": "thought",
                          "content": f"Observation: {truncated_output}"
                      }
-                     yield json.dumps(message) + "\n"
+                     yield json.dumps(message, ensure_ascii=False) + "\n"
 
         except Exception as e:
             print(f"Error processing event: {e}")
@@ -115,11 +120,10 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 def start():
-    """Entry point for running the server programmatically."""
-    # Ensure environment variables are set for the custom model
-    if "OPENAI_API_BASE" not in os.environ:
-        os.environ["OPENAI_API_BASE"] = "https://api.siliconflow.cn/v1"
-    if "OPENAI_API_KEY" not in os.environ:
-        os.environ["OPENAI_API_KEY"] = "sk-xoadryhpubnvadszkevovyqrjmbjpehgkhdlewwrizjffofm"
-        
+    """
+    Entry point for running the server programmatically.
+    Note: Environment configuration is done in main.py before this module is imported.
+    """
     uvicorn.run(app, host="0.0.0.0", port=9000)
+
+

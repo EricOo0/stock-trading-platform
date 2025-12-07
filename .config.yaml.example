@@ -1,0 +1,29 @@
+# Stock Trading Platform Configuration File
+# This file should be placed in one of the following locations:
+# 1. ~/.stock_trading_platform/config.yaml
+# 2. ~/.config.yaml
+# 3. ./config.yaml (in the project root directory)
+
+# API Keys for various services
+api_keys:
+  # Tavily Search API (used for market news search)
+  # Get your key at: https://tavily.com
+  tavily: "your_tavily_api_key_here"
+  
+  # LlamaCloud API (used for PDF parsing of financial reports)
+  # Get your key at: https://cloud.llamaindex.ai
+  llama_cloud: "your_llama_cloud_api_key_here"
+  
+  # SerpApi (alternative search provider)
+  # Get your key at: https://serpapi.com
+  serpapi: "your_serpapi_key_here"
+  
+  # OpenAI API (if using OpenAI directly)
+  openai: "your_openai_api_key_here"
+  
+  # SiliconFlow API (custom LLM provider - already set in code)
+  siliconflow: "sk-xoadryhpubnvadszkevovyqrjmbjpehgkhdlewwrizjffofm"
+
+# Database configuration (optional)
+database:
+  path: "stock_data.db"
