@@ -95,7 +95,8 @@ const StockSimulationPage: React.FC = () => {
         totalValue: record.total_value,
         price: record.price,
         cash: record.cash,
-        holdingsValue: record.holdings * record.price
+        holdingsValue: record.holdings * record.price,
+        avgCost: record.avg_cost || 0
     })) || [];
 
     return (
@@ -174,6 +175,21 @@ const StockSimulationPage: React.FC = () => {
                                     Cash: ${selectedTask.current_cash.toFixed(2)}
                                 </div>
                             </div>
+                            {/* Cost Basis Card */}
+                            <div className="col-span-2 p-3 bg-slate-700/50 rounded-xl border border-slate-600/50 flex justify-between items-center">
+                                <div>
+                                    <div className="text-slate-400 text-xs mb-1">持仓均价 (Avg Cost)</div>
+                                    <div className="text-lg font-bold text-orange-400">
+                                        ${selectedTask.avg_cost?.toFixed(2) || '0.00'}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-slate-400 text-xs mb-1">浮动盈亏 (Unrealized P&L)</div>
+                                    <div className={`text-lg font-bold ${(selectedTask.total_value - selectedTask.initial_capital) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        ${((selectedTask.holdings * (chartData[chartData.length - 1]?.price || 0)) - (selectedTask.holdings * (selectedTask.avg_cost || 0))).toFixed(2)}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -220,12 +236,19 @@ const StockSimulationPage: React.FC = () => {
                                             {expandedLog === idx ? <ChevronDown size={14} className="text-blue-400" /> : <ChevronRight size={14} className="text-slate-500" />}
                                             <span className="text-slate-400 font-mono text-xs">{record.date}</span>
                                         </div>
-                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${record.action_taken === 'BUY' ? 'bg-green-500/20 text-green-400' :
-                                            record.action_taken === 'SELL' ? 'bg-red-500/20 text-red-400' :
-                                                'bg-slate-600/50 text-slate-300'
-                                            }`}>
-                                            {record.action_taken}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            {(record.action_taken === 'BUY' || record.action_taken === 'SELL') && (
+                                                <span className="text-xs font-mono text-slate-300">
+                                                    {record.quantity ? `${record.quantity}股` : '-'}
+                                                </span>
+                                            )}
+                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${record.action_taken === 'BUY' ? 'bg-green-500/20 text-green-400' :
+                                                record.action_taken === 'SELL' ? 'bg-red-500/20 text-red-400' :
+                                                    'bg-slate-600/50 text-slate-300'
+                                                }`}>
+                                                {record.action_taken}
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="flex justify-between text-slate-300 mb-2 pl-6">
                                         <span>Price: ${record.price.toFixed(2)}</span>
@@ -297,6 +320,28 @@ const StockSimulationPage: React.FC = () => {
                                                 fill="url(#colorValue)"
                                                 name="Total Assets ($)"
                                             />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            {/* Chart 3: Price vs Cost */}
+                            <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl">
+                                <h3 className="text-lg font-bold text-slate-200 mb-6 flex items-center gap-2">
+                                    <TrendingUp className="text-blue-400" /> 股价与成本 (Price vs Avg Cost)
+                                </h3>
+                                <div className="h-80">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={chartData}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                            <XAxis dataKey="date" stroke="#94a3b8" />
+                                            <YAxis stroke="#94a3b8" domain={['auto', 'auto']} />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f1f5f9' }}
+                                            />
+                                            <Legend />
+                                            <Area type="monotone" dataKey="price" stroke="#3b82f6" fillOpacity={0.1} fill="#3b82f6" name="Price" dot={true} />
+                                            <Area type="step" dataKey="avgCost" stroke="#f59e0b" fillOpacity={0} strokeDasharray="5 5" strokeWidth={2} name="Avg Cost" />
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>

@@ -22,6 +22,9 @@ export interface DailyRecord {
     holdings: number;
     cash: number;
     total_value: number;
+    avg_cost?: number;
+    unrealized_pl?: number;
+    quantity?: number; // Added quantity
     action_taken: string;
     reason: string;
     analysis?: Analysis; // Optional detailed analysis
@@ -35,6 +38,7 @@ export interface SimulationTask {
     current_cash: number;
     holdings: number;
     total_value: number;
+    avg_cost?: number; // Current average cost
     transactions: Transaction[];
     daily_records: DailyRecord[];
     status: string;

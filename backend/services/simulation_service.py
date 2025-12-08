@@ -56,6 +56,7 @@ class SimulationService:
             "total_value": initial_capital,
             "transactions": [],
             "daily_records": [],
+            "avg_cost": 0.0,
             "status": "active" 
         }
         self.tasks[task_id] = task
@@ -264,6 +265,15 @@ class SimulationService:
         if action == 'BUY':
             cost = quantity * executed_price
             if cost > 0 and cost <= task['current_cash']:
+                # Calculate new weighted average cost
+                current_holdings = task['holdings']
+                current_avg = task.get('avg_cost', 0.0)
+                
+                new_total_cost = (current_holdings * current_avg) + cost
+                new_total_shares = current_holdings + quantity
+                
+                task['avg_cost'] = new_total_cost / new_total_shares if new_total_shares > 0 else 0.0
+                
                 task['current_cash'] -= cost
                 task['holdings'] += quantity
                 transaction = {
@@ -302,12 +312,18 @@ class SimulationService:
         stock_value = task['holdings'] * current_price
         task['total_value'] = task['current_cash'] + stock_value
         
+        # Calculate Unrealized P&L
+        avg_cost = task.get('avg_cost', 0.0)
+        unrealized_pl = (current_price - avg_cost) * task['holdings'] if task['holdings'] > 0 else 0.0
+        
         record = {
             "date": current_date_str,
             "price": executed_price,
             "holdings": task['holdings'],
             "cash": task['current_cash'],
-            "stock_value": stock_value, # Explicitly separate stock value
+            "stock_value": stock_value,
+            "avg_cost": avg_cost,
+            "unrealized_pl": unrealized_pl,
             "total_value": task['total_value'],
             "action_taken": action,
             "quantity": quantity,
