@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Optional, Union
 from tools.market.sina import SinaFinanceTool
 from tools.market.akshare import AkShareTool
 from tools.market.yahoo import YahooFinanceTool
+from tools.market.technical import TechnicalAnalysisTool
 from tools.search.tavily import TavilyTool
 from tools.search.serp import SerpAppTool
 from tools.search.duckduckgo import DuckDuckGoTool
@@ -42,6 +43,7 @@ class Tools:
         self.sina = SinaFinanceTool()
         self.akshare = AkShareTool()
         self.yahoo = YahooFinanceTool()
+        self.technical = TechnicalAnalysisTool()
         self.finbert = FinBERTTool()
         self.report_finder = ReportFinderTool()
         self.report_content = ReportContentTool()
@@ -329,7 +331,15 @@ class Tools:
         elif market in ["US", "HK"]:
             return self.yahoo.get_historical_data(symbol, market=market, period=period, interval=interval)
             
+            
         return []
+
+    def get_technical_indicators(self, symbol: str, period: str = "60d") -> Dict[str, Any]:
+        """Get technical indicators based on historical data."""
+        # Get history first
+        # market detection is handled inside get_historical_data
+        history = self.get_historical_data(symbol, period=period)
+        return self.technical.calculate_indicators(history)
 
     def get_macro_history(self, query: str, period: str = "1y") -> Dict[str, Any]:
         """Get historical macro data."""

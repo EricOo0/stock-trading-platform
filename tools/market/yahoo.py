@@ -164,6 +164,7 @@ class YahooFinanceTool:
                 "cashflow": self._extract_cashflow(cashflow, financials),
                 "debt": self._extract_debt(balance_sheet),
                 "shareholder_return": self._extract_shareholder_return(info, financials, balance_sheet),
+                "valuation": self._extract_valuation(info),
                 "history": self._extract_financial_history(financials, balance_sheet)
             }
         except Exception as e:
@@ -233,7 +234,7 @@ class YahooFinanceTool:
         return symbol.upper() # US
 
     def _empty_indicators(self):
-         return {k: {} for k in ["revenue", "profit", "cashflow", "debt", "shareholder_return"]} | {"history": []}
+         return {k: {} for k in ["revenue", "profit", "cashflow", "debt", "shareholder_return", "valuation"]} | {"history": []}
 
     # Extraction helpers (copied/adapted from source)
     def _safe_get(self, df, key, idx=0):
@@ -298,10 +299,23 @@ class YahooFinanceTool:
                  hist.append({
                      "date": date,
                      "net_margin": round((net/rev*100) if rev else 0, 2),
-                     "roe": round((net/equity*100) if equity else 0, 2)
+                         "roe": round((net/equity*100) if equity else 0, 2)
                  })
              except: pass
         return hist
+        
+    def _extract_valuation(self, info):
+        """Extract PE and PB ratios."""
+        try:
+            pe = info.get('trailingPE', 0) or info.get('forwardPE', 0)
+            pb = info.get('priceToBook', 0)
+            return {
+                "pe_ratio": round(pe, 2) if pe else None,
+                "pb_ratio": round(pb, 2) if pb else None,
+                "market_cap": info.get('marketCap', 0)
+            }
+        except:
+            return {"pe_ratio": None, "pb_ratio": None}
 
 if __name__ == "__main__":
     tool = YahooFinanceTool()

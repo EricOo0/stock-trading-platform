@@ -35,6 +35,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       color: 'text-pink-500'
     },
     {
+      id: 'stock-simulation',
+      label: '模拟回测',
+      icon: <TrendingUp size={20} />,
+      color: 'text-orange-500'
+    },
+    {
       id: 'market-query',
       label: '行情查询',
       icon: <TrendingUp size={20} />,

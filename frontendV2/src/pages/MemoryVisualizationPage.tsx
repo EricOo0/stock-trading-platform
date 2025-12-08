@@ -70,28 +70,41 @@ const MemoryVisualizationPage: React.FC = () => {
         fetchMemories();
     }, [selectedAgent]);
 
-    // Filter memories based on search query
+    // Filter and sort memories
     const filteredMemories = useMemo(() => {
-        if (!memoryData || !searchQuery.trim()) return memoryData;
+        if (!memoryData) return null;
 
-        const query = searchQuery.toLowerCase();
+        const query = searchQuery.trim().toLowerCase();
+
+        const sortByTimeDesc = (a: any, b: any) => {
+            const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+            const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+            return timeB - timeA;
+        };
+
         return {
             ...memoryData,
-            working_memory: memoryData.working_memory?.filter((item) =>
-                item.content.toLowerCase().includes(query)
-            ) || [],
-            episodic_memory: memoryData.episodic_memory?.filter((item) => {
+            working_memory: (memoryData.working_memory || [])
+                .filter((item) =>
+                    !query || item.content.toLowerCase().includes(query)
+                )
+                .sort(sortByTimeDesc),
+            episodic_memory: (memoryData.episodic_memory || [])
+                .filter((item) => {
+                    if (!query) return true;
+                    const content = typeof item.content === 'string'
+                        ? item.content
+                        : JSON.stringify(item.content);
+                    return content.toLowerCase().includes(query);
+                })
+                .sort(sortByTimeDesc),
+            semantic_memory: (memoryData.semantic_memory || []).filter((item) => {
+                if (!query) return true;
                 const content = typeof item.content === 'string'
                     ? item.content
                     : JSON.stringify(item.content);
                 return content.toLowerCase().includes(query);
-            }) || [],
-            semantic_memory: memoryData.semantic_memory?.filter((item) => {
-                const content = typeof item.content === 'string'
-                    ? item.content
-                    : JSON.stringify(item.content);
-                return content.toLowerCase().includes(query);
-            }) || [],
+            }),
         };
     }, [memoryData, searchQuery]);
 

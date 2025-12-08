@@ -22,7 +22,12 @@ sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 from tools.registry import Tools
 
 # 初始化全局 Tools 实例
+# 初始化全局 Tools 实例
 tools = Tools()
+
+# Initialize Simulation Service
+from services.simulation_service import SimulationService
+simulation_service = SimulationService()
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -96,6 +101,8 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             self.handle_web_search(query_params)
         elif path.startswith('/api/financial-report/'):
             self.handle_financial_report(path)
+        elif path.startswith('/api/simulation/'):
+            self.handle_simulation(path, query_params)
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
@@ -109,6 +116,8 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             self.handle_market_data()
         elif path == '/api/tools/financial_report_tool/get_financial_indicators':
             self.handle_financial_indicators()
+        elif path.startswith('/api/simulation/'):
+            self.handle_simulation_post(path)
         else:
             self._set_headers(404)
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
@@ -658,6 +667,70 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             }
             self._set_headers(500)
             self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+    def handle_simulation(self, path: str, query_params: Dict[str, List[str]]):
+        """处理模拟交易GET请求"""
+        try:
+            if path == '/api/simulation/tasks':
+                tasks = simulation_service.get_all_tasks()
+                self._set_headers(200)
+                self.wfile.write(json.dumps({'status': 'success', 'data': tasks}, ensure_ascii=False, default=str).encode())
+            elif path.startswith('/api/simulation/task/'):
+                # Get single task
+                task_id = path.split('/')[-1]
+                task = simulation_service.get_task(task_id)
+                if task:
+                    self._set_headers(200)
+                    self.wfile.write(json.dumps({'status': 'success', 'data': task}, ensure_ascii=False, default=str).encode())
+                else:
+                    self._set_headers(404)
+                    self.wfile.write(json.dumps({'status': 'error', 'message': 'Task not found'}).encode())
+            else:
+                self._set_headers(404)
+                self.wfile.write(json.dumps({'error': 'Not found'}).encode())
+        except Exception as e:
+            logger.error(f"Simulation GET error: {e}")
+            self._set_headers(500)
+            self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
+
+    def handle_simulation_post(self, path: str):
+        """处理模拟交易POST请求"""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+
+            if path == '/api/simulation/create':
+                symbol = request_data.get('symbol')
+                if not symbol:
+                    self._set_headers(400)
+                    self.wfile.write(json.dumps({'status': 'error', 'message': 'Symbol required'}).encode())
+                    return
+                task = simulation_service.create_task(symbol)
+                self._set_headers(200)
+                self.wfile.write(json.dumps({'status': 'success', 'data': task}, ensure_ascii=False, default=str).encode())
+            
+            elif path == '/api/simulation/run':
+                task_id = request_data.get('task_id')
+                if not task_id:
+                    self._set_headers(400)
+                    self.wfile.write(json.dumps({'status': 'error', 'message': 'Task ID required'}).encode())
+                    return
+                
+                # Run simulation step
+                result = simulation_service.run_daily_simulation(task_id, tools)
+                self._set_headers(200)
+                self.wfile.write(json.dumps(result, ensure_ascii=False, default=str).encode())
+            
+            else:
+                self._set_headers(404)
+                self.wfile.write(json.dumps({'error': 'Not found'}).encode())
+
+        except Exception as e:
+            logger.error(f"Simulation POST error: {e}")
+            self._set_headers(500)
+            self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode())
+
+
 def run_server(port=8000):
     """运行API服务器"""
     server_address = ('', port)

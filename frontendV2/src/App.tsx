@@ -6,6 +6,7 @@ import MacroDataPage from './pages/MacroDataPage';
 
 import FinancialAnalysisPage from './pages/FinancialAnalysisPage';
 import MemoryVisualizationPage from './pages/MemoryVisualizationPage';
+import StockSimulationPage from './pages/StockSimulationPage';
 
 import CouncilRoom from './components/Council/CouncilRoom';
 
@@ -22,6 +23,8 @@ function App() {
         return '首页';
       case 'council':
         return 'AI 顾问团';
+      case 'stock-simulation':
+        return '股票模拟回测';
       case 'test':
         return '测试页面';
       case 'debug':
@@ -51,6 +54,8 @@ function App() {
         return <HomePage onNavigate={handleTabChange} />;
       case 'council':
         return <CouncilRoom />;
+      case 'stock-simulation':
+        return <StockSimulationPage />;
       case 'market-query':
         return <MarketQueryPage />;
       case 'financial-analysis':
