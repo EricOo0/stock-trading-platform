@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Optional, Union
 from tools.market.sina import SinaFinanceTool
 from tools.market.akshare import AkShareTool
 from tools.market.yahoo import YahooFinanceTool
+from tools.market.fred import FredTool # Added FredTool
 from tools.market.technical import TechnicalAnalysisTool
 from tools.search.tavily import TavilyTool
 from tools.search.serp import SerpAppTool
@@ -28,7 +29,7 @@ class Tools:
     Handles routing, fallbacks, and parameter normalization.
     """
 
-    def __init__(self, tavily_api_key: Optional[str] = None, serp_api_key: Optional[str] = None, llama_cloud_api_key: Optional[str] = None):
+    def __init__(self, tavily_api_key: Optional[str] = None, serp_api_key: Optional[str] = None, llama_cloud_api_key: Optional[str] = None, fred_api_key: Optional[str] = None):
         # Load config automatically if keys not provided
         if not tavily_api_key:
             tavily_api_key = config.get_api_key("tavily")
@@ -39,10 +40,14 @@ class Tools:
         if not llama_cloud_api_key:
             llama_cloud_api_key = config.get_api_key("llama_cloud")
 
+        if not fred_api_key:
+            fred_api_key = config.get_api_key("fred_api_key")
+
         # Initialize sub-tools
         self.sina = SinaFinanceTool()
         self.akshare = AkShareTool()
         self.yahoo = YahooFinanceTool()
+        self.fred = FredTool(fred_api_key) # Initialize FredTool
         self.technical = TechnicalAnalysisTool()
         self.finbert = FinBERTTool()
         self.report_finder = ReportFinderTool()
@@ -348,13 +353,23 @@ class Tools:
              if "gdp" in query: return self.akshare.get_macro_history("gdp")
              if "cpi" in query: return self.akshare.get_macro_history("cpi")
              if "pmi" in query: return self.akshare.get_macro_history("pmi")
+             if "ppi" in query: return self.akshare.get_macro_history("ppi")
+             if "m2" in query: return self.akshare.get_macro_history("m2")
+             if "lpr" in query: return self.akshare.get_macro_history("lpr")
         
+        # FRED macro Data
+        if "unemployment" in query: return self.fred.get_macro_history("UNEMPLOYMENT", period)
+        if "nonfarm" in query: return self.fred.get_macro_history("NONFARM_PAYROLLS", period)
+        if "us cpi" in query or "cpi us" in query or "us_cpi" in query: return self.fred.get_macro_history("CPI", period)
+        if "fed funds" in query or "fed_funds" in query: return self.fred.get_macro_history("FED_FUNDS", period)
+        if "m2" in query and "us" in query: return self.fred.get_macro_history("M2", period)
+
         # Yahoo macro
         indicator = None
         if "vix" in query: indicator = "VIX"
         elif "dxy" in query: indicator = "DXY"
         elif "yield" in query or "us10y" in query: indicator = "US10Y"
-        elif "fed" in query: indicator = "FED_FUNDS_FUTURES"
+        elif "fed" in query and "future" in query: indicator = "FED_FUNDS_FUTURES"
         
         if indicator:
             return self.yahoo.get_macro_history(indicator, period)
@@ -368,10 +383,16 @@ class Tools:
             if "gdp" in query: return self.akshare.get_macro_data("gdp")
             if "cpi" in query: return self.akshare.get_macro_data("cpi")
             if "pmi" in query: return self.akshare.get_macro_data("pmi")
+            if "ppi" in query: return self.akshare.get_macro_data("ppi")
+            if "m2" in query: return self.akshare.get_macro_data("m2")
+            if "lpr" in query: return self.akshare.get_macro_data("lpr")
+            if "social" in query: return self.akshare.get_macro_data("SOCIAL_FINANCING")
+
         if "vix" in query: return self.yahoo.get_macro_data("VIX")
         if "dxy" in query: return self.yahoo.get_macro_data("DXY")
         if "yield" in query or "us10y" in query: return self.yahoo.get_macro_data("US10Y")
-        if "fed" in query: return self.yahoo.get_macro_data("FED_FUNDS_FUTURES")
+        if "fed" in query and "future" in query: return self.yahoo.get_macro_data("FED_FUNDS_FUTURES")
+        
         return {"error": "Unknown macro indicator requested"}
 
     def search_market_news(self, query: str, provider: str = "auto") -> List[Dict[str, Any]]:

@@ -48,13 +48,14 @@ class ConfigLoader:
         # Helper: Find project root by looking for .config.yaml in parent directories
         def find_project_root():
             """向上查找包含 .config.yaml 的目录"""
-            current = os.getcwd()
+            # Use file path to find root, more robust than getcwd
+            current = os.path.dirname(os.path.abspath(__file__))
             for _ in range(5):  # 最多向上查找5层
                 config_path = os.path.join(current, ".config.yaml")
                 if os.path.exists(config_path):
                     return config_path
                 parent = os.path.dirname(current)
-                if parent == current:  # 已到根目录
+                if parent == current:
                     break
                 current = parent
             return None
@@ -88,7 +89,8 @@ class ConfigLoader:
             "TAVILY_API_KEY": ("api_keys", "tavily"),
             "LLAMA_CLOUD_API_KEY": ("api_keys", "llama_cloud"),
             "OPENAI_API_KEY": ("api_keys", "openai"),
-            "SILICONFLOW_API_KEY": ("api_keys", "siliconflow")
+            "SILICONFLOW_API_KEY": ("api_keys", "siliconflow"),
+            "FRED_API_KEY": ("api_keys", "fred_api_key")
         }
 
         for env_var, keys in env_mapping.items():

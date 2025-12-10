@@ -48,7 +48,10 @@ class MemoryCallbackHandler:
             request = kwargs.get('llm_request')
             if not request and len(args) >= 2:
                  request = args[1]
-            
+            print("--- 完整的 LLM 请求 (LlmRequest) ---")
+            # 打印完整的请求对象，它包含了所有组成 Prompt 的部分
+            print(request) 
+            print("---------------------------------")
             if request:
                 # Extract user message from request
                 user_msg = ""

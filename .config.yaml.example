@@ -22,7 +22,8 @@ api_keys:
   openai: "your_openai_api_key_here"
   
   # SiliconFlow API (custom LLM provider - already set in code)
-  siliconflow: "sk-xoadryhpubnvadszkevovyqrjmbjpehgkhdlewwrizjffofm"
+  siliconflow: "xxx"
+  fred_api_key:xxx
 
 # Database configuration (optional)
 database:

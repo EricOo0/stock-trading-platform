@@ -183,6 +183,40 @@ class AkShareTool:
                     "non_manufacturing": float(latest['非制造业-商务活动指数']),
                     "date": latest['月份']
                 }
+            elif indicator_upper == 'PPI':
+                df = ak.macro_china_ppi_yearly()
+                if df.empty: return {"error": "No data"}
+                latest = df.iloc[0]
+                return {
+                    "indicator": "China PPI",
+                    "value": float(latest['今值']),
+                    "date": str(latest['日期'])
+                }
+            elif indicator_upper == 'M2':
+                df = ak.macro_china_money_supply()
+                if df.empty: return {"error": "No data"}
+                latest = df.iloc[0]
+                return {
+                    "indicator": "China M2",
+                    "value": float(latest['货币和准货币(M2)-数量(亿元)']),
+                    "yoy": float(latest['货币和准货币(M2)-同比增长']),
+                    "date": latest['月份']
+                }
+            elif indicator_upper == 'LPR':
+                df = ak.macro_china_lpr()
+                if df.empty: return {"error": "No data"}
+                # Sort by date desc to get latest
+                df = df.sort_values('TRADE_DATE', ascending=False)
+                latest = df.iloc[0]
+                return {
+                    "indicator": "China LPR",
+                    "1y": float(latest['LPR1Y']),
+                    "5y": float(latest['LPR5Y']),
+                    "date": str(latest['TRADE_DATE'])
+                }
+            # elif indicator_upper == 'SOCIAL_FINANCING':
+            #     # SSL Error on source
+            #     pass
             return {"error": f"Unsupported indicator: {indicator}"}
         except Exception as e:
             logger.error(f"AkShare get_macro_data failed: {e}")
@@ -215,9 +249,37 @@ class AkShareTool:
                 for _, row in df.iterrows():
                     data.append({
                         "date": row['月份'],
-                        "value": float(row['制造业-PMI']),
-                        "non_manufacturing": float(row['非制造业-商务活动指数'])
+                        "value": float(row['制造业-指数']),
+                        "non_manufacturing": float(row['非制造业-指数'])
                     })
+            elif indicator_upper == 'PPI':
+                df = ak.macro_china_ppi_yearly()
+                for _, row in df.iterrows():
+                    data.append({
+                        "date": str(row['日期']),
+                        "value": float(row['今值']), 
+                        "ppi": float(row['今值'])
+                    })
+            elif indicator_upper == 'M2':
+                df = ak.macro_china_money_supply()
+                for _, row in df.iterrows():
+                    data.append({
+                        "date": row['月份'],
+                        "value": float(row['货币和准货币(M2)-数量(亿元)']),
+                        "yoy": float(row['货币和准货币(M2)-同比增长'])
+                    })
+            elif indicator_upper == 'LPR':
+                df = ak.macro_china_lpr()
+                df = df.sort_values('TRADE_DATE', ascending=False)
+                for _, row in df.iterrows():
+                    data.append({
+                        "date": str(row['TRADE_DATE']),
+                        "value": float(row['LPR1Y']), # Map 1Y to value for frontend
+                        "1y": float(row['LPR1Y']),
+                        "5y": float(row['LPR5Y'])
+                    })
+            # elif indicator_upper == 'SOCIAL_FINANCING':
+                # pass
             else:
                  return {"error": f"Unsupported indicator: {indicator}"}
             

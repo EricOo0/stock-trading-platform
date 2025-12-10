@@ -11,6 +11,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 import datetime as dt
+import math
 from typing import Dict, List
 
 # 添加父目录到Python路径
@@ -38,6 +39,16 @@ import mimetypes
 class MarketDataAPIHandler(BaseHTTPRequestHandler):
     """市场数据API处理器"""
     
+    def _clean_nans(self, obj):
+        """Recursively replace NaNs with None for JSON serialization"""
+        if isinstance(obj, float):
+            return None if math.isnan(obj) or math.isinf(obj) else obj
+        if isinstance(obj, dict):
+            return {k: self._clean_nans(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._clean_nans(i) for i in obj]
+        return obj
+
     def _set_headers(self, status=200, content_type='application/json'):
         """设置响应头"""
         self.send_response(status)
@@ -95,6 +106,8 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             self.handle_historical_data(path, query_params)
         elif path.startswith('/api/macro-data/historical/'):
             self.handle_macro_historical_data(path, query_params)
+        elif path == '/api/macro-data/fed-implied-probability':
+            self.handle_fed_implied_probability()
         elif path.startswith('/api/market/technical/'):
             self.handle_technical_analysis(path, query_params)
         elif path == '/api/web-search':
@@ -640,6 +653,9 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             # skill = MacroDataSkill()
             # result = skill.get_historical_data(indicator, period)
             result = tools.get_macro_history(indicator, period)
+
+            # Clean NaNs before sending
+            result = self._clean_nans(result)
             
             if 'error' not in result:
                 response = {
@@ -667,6 +683,130 @@ class MarketDataAPIHandler(BaseHTTPRequestHandler):
             }
             self._set_headers(500)
             self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+    
+    def handle_fed_implied_probability(self):
+        """处理美联储降息概率查询 (基于 Implied Rate)"""
+        try:
+            logger.info("Handling Fed Implied Probability request")
+            
+            # 1. Fetch Current Fed Target Upper Limit (DFEDTARU) from FRED
+            # Use get_macro_history directly via tools which routes to FredTool
+            # We fetch 1y to be safe and get the latest
+            fed_data = tools.get_macro_history("DFEDTARU", "1y")
+            
+            current_target_upper = 5.50 # Default fallback
+            current_date = ""
+            
+            if fed_data and "data" in fed_data and len(fed_data["data"]) > 0:
+                # Get latest value
+                latest = fed_data["data"][-1]
+                if latest.get("value") is not None:
+                    current_target_upper = float(latest["value"])
+                    current_date = latest.get("date")
+            
+            # Current Target Bin is [Upper-0.25, Upper]
+            # e.g. 4.0 -> Bin 3.75-4.00. Midpoint 3.875
+            current_target_mid = current_target_upper - 0.125
+            
+            # 2. Fetch ZQ=F (30-Day Fed Funds Futures) from yfinance
+            import yfinance as yf
+            ticker = yf.Ticker("ZQ=F")
+            # Fetch brief history to get latest 'Close'
+            hist = ticker.history(period="5d")
+            
+            if hist.empty:
+                raise Exception("Failed to fetch ZQ=F futures data")
+                
+            zq_price = hist["Close"].iloc[-1]
+            implied_rate = 100 - zq_price # e.g. 100 - 96.345 = 3.655
+            
+            # 3. Calculate Bin Distribution
+            # We assume the implied rate is the weighted average of two adjacent bins
+            # Bin width is 0.25
+            
+            # Function to get bin name: 3.75-4.00 -> "375-400"
+            def get_bin_name(midpoint):
+                low = int((midpoint - 0.125) * 100)
+                high = int((midpoint + 0.125) * 100)
+                return f"{low}-{high}"
+            
+            # Find the two bins bracketing the implied rate
+            # Standard bins are centered at ..., 3.625, 3.875, 4.125, ...
+            # Normalized implied rate to finding nearest midpoints
+            # x = (rate - 0.125) / 0.25
+            
+            # Let's project relative to current target
+            # e.g. Current Mid: 3.875. Implied: 3.655.
+            # Difference from current: -0.22
+            
+            # Base bin midpoint (nearest 0.25 step)
+            # 3.655 -> nearest standard midpoints are 3.625 (Bin 3.50-3.75) and 3.875 (Bin 3.75-4.00)
+            
+            # To be precise:
+            # Shift implied rate to align with bin centers
+            # Center of Bin N = 0.125 + N * 0.25
+            
+            # Simple Linear Interpolation between two nearest bins
+            # Lower Bin Center
+            bin_step = 0.25
+            # Shift by offset to align 0.125 to 0
+            shifted_rate = implied_rate - 0.125
+            lower_bin_index = math.floor(shifted_rate / bin_step)
+            
+            lower_bin_mid = 0.125 + lower_bin_index * bin_step
+            upper_bin_mid = lower_bin_mid + bin_step
+            
+            # Weight of Upper Bin
+            # If Implied = 3.655. Lower Mid (3.625). Upper Mid (3.875).
+            # Weight Upper = (3.655 - 3.625) / 0.25 = 0.03 / 0.25 = 0.12 (12%)
+            # Weight Lower = 1 - 0.12 = 0.88 (88%)
+            
+            weight_upper = (implied_rate - lower_bin_mid) / bin_step
+            weight_lower = 1.0 - weight_upper
+            
+            # Clamp weights (in case implied rate is erratic, though unlikely for spread)
+            weight_upper = max(0.0, min(1.0, weight_upper))
+            weight_lower = 1.0 - weight_upper
+            
+            bins = [
+                {
+                    "bin": get_bin_name(lower_bin_mid),
+                    "prob": round(weight_lower * 100, 1),
+                    "is_current": abs(lower_bin_mid - current_target_mid) < 0.01
+                },
+                {
+                    "bin": get_bin_name(upper_bin_mid),
+                    "prob": round(weight_upper * 100, 1),
+                    "is_current": abs(upper_bin_mid - current_target_mid) < 0.01
+                }
+            ]
+            
+            # Identify which is "Current"
+            # We already marked it. Now add 'label' e.g. "Current"
+            
+            results = {
+                "status": "success",
+                "current_target_rate": f"{current_target_upper-0.25:.2f}-{current_target_upper:.2f}",
+                "implied_rate": round(implied_rate, 3),
+                "data": bins,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            self._set_headers(200)
+            self.wfile.write(json.dumps(results, ensure_ascii=False).encode())
+
+        except Exception as e:
+            logger.error(f"处理美联储概率请求失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            error_response = {
+                'status': 'error',
+                'message': f'服务器错误: {str(e)}',
+                'timestamp': datetime.now().isoformat()
+            }
+            self._set_headers(500)
+            self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode())
+
     def handle_simulation(self, path: str, query_params: Dict[str, List[str]]):
         """处理模拟交易GET请求"""
         try:

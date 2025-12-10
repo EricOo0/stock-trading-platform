@@ -45,11 +45,13 @@ export const ChartComponent: React.FC<ChartComponentProps> = ({
             // Sort data by date just in case
             const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-            // Map data to lightweight-charts format
-            const chartData = sortedData.map(item => ({
-                time: item.date,
-                value: item.value,
-            }));
+            // Map data to lightweight-charts format and filter out nulls
+            const chartData = sortedData
+                .filter(item => item.value !== null && item.value !== undefined && !isNaN(item.value))
+                .map(item => ({
+                    time: item.date,
+                    value: item.value,
+                }));
 
             console.log("Chart data prepared:", chartData);
 
