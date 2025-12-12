@@ -40,7 +40,7 @@ def get_all_files_mtimes(root_dir, watch_dirs):
 
 def run_server():
     root_dir = get_project_root()
-    server_script = os.path.join(root_dir, "backend", "api_server.py")
+    server_script = os.path.join(root_dir, "backend", "entrypoints", "api", "server.py")
     
     # Use same python interpreter
     cmd = [sys.executable, server_script]

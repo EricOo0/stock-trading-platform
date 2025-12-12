@@ -3,11 +3,10 @@ import { Layout } from './components/Layout';
 import { MarketQueryPage, HomePage, StockSearchPage } from './pages';
 import TechnicalAnalysisPage from './pages/TechnicalAnalysisPage';
 import MacroDataPage from './pages/MacroDataPage';
-
 import FinancialAnalysisPage from './pages/FinancialAnalysisPage';
 import MemoryVisualizationPage from './pages/MemoryVisualizationPage';
 import StockSimulationPage from './pages/StockSimulationPage';
-
+import DeepResearchPage from './pages/DeepResearchPage';
 import CouncilRoom from './components/Council/CouncilRoom';
 
 function App() {
@@ -25,6 +24,8 @@ function App() {
         return 'AI 顾问团';
       case 'stock-simulation':
         return '股票模拟回测';
+      case 'deep-research':
+        return '深度投研';
       case 'test':
         return '测试页面';
       case 'debug':
@@ -56,6 +57,8 @@ function App() {
         return <CouncilRoom />;
       case 'stock-simulation':
         return <StockSimulationPage />;
+      case 'deep-research':
+        return <DeepResearchPage />;
       case 'market-query':
         return <MarketQueryPage />;
       case 'financial-analysis':

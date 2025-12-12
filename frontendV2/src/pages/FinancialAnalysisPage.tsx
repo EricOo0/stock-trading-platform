@@ -52,7 +52,7 @@ const FloatingAIAssistant: React.FC = () => {
         setMessages(prev => [...prev, { role: 'ai', content: '' }]);
 
         try {
-            const response = await fetch('http://localhost:9000/chat', {
+            const response = await fetch('http://localhost:8000/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -41,6 +41,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       color: 'text-cyan-500'
     },
     {
+      id: 'deep-research',
+      label: '深度研究',
+      icon: <Search size={20} />,
+      color: 'text-purple-400'
+    },
+    {
       id: 'technical-analysis',
       label: '技术分析',
       icon: <BarChart2 size={20} />,
