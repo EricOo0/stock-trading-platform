@@ -28,11 +28,11 @@ const FinancialReportHeader: React.FC<FinancialReportHeaderProps> = ({
             <BarChart2 size={24} className="text-blue-500" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">智能财报分析</h2>
+            <h2 className="text-xl font-bold text-white">智能财报解读</h2>
             <p className="text-sm text-slate-400">AI驱动的财报解读与原文对照</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <form onSubmit={handleFinancialSearch} className="flex gap-2 w-80 lg:w-96">
             <div className="relative flex-1">
@@ -62,7 +62,7 @@ const FinancialReportHeader: React.FC<FinancialReportHeaderProps> = ({
           </button>
         </div>
       </div>
-      
+
       {error && (
         <div className="p-3 bg-red-900/20 border border-red-800/50 rounded-lg text-red-400 text-sm flex items-center gap-2">
           <AlertCircle size={16} />

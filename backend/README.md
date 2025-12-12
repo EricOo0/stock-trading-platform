@@ -101,4 +101,46 @@ graph TD
     服务将启动在 `http://localhost:8000`。
 
 3.  **开发调试**:
-    修改代码后**需要重启服务**才能生效 (Python `http.server` 默认无热重载)。
+
+## 数据源说明 (Data Sources)
+
+### 1. 宏观数据 (Macro Data)
+宏观数据接口 (`/api/market-data/macro`) 根据请求的指标类型自动路由到不同的上游数据源。
+
+| 指标类型 | 具体指标 | 数据源 | 原理/备注 |
+| :--- | :--- | :--- | :--- |
+| **中国宏观** | GDP, M2, LPR, PPI, PMI | **AkShare** | 直接调用 AkShare 相关接口 (如 `macro_china_gdp`, `macro_china_lpr`) 获取官方统计局发布的最新数据。 |
+| **中国通胀** | CPI | **AkShare** | 调用 `macro_china_cpi` 获取全国居民消费价格指数。 |
+| **美国/全球** | US GDP, Unemployment | **FRED** | 调用 St. Louis Fed (FRED) API 获取权威美国经济数据。 |
+| **美国通胀** | US CPI | **FRED** | 调用 FRED API 获取 `CPIAUCSL` (Consumer Price Index for All Urban Consumers)。 |
+| **利率相关** | Fed Funds Rate | **FRED** | 获取联邦基金利率。 |
+| **市场指标** | VIX, DXY, US10Y | **Yahoo Finance** | 通过 `yfinance` 获取实时行情数据 (如 `^VIX`, `DX-Y.NYB`, `^TNX`)。 |
+
+### 2. 财报数据 (Financial Reports)
+财务指标接口 (`/api/tools/financial_report_tool/get_financial_indicators`) 采用多级降级策略以确保数据的高可用性。
+
+#### A股 (A-Share)
+**首选源**: AkShare (`stock_financial_analysis_indicator`)
+**备选源**: Yahoo Finance (当 AkShare 数据缺失时自动触发)
+
+| 指标分类 | 具体指标 | 计算方式 / 来源逻辑 |
+| :--- | :--- | :--- |
+| **收入端** | 营业收入YoY | 直接取自财报 `主营业务收入增长率`。 |
+| | 核心营收占比 | 取自 `主营利润比重` (若 Yahoo源则为 `N/A`)。 |
+| | 现金收入比 | **AkShare**: `每股经营性现金流 > 0 ? 1 : 0` (简化逻辑) <br> **Yahoo**: `经营现金流 / 总营收`。 |
+| **利润端** | 扣非归母净利(EPS) | **AkShare**: 取自 `扣除非经常性损益后的每股收益`。 <br> **Yahoo**: 降级使用 `Basic EPS` (基本每股收益)。 |
+| | 经营毛利率 | `销售毛利率` (Gross Profit / Revenue)。 |
+| | 核心净利率 | `销售净利率` (Net Profit / Revenue)。 |
+| **现金流** | 经营现金流/净利 | `每股经营性现金流 / 每股收益`。 |
+| | 自由现金流 (FCF) | **AkShare**: 暂不支持 (`N/A`)。 <br> **Yahoo**: `Free Cash Flow` 字段。 |
+| **负债端** | 资产负债率 | `总负债 / 总资产`。 |
+| | 流动比率 | `流动资产 / 流动负债` (Yahoo源通过资产负债表计算)。 |
+| **股东回报** | ROE (净资产收益率) | `净资产收益率` (Net Income / Shareholder Equity)。 |
+| | 股息率 | 取自最近一期分红数据或 TTM 计算。 |
+
+#### 美股/港股 (US/HK)
+**唯一源**: Yahoo Finance (`yfinance`)
+
+- **数据获取**: 直接解析 Yahoo Finance 提供的 Income Statement, Balance Sheet, Cash Flow Statement。
+- **计算逻辑**: 与上述 A股 Yahoo 备选源逻辑一致。
+- **特殊处理**: 港股代码会自动标准化 (如 `0700` -> `0700.HK`)。

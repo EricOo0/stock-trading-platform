@@ -4,7 +4,7 @@ import FinancialReportHeader from '../components/MarketQuery/components/Financia
 import FinancialAnalysisPanel from '../components/MarketQuery/components/FinancialAnalysisPanel';
 import FinancialPDFViewer from '../components/MarketQuery/components/FinancialPDFViewer';
 import type { FinancialReport, AnchorMap, Citation } from '../components/MarketQuery/components/types';
-import { Send, Bot, User, Sparkles, X, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+import { Send, Bot, User, Sparkles, X, ChevronDown, Maximize2, Minimize2, FileText } from 'lucide-react';
 
 import { FinancialIndicatorsDisplay } from '../components/Financial';
 import { getFinancialIndicators } from '../services/financialService';
@@ -257,7 +257,8 @@ const FinancialAnalysisPage: React.FC = () => {
     const [highlightRect, setHighlightRect] = useState<[number, number, number, number] | null>(null);
 
     // Layout State
-    const [expandedPanel, setExpandedPanel] = useState<'analysis' | 'indicators' | null>(null);
+    const [isIndicatorsExpanded, setIsIndicatorsExpanded] = useState(false);
+
 
     const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
         setNumPages(numPages);
@@ -401,14 +402,23 @@ const FinancialAnalysisPage: React.FC = () => {
         }
     };
 
-    const toggleExpand = (panel: 'analysis' | 'indicators') => {
-        setExpandedPanel(prev => prev === panel ? null : panel);
-    };
+
 
     return (
-        <div className="h-full flex flex-col gap-6 p-6 max-w-[1920px] mx-auto w-full relative">
-            {/* Search Header - Refined */}
-            <div className="flex-none">
+        <div className="min-h-screen flex flex-col gap-6 p-6 max-w-[1920px] mx-auto w-full relative overflow-y-auto pb-20">
+            {/* Header / Search Bar */}
+            <div className="flex-none z-10">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+                            <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
+                                <span className="w-1.5 h-6 bg-indigo-500 rounded-full block"></span>
+                            </div>
+                            新财报分析
+                        </h1>
+                    </div>
+                </div>
+
                 <FinancialReportHeader
                     financialSearchQuery={financialSearchQuery}
                     setFinancialSearchQuery={setFinancialSearchQuery}
@@ -420,119 +430,122 @@ const FinancialAnalysisPage: React.FC = () => {
                 />
             </div>
 
-            {/* Layout Grid */}
-            <div className="flex-1 grid grid-cols-12 gap-6 min-h-0">
+            {/* Top Section: Financial Indicators */}
+            <div
+                className={`
+                    transition-all duration-300 bg-slate-50/95 backdrop-blur-sm shadow-xl border border-slate-200/50 overflow-hidden
+                    ${isIndicatorsExpanded
+                        ? 'fixed inset-4 z-50 h-[calc(100vh-2rem)] rounded-2xl p-6' // Fullscreen Overlay Mode
+                        : `flex-none rounded-2xl p-5 ${financialIndicators ? 'h-[380px]' : 'h-32'}` // Normal Mode
+                    }
+                `}
+            >
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-slate-800 font-bold text-lg tracking-wide flex items-center gap-2">
+                        <span className="w-1 h-5 bg-emerald-500 rounded-full"></span>
+                        关键财务指标
+                    </h3>
+                    <div className="flex items-center gap-2">
+                        {financialIndicators && (
+                            <button
+                                onClick={() => setIsIndicatorsExpanded(!isIndicatorsExpanded)}
+                                className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-colors bg-slate-100/50"
+                                title={isIndicatorsExpanded ? "退出全屏" : "全屏查看"}
+                            >
+                                {isIndicatorsExpanded ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                            </button>
+                        )}
+                    </div>
+                </div>
 
-                {/* Left Column: Financial Analysis */}
-                {/* 
-                    Logic: 
-                    - If expandedPanel is 'analysis', take col-span-12
-                    - If expandedPanel is 'indicators', hide (return null)
-                    - Default: col-span-8 (Wider than before)
-                */}
-                {expandedPanel !== 'indicators' && (
-                    <div className={`${expandedPanel === 'analysis' ? 'col-span-12' : 'col-span-8'} flex flex-col gap-4 min-h-0 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-5 shadow-xl overflow-hidden transition-all duration-300`}>
-                        <div className="flex items-center justify-between mb-2 px-1">
-                            <h3 className="text-white font-medium text-lg tracking-wide flex items-center gap-2">
-                                <span className="w-1 h-5 bg-indigo-500 rounded-full"></span>
-                                智能财报分析
-                            </h3>
-                            <div className="flex items-center gap-3">
-                                {financialData?.symbol && (
-                                    <span className="text-xs font-mono text-slate-400 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50">
-                                        {financialData.symbol}
-                                    </span>
-                                )}
-                                <button
-                                    onClick={() => toggleExpand('analysis')}
-                                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                                    title={expandedPanel === 'analysis' ? "退出全屏" : "全屏查看"}
-                                >
-                                    {expandedPanel === 'analysis' ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                                </button>
+                <div className="h-[calc(100%-3rem)] w-full overflow-hidden">
+                    {financialIndicators ? (
+                        <div className="h-full w-full overflow-auto custom-scrollbar pb-4">
+                            <FinancialIndicatorsDisplay
+                                indicators={financialIndicators}
+                                symbol={indicatorSymbol}
+                                market={indicatorMarket}
+                                compact={false}
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-slate-400 gap-3">
+                            <div className="w-10 h-10 bg-slate-200/50 rounded-full flex items-center justify-center">
+                                <Sparkles size={20} className="text-slate-400" />
+                            </div>
+                            <p className="text-sm font-medium">输入股票代码开始分析</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Backdrop for fullscreen mode */}
+            {isIndicatorsExpanded && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={() => setIsIndicatorsExpanded(false)} />
+            )}
+
+            {/* Bottom Section: Analysis & PDF Split View */}
+            {/* Added min-h-[800px] to force scrolling and give space */}
+            <div className="flex-1 grid grid-cols-2 gap-6 min-h-[800px]">
+                {/* Left: AI Analysis */}
+                <div className="flex flex-col gap-4 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-5 shadow-xl overflow-hidden h-full">
+                    <div className="flex-none flex items-center justify-between mb-2">
+                        <h3 className="text-white font-medium text-lg tracking-wide flex items-center gap-2">
+                            <span className="w-1 h-5 bg-indigo-500 rounded-full"></span>
+                            智能财报分析
+                        </h3>
+                        {financialData?.symbol && (
+                            <span className="text-xs font-mono text-slate-400 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50">
+                                {financialData.symbol}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 relative">
+                        <FinancialAnalysisPanel
+                            financialData={financialData}
+                            financialLoading={financialLoading}
+                            isAnalyzing={isAnalyzing}
+                            analysisReport={analysisReport}
+                            analysisDate={analysisDate}
+                            citations={citations}
+                            showPdf={false}
+                            handleAnalyze={handleAnalyze}
+                            handleCitationClick={handleCitationClick}
+                        />
+                    </div>
+                </div>
+
+                {/* Right: PDF Viewer */}
+                <div className="flex flex-col gap-4 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden relative h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500/50 to-purple-500/50 z-10"></div>
+                    {showPdf ? (
+                        <div className="h-full w-full">
+                            <FinancialPDFViewer
+                                financialData={financialData}
+                                pdfUrl={pdfUrl}
+                                currentPdfPage={currentPdfPage}
+                                numPages={numPages}
+                                scale={scale}
+                                highlightRect={highlightRect}
+                                onDocumentLoadSuccess={onDocumentLoadSuccess}
+                                changePage={changePage}
+                                changeScale={changeScale}
+                                setShowPdf={setShowPdf}
+                            />
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-4 p-8 text-center bg-slate-800/20">
+                            <div className="w-16 h-16 bg-slate-800/50 rounded-2xl flex items-center justify-center border border-slate-700/50">
+                                <FileText size={32} className="text-slate-600" />
+                            </div>
+                            <div>
+                                <h4 className="text-slate-400 font-medium mb-1">暂无财报 PDF</h4>
+                                <p className="text-xs text-slate-600">点击左侧"生成 AI 解读"可自动加载相关财报文件</p>
                             </div>
                         </div>
-
-                        <div className="flex-1 flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-2">
-                            {/* Analysis Panel */}
-                            <FinancialAnalysisPanel
-                                financialData={financialData}
-                                financialLoading={financialLoading}
-                                isAnalyzing={isAnalyzing}
-                                analysisReport={analysisReport}
-                                analysisDate={analysisDate}
-                                citations={citations}
-                                showPdf={showPdf}
-                                handleAnalyze={handleAnalyze}
-                                handleCitationClick={handleCitationClick}
-                            />
-
-                            {/* PDF Viewer - Stacked below analysis */}
-                            {showPdf && (
-                                <div className="h-[800px] border-t border-slate-700/50 pt-6 animate-in slide-in-from-bottom-10 duration-500">
-                                    <FinancialPDFViewer
-                                        financialData={financialData}
-                                        pdfUrl={pdfUrl}
-                                        currentPdfPage={currentPdfPage}
-                                        numPages={numPages}
-                                        scale={scale}
-                                        highlightRect={highlightRect}
-                                        onDocumentLoadSuccess={onDocumentLoadSuccess}
-                                        changePage={changePage}
-                                        changeScale={changeScale}
-                                        setShowPdf={setShowPdf}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Right Column: Financial Indicators */}
-                {/* 
-                    Logic: 
-                    - If expandedPanel is 'indicators', take col-span-12
-                    - If expandedPanel is 'analysis', hide
-                    - Default: col-span-4 (Wider than before)
-                */}
-                {expandedPanel !== 'analysis' && (
-                    <div className={`${expandedPanel === 'indicators' ? 'col-span-12' : 'col-span-4'} min-h-0 flex flex-col bg-slate-50/95 backdrop-blur-sm rounded-2xl p-5 shadow-xl border border-slate-200/50 overflow-hidden transition-all duration-300`}>
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-slate-800 font-bold text-lg tracking-wide flex items-center gap-2">
-                                <span className="w-1 h-5 bg-emerald-500 rounded-full"></span>
-                                关键财务指标
-                            </h3>
-                            <button
-                                onClick={() => toggleExpand('indicators')}
-                                className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors"
-                                title={expandedPanel === 'indicators' ? "退出全屏" : "全屏查看"}
-                            >
-                                {expandedPanel === 'indicators' ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
-                            {financialIndicators ? (
-                                <div className="space-y-6 pb-4">
-                                    <FinancialIndicatorsDisplay
-                                        indicators={financialIndicators}
-                                        symbol={indicatorSymbol}
-                                        market={indicatorMarket}
-                                        compact={expandedPanel !== 'indicators'} // Only use compact if NOT full screen
-                                    />
-                                </div>
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-3">
-                                    <div className="w-16 h-16 bg-slate-200/50 rounded-full flex items-center justify-center">
-                                        <Sparkles size={24} className="text-slate-400" />
-                                    </div>
-                                    <p className="text-sm font-medium">暂无数据，请先搜索股票</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
+                    )}
+                </div>
             </div>
 
             {/* Floating AI Assistant */}

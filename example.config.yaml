@@ -5,6 +5,9 @@ api_keys:
   # Web Search (https://tavily.com/)
   tavily: "tvly-xxxxxxxxxxxx"
   
+  # Browser Automation (https://steel.dev/)
+  steel: "ste-xxxxxx"
+  
   # PDF Parsing (https://cloud.llamaindex.ai/)
   llama_cloud: "llx-xxxxxxxxxxxx"
   

@@ -250,7 +250,11 @@ class YahooFinanceTool:
         
         yoy = ((rev_now - rev_prev)/rev_prev * 100) if rev_prev else 0.0
         ratio = (ocf / rev_now) if rev_now else 0.0
-        return {"revenue_yoy": round(yoy, 2), "cash_to_revenue": round(ratio, 2)}
+        return {
+            "revenue_yoy": round(yoy, 2), 
+            "cash_to_revenue": round(ratio, 2),
+            "core_revenue_ratio": None
+        }
 
     def _extract_profit(self, financials):
         net = self._safe_get(financials, 'Net Income', 0)
@@ -259,7 +263,8 @@ class YahooFinanceTool:
         
         return {
             "gross_margin": round((gross/rev*100) if rev else 0, 2),
-            "net_margin": round((net/rev*100) if rev else 0, 2)
+            "net_margin": round((net/rev*100) if rev else 0, 2),
+            "non_recurring_eps": self._safe_get(financials, 'Basic EPS', 0)
         }
 
     def _extract_cashflow(self, cashflow, financials):
@@ -274,7 +279,13 @@ class YahooFinanceTool:
     def _extract_debt(self, bs):
         liab = self._safe_get(bs, 'Total Liabilities Net Minority Interest', 0)
         assets = self._safe_get(bs, 'Total Assets', 0)
-        return {"asset_liability_ratio": round((liab/assets*100) if assets else 0, 2)}
+        curr_assets = self._safe_get(bs, 'Current Assets', 0)
+        curr_liab = self._safe_get(bs, 'Current Liabilities', 0)
+        
+        return {
+            "asset_liability_ratio": round((liab/assets*100) if assets else 0, 2),
+            "current_ratio": round((curr_assets/curr_liab) if curr_liab else 0, 2)
+        }
 
     def _extract_shareholder_return(self, info, fin, bs):
         roe = 0.0

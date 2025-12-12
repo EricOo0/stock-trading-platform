@@ -78,7 +78,12 @@ export const FinancialIndicatorsDisplay: React.FC<FinancialIndicatorsDisplayProp
                     <div>
                         <h3 className="text-xl font-bold text-gray-900">财务指标分析</h3>
                         <p className="text-sm text-gray-500 mt-1">
-                            {symbol} • {market === 'A-SHARE' ? 'A股' : market === 'US' ? '美股' : '港股'}
+                            {symbol} • {
+                                market === 'A-SHARE' ? 'A股' :
+                                    market === 'US' ? '美股' :
+                                        market === 'HK' ? '港股' :
+                                            market
+                            }
                         </p>
                     </div>
                 </div>

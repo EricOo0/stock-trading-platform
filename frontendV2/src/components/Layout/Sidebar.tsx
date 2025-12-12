@@ -41,6 +41,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       color: 'text-cyan-500'
     },
     {
+      id: 'technical-analysis',
+      label: '技术分析',
+      icon: <BarChart2 size={20} />,
+      color: 'text-emerald-500'
+    },
+    {
       id: 'stock-simulation',
       label: '模拟回测',
       icon: <TrendingUp size={20} />,
@@ -57,12 +63,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: '新财报分析',
       icon: <FileText size={20} />,
       color: 'text-indigo-400'
-    },
-    {
-      id: 'technical-analysis',
-      label: '技术分析',
-      icon: <BarChart2 size={20} />,
-      color: 'text-emerald-500'
     },
     {
       id: 'stock-search',

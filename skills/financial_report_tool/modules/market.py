@@ -12,7 +12,7 @@ def detect_market(symbol: str) -> Tuple[str, str]:
     - 'HK': Hong Kong stocks (e.g., 0700.HK, 9988.HK)
     - 'A-SHARE': Chinese A-shares (e.g., 600036.SS, 000001.SZ)
     """
-    symbol = urllib.parse.unquote(symbol)
+    symbol = urllib.parse.unquote(symbol).strip()
     
     match = re.search(r'\((.*?)\)', symbol)
     if match:
