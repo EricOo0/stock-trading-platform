@@ -13,6 +13,22 @@ export interface DeepSearchResponse {
 
 export const deepResearchAPI = {
     /**
+     * Create a new Browser Session
+     */
+    createSession: async (): Promise<string> => {
+        try {
+            const response = await axios.post(`${API_BASE_URL}/browser/session`, {});
+            if (response.data.status === 'success' && response.data.data) {
+                return response.data.data.session_id;
+            }
+            throw new Error("Failed to create session");
+        } catch (error) {
+            console.error("Session Creation Error:", error);
+            throw error;
+        }
+    },
+
+    /**
      * Start a Deep Research session
      * @param query The research query
      * @param sessionId Optional session ID (for browser persistence)

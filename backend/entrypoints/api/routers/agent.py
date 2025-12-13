@@ -10,5 +10,9 @@ class DeepSearchRequest(BaseModel):
 
 @router.post("/start")
 async def start_deep_search(request: DeepSearchRequest):
-    """Starts the Deep Search Agent."""
-    return await deep_search_service.start_research(request.session_id, request.query)
+    """Starts the Deep Search Agent (Streaming)."""
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        deep_search_service.start_research(request.session_id, request.query),
+        media_type="application/x-ndjson"
+    )

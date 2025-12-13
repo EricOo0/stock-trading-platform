@@ -1,144 +1,280 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { deepResearchAPI } from '../services/deepResearchAPI';
-import { FiSearch, FiMonitor, FiCpu, FiFileText } from 'react-icons/fi';
+import ActivityCarousel from '../components/ActivityCarousel';
+import type { ActivityCard } from '../components/ActivityCarousel';
+import { FiSearch, FiCpu, FiFileText, FiLoader, FiLayers } from 'react-icons/fi';
+
+interface StreamItem {
+    id: string;
+    type: 'thought' | 'tool_notice';
+    content: string;
+    timestamp: number;
+}
 
 const DeepResearchPage: React.FC = () => {
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [result, setResult] = useState<any>(null);
-    const [sessionId, setSessionId] = useState<string>('');
+
+    // Unified stream state for the right panel
+    const [streamItems, setStreamItems] = useState<StreamItem[]>([]);
+
+    // We still keep activities for the left panel carousel
+    const [activities, setActivities] = useState<ActivityCard[]>([]);
     const [logs, setLogs] = useState<string[]>([]);
+
+    const addLog = (msg: string) => setLogs(prev => [...prev, msg]);
 
     const handleSearch = async () => {
         if (!query.trim()) return;
 
         setIsLoading(true);
-        setLogs(prev => [...prev, `Starting research on: "${query}"...`]);
-        setResult(null);
-
-        // Generate a new session ID for this task
-        const newSessionId = `research_${Date.now()}`;
-        setSessionId(newSessionId);
+        setActivities([]);
+        setLogs([]);
+        setStreamItems([]);
+        addLog(`Starting research on: "${query}"...`);
 
         try {
-            setLogs(prev => [...prev, `Initializing session: ${newSessionId}`]);
+            const sessionId = await deepResearchAPI.createSession();
+            addLog(`Session created: ${sessionId}`);
 
-            const response = await deepResearchAPI.startResearch(query, newSessionId);
+            const response = await fetch('/api/agent/deep-search/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, session_id: sessionId })
+            });
 
-            if (response.status === 'success') {
-                setResult(response.data);
-                setLogs(prev => [...prev, 'Research completed successfully.']);
-            } else {
-                setLogs(prev => [...prev, `Error: ${response.message}`]);
+            if (!response.body) throw new Error("No response body");
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const event = JSON.parse(line);
+
+                        if (event.type === 'tool') {
+                            const eventTime = Date.now();
+                            if (event.status === 'start') {
+                                // 1. Update Carousel Logic
+                                const newActivity: ActivityCard = {
+                                    id: event.id || eventTime.toString(),
+                                    type: 'tool',
+                                    title: `Invoking: ${event.tool}`,
+                                    detail: event.input,
+                                    status: 'pending',
+                                    timestamp: eventTime
+                                };
+                                setActivities(prev => [...prev, newActivity]);
+                                addLog(`[TOOL START] ${event.tool} on ${event.input}`);
+
+                                // 2. Insert Tool Notice into Stream (Breaks the thought bubble)
+                                setStreamItems(prev => [...prev, {
+                                    id: `tool-${eventTime}`,
+                                    type: 'tool_notice',
+                                    content: `Calling Tool: ${event.tool}...`,
+                                    timestamp: eventTime
+                                }]);
+                            }
+                            else if (event.status === 'end') {
+                                // Update Carousel Logic
+                                setActivities(prev => {
+                                    const copy = [...prev];
+                                    let targetIndex = -1;
+
+                                    if (event.id) {
+                                        targetIndex = copy.findIndex(a => a.id === event.id);
+                                    } else {
+                                        // Find last pending activity (backward compatible replacement for findLastIndex)
+                                        for (let i = copy.length - 1; i >= 0; i--) {
+                                            if (copy[i].status === 'pending') {
+                                                targetIndex = i;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (targetIndex !== -1) {
+                                        copy[targetIndex] = {
+                                            ...copy[targetIndex],
+                                            status: 'completed',
+                                            detail: `${copy[targetIndex].detail}\n\nResult: ${event.output}`
+                                        };
+                                    }
+                                    return copy;
+                                });
+                                addLog(`[TOOL END] Result: ${event.output}`);
+                            }
+                        }
+                        else if (event.type === 'thought') {
+                            setStreamItems(prev => {
+                                const last = prev[prev.length - 1];
+                                // If last item is a thought, merge content
+                                if (last && last.type === 'thought') {
+                                    return [
+                                        ...prev.slice(0, -1),
+                                        { ...last, content: last.content + event.content }
+                                    ];
+                                }
+                                // Otherwise start new bubble
+                                return [...prev, {
+                                    id: `thought - ${Date.now()} `,
+                                    type: 'thought',
+                                    content: event.content,
+                                    timestamp: Date.now()
+                                }];
+                            });
+                        }
+                        else if (event.type === 'result') {
+                            addLog("[COMPLETE] Research finished.");
+                        }
+                        else if (event.type === 'error') {
+                            addLog(`[ERROR] ${event.content} `);
+                        }
+
+                    } catch (e) {
+                        console.warn("Failed to parse NDJSON line", line);
+                    }
+                }
             }
         } catch (error) {
-            setLogs(prev => [...prev, 'System Error: Failed to execute research.']);
+            addLog('System Error: Failed to execute research.');
+            console.error(error);
         } finally {
             setIsLoading(false);
         }
     };
 
+    const streamEndRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        streamEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [streamItems]);
+
     return (
-        <div className="p-6 h-full flex flex-col gap-6">
-            <header>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <FiSearch className="text-blue-500" />
-                    Deep Research Agent
-                </h1>
-                <p className="text-gray-400 text-sm mt-1">
-                    Powered by browser automation and recursive search.
-                </p>
-            </header>
-
-            {/* Input Section */}
-            <div className="bg-[#1e1e1e] p-4 rounded-xl border border-gray-800 flex gap-4">
-                <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Enter a complex research topic (e.g., 'Latest trends in renewable energy stocks for Q4 2025')..."
-                    className="flex-1 bg-black/30 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    disabled={isLoading}
-                />
-                <button
-                    onClick={handleSearch}
-                    disabled={isLoading}
-                    className={`px-6 py-2 rounded-lg font-medium transition-all ${isLoading
-                            ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20'
-                        }`}
-                >
-                    {isLoading ? 'Researching...' : 'Start Research'}
-                </button>
-            </div>
-
-            {/* Main Content Grid */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
-
-                {/* Left Panel: Logs & Results */}
-                <div className="flex flex-col gap-6 h-full overflow-hidden">
-                    {/* Live Logs */}
-                    <div className="flex-1 bg-[#151515] rounded-xl border border-gray-800 flex flex-col overflow-hidden">
-                        <div className="p-3 border-b border-gray-800 bg-[#1e1e1e] flex items-center gap-2">
-                            <FiCpu className="text-green-500" />
-                            <span className="font-medium text-sm">Execution Logs</span>
-                        </div>
-                        <div className="flex-1 p-4 overflow-y-auto font-mono text-sm space-y-2 text-gray-300">
-                            {logs.length === 0 && (
-                                <div className="text-gray-600 italic">Waiting for input...</div>
-                            )}
-                            {logs.map((log, i) => (
-                                <div key={i} className="break-words border-l-2 border-green-900 pl-2">
-                                    <span className="text-green-600 mr-2">{'>'}</span>
-                                    {log}
-                                </div>
-                            ))}
+        <div className="h-screen bg-[#F5F5F7] text-gray-900 font-sans overflow-hidden flex flex-col">
+            {/* Header */}
+            <header className="px-8 py-5 flex items-center justify-between border-b border-gray-200 bg-white/80 backdrop-blur-md z-10">
+                <div className="flex items-center gap-6">
+                    <h1 className="text-xl font-bold flex items-center gap-2 tracking-tight">
+                        <span className="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center">
+                            <FiCpu size={16} />
+                        </span>
+                        网络舆情监测
+                    </h1>
+                    {/* Monitor Sources Box */}
+                    <div className="hidden md:flex items-center gap-3 px-3 py-1.5 bg-gray-100/50 rounded-lg border border-gray-200/50">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                            <FiLayers size={10} /> 接入源
+                        </span>
+                        <div className="h-3 w-px bg-gray-300" />
+                        <div className="flex gap-2">
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 bg-white rounded shadow-sm border border-gray-100 text-[10px] font-semibold text-gray-700">
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" /> Reddit
+                            </span>
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 bg-white rounded shadow-sm border border-gray-100 text-[10px] font-semibold text-gray-700">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> 雪球 (Xueqiu)
+                            </span>
                         </div>
                     </div>
-
-                    {/* Final Result */}
-                    {result && (
-                        <div className="flex-1 bg-[#1e1e1e] rounded-xl border border-gray-800 p-4 overflow-y-auto">
-                            <h3 className="font-bold mb-2 flex items-center gap-2 text-blue-400">
-                                <FiFileText /> Research Findings
-                            </h3>
-                            <div className="prose prose-invert max-w-none text-sm">
-                                <pre className="whitespace-pre-wrap font-sans text-gray-300">
-                                    {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
-                                </pre>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
-                {/* Right Panel: Browser View */}
-                <div className="bg-[#151515] rounded-xl border border-gray-800 flex flex-col overflow-hidden shadow-2xl">
-                    <div className="p-3 border-b border-gray-800 bg-[#1e1e1e] flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <FiMonitor className="text-purple-500" />
-                            <span className="font-medium text-sm">Live Browser Session</span>
+                {/* Search Bar */}
+                <div className="flex-1 max-w-2xl mx-12">
+                    <div className="relative group">
+                        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-black transition-colors" />
+                        <input
+                            type="text"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Type a research objective..."
+                            className="w-full bg-gray-100 hover:bg-white border-none focus:bg-white focus:ring-1 focus:ring-gray-200 rounded-xl pl-12 pr-20 py-3 text-sm transition-all focus:shadow-lg shadow-sm"
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            disabled={isLoading}
+                        />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                            {isLoading ? <FiLoader className="animate-spin text-orange-500" /> :
+                                <button onClick={handleSearch} className="p-1.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm">
+                                    <FiSearch size={14} />
+                                </button>
+                            }
                         </div>
-                        {sessionId && (
-                            <span className="text-xs px-2 py-1 bg-gray-800 rounded text-gray-400">
-                                SID: {sessionId.slice(-6)}
-                            </span>
-                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    <span className="text-xs font-semibold text-gray-400 tracking-wide">SYSTEM READY</span>
+                </div>
+            </header>
+
+            {/* Split Content */}
+            <div className="flex-1 flex min-h-0">
+                {/* Left Panel: Carousel */}
+                <div className="w-[60%] p-8 flex flex-col bg-[#F5F5F7]">
+                    <ActivityCarousel activities={activities} />
+                </div>
+
+                {/* Right Panel: Intelligence Stream */}
+                <div className="w-[40%] border-l border-gray-200 bg-white flex flex-col shadow-xl z-20">
+                    <div className="p-5 border-b border-gray-50 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur z-10">
+                        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                            <FiFileText /> Intelligence Stream
+                        </h3>
                     </div>
 
-                    <div className="flex-1 relative bg-black flex items-center justify-center">
-                        {sessionId ? (
-                            <iframe
-                                src={`/api/browser/session/${sessionId}/view`}
-                                className="absolute inset-0 w-full h-full border-0"
-                                title="Browser Session"
-                                allow="clipboard-read; clipboard-write"
-                            />
-                        ) : (
-                            <div className="text-center text-gray-500">
-                                <FiMonitor size={48} className="mx-auto mb-4 opacity-20" />
-                                <p>Browser inactive</p>
+                    <div className="flex-1 overflow-y-auto p-6 custom-scrollbar-light space-y-6">
+                        {streamItems.length === 0 && logs.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-300 gap-4 opacity-50">
+                                <FiFileText size={48} />
+                                <p className="text-sm font-medium">Waiting for agent thoughts...</p>
                             </div>
+                        ) : (
+                            <>
+                                {streamItems.map((item, idx) => (
+                                    <div key={item.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-backwards" style={{ animationDelay: `${idx * 0.1} s` }}>
+                                        {item.type === 'thought' ? (
+                                            <div className="flex flex-col gap-2">
+                                                <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider ml-1 self-start">
+                                                    Agent Thought
+                                                </span>
+                                                <div className="bg-blue-50/50 p-4 rounded-2xl rounded-tl-none border border-blue-100/50 text-gray-800 text-sm leading-relaxed shadow-sm">
+                                                    <pre className="whitespace-pre-wrap font-sans bg-transparent p-0 m-0 border-none">{item.content}</pre>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-center py-4">
+                                                <div className="bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200 flex items-center gap-2 shadow-sm">
+                                                    <FiLoader className="animate-spin text-gray-400" size={12} />
+                                                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                                                        {item.content}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+
+                                {logs.length > 0 && (
+                                    <div className="pt-8 opacity-40 hover:opacity-100 transition-opacity duration-300">
+                                        <div className="h-px bg-gray-200 mb-4" />
+                                        <div className="space-y-1 font-mono text-[10px] text-gray-400">
+                                            {logs.slice(-5).map((log, i) => (
+                                                <div key={i}>{log}</div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={streamEndRef} />
+                            </>
                         )}
                     </div>
                 </div>
