@@ -16,7 +16,7 @@ class ReportFinderTool:
     def __init__(self):
         try:
             # Set identity for SEC EDGAR
-            set_identity("StockTradingPlatform <agent@example.com>")
+            set_identity("StockAnalysisTool <admin@stockanalysistool.com>")
             
             # Suppress noisy edgar logs (especially 304 errors which act as cache hits but log as errors)
             logging.getLogger("edgar").setLevel(logging.CRITICAL)
@@ -74,19 +74,21 @@ class ReportFinderTool:
         """
         Manual fallback to fetch SEC filings without using edgartools.
         """
+        # Strict compliance with SEC User-Agent policy: "AppName <email>"
         headers = {
-            "User-Agent": "StockTradingPlatform <agent@example.com>",
+            "User-Agent": "StockAnalysisTool <admin@stockanalysistool.com>",
             "Accept-Encoding": "gzip, deflate",
-            "Host": "www.sec.gov"
+            "Host": "www.sec.gov",
+            "Accept": "application/json"
         }
         
+        session = requests.Session()
+        session.headers.update(headers)
+        
         # 1. Get CIK from Tickers JSON
-        # Note: We use a different URL or just ignores cache to avoid 304 if possible, 
-        # or just standard requests which handles 304 as distinct from error if handled right.
-        # Here we just fetch it.
         try:
             tickers_url = "https://www.sec.gov/files/company_tickers.json"
-            resp = requests.get(tickers_url, headers=headers, timeout=10)
+            resp = session.get(tickers_url, timeout=10)
             resp.raise_for_status()
             tickers_data = resp.json()
             
@@ -102,10 +104,10 @@ class ReportFinderTool:
             # 2. Fetch Submissions
             # https://data.sec.gov/submissions/CIKxxxxxxxxxx.json
             submissions_url = f"https://data.sec.gov/submissions/CIK{cik_str}.json"
-            # Host must be data.sec.gov
-            headers["Host"] = "data.sec.gov"
+            # Host must be data.sec.gov for this request
+            session.headers.update({"Host": "data.sec.gov"})
             
-            resp = requests.get(submissions_url, headers=headers, timeout=15)
+            resp = session.get(submissions_url, timeout=15)
             resp.raise_for_status()
             data = resp.json()
             

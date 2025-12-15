@@ -92,6 +92,7 @@ const TechnicalAnalysisPage: React.FC = () => {
             const decoder = new TextDecoder();
             let buffer = '';
             let hasReceivedThoughts = false;
+            let fullResponseText = '';
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -99,6 +100,11 @@ const TechnicalAnalysisPage: React.FC = () => {
                 if (signal.aborted) break;
 
                 buffer += decoder.decode(value, { stream: true });
+
+                // Fix concatenated JSON objects if newline is missing
+                // This is a robust fix for when the stream chunks arrive fused
+                buffer = buffer.replace(/}{"type"/g, '}\n{"type"');
+
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
 
@@ -115,22 +121,44 @@ const TechnicalAnalysisPage: React.FC = () => {
                             }
                         }
                         else if (event.type === 'agent_response') {
-                            try {
-                                const cleanContent = event.content.replace(/```json/g, '').replace(/```/g, '').trim();
-                                const result = JSON.parse(cleanContent);
-                                setAiSignal(result.signal);
-                                setAiSummary(result.summary);
-                                // If no stream thoughts received, use the full analysis block
-                                if (!hasReceivedThoughts) {
-                                    setAiReasoning(result.analysis);
-                                }
-                            } catch (e) {
-                                console.warn("Failed to parse agent final JSON", e);
+                            // Accumulate the final answer text
+                            fullResponseText += event.content;
+                            // Optionally display it as it arrives if we haven't switched to summary yet
+                            if (!hasReceivedThoughts) {
+                                setAiReasoning(prev => prev + event.content);
                             }
                         }
                     } catch (e) {
-                        console.warn("Stream parse error", e);
+                        // ignore partial line parse errors
                     }
+                }
+            }
+
+            // Stream complete, try to parse the final JSON from fullResponseText
+            if (fullResponseText) {
+                try {
+                    // Extract JSON block: find first '{' and last '}'
+                    const firstOpen = fullResponseText.indexOf('{');
+                    const lastClose = fullResponseText.lastIndexOf('}');
+
+                    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+                        const jsonStr = fullResponseText.substring(firstOpen, lastClose + 1);
+                        const result = JSON.parse(jsonStr);
+
+                        setAiSignal(result.signal);
+                        setAiSummary(result.summary);
+                        // If we didn't receive thought stream, ensure the reasoning is set to the structured analysis
+                        if (!hasReceivedThoughts) {
+                            setAiReasoning(result.analysis);
+                        }
+                    } else {
+                        // If no JSON found, just show the text
+                        setAiSummary("Analysis Completed (Unstructured)");
+                        if (!hasReceivedThoughts) setAiReasoning(fullResponseText);
+                    }
+                } catch (e) {
+                    console.warn("Failed to parse final accumulated JSON", e);
+                    setAiSummary("Analysis Parsing Failed");
                 }
             }
         } catch (e) {

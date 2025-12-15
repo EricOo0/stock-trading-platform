@@ -82,13 +82,43 @@ graph TD
 
 ## 🧩 Features
 
-| Module | Description | Implementation Method |
-| :--- | :--- | :--- |
-| **News Analysis**<br>(消息面分析) | Hybrid search strategy capturing market pulses. Aggregates mainstream news via Search APIs while autonomously navigating social forums using LLM-controlled browsers (**Playwright/Browser-use**) to extract retail sentiment. | **Tools**: Tavily/SerpApi (Mainstream) + Browser-use (Social)<br>**Algorithm**: Multi-source fusion & LLM Sentiment Weighting. |
-| **Fundamental** | In-depth valuation analysis including PE, PB, Revenue Growth, and Profit Margins to identify undervalued assets. | **Source**: AkShare (A-share), YFinance (US/HK).<br>**Logic**: Multi-factor scoring model. |
-| **Technical** | Comprehensive trend prediction integrating **Dow Theory**, **Elliott Wave**, and **Wyckoff Method**. Combines price action with quantitative indicators (**RSI, MACD, Bollinger Bands, KDJ**) for high-confidence signal generation. | **Libs**: Pandas, TA-Lib.<br>**Agent**: COT (Chain-of-Thought) reasoning with multi-theory cross-verification. |
-| **Report Analysis** | Intelligent parsing of PDF Annual/Quarterly reports (10-K/10-Q) with precise citation handling. | **Engine**: LlamaCloud (Parser) + LangChain.<br>**Feature**: RAG with exact Source-Grounding (citations). |
-| **Macro** | Global economic policy analysis (Fed rates, Inflation data) and its impact on asset classes. | **Data**: FRED API, Web Search.<br>**Model**: Macro-economic inference engine. |
+### 1. News Analysis (消息面分析)
+Utilizes a hybrid search strategy to capture real-time market dynamics. It aggregates mainstream news via Search APIs while employing LLM-controlled headless browsers (**Browser-use/Playwright**) to mine retail sentiment from social forums.
+*(Note: Social media scraping is currently being optimized due to strict anti-bot measures)*
+
+![News Analysis 1](assets/消息面分析1.png)
+![News Analysis 2](assets/消息面分析2.png)
+
+### 2. Technical Analysis (技术面分析)
+Integrates Dow Theory, Elliott Wave Theory, and Wyckoff Method with quantitative indicators (RSI, MACD, Bollinger Bands, KDJ) to provide high-confidence trend predictions and trading signals.
+
+![Technical Analysis 1](assets/技术面分析1.png)
+![Technical Analysis 2](assets/技术面分析2.png)
+
+### 3. Macro Data Analysis (宏观数据分析)
+Real-time retrieval and analysis of core domestic and international macroeconomic data (e.g., Fed interest rates, CPI/PPI, GDP growth) to assess asset cycles and macro trends.
+
+![Macro Analysis 1](assets/宏观数据分析1.png)
+![Macro Analysis 2](assets/宏观数据分析2.png)
+
+### 4. Financial Report Analysis (财报分析)
+Intelligently fetches and parses PDF financial reports (US/HK/A-share), extracting key metrics (Revenue, Net Profit, Cash Flow) using RAG technology for precise source grounding.
+*(Note: LLM deep interpretation capabilities are currently under iteration)*
+
+![Financial Report 1](assets/财报分析.png)
+![Financial Report 2](assets/财报分析2.png)
+
+### 5. Paper Trading (模拟盘)
+AI agents automatically execute simulated trades, tracking strategy performance in real-time to validate the effectiveness and robustness of investment strategies.
+
+![Simulation](assets/模拟盘.png)
+
+### 6. AI Council (AI 顾问团)
+Simulates a "One-Person Company" decision-making structure. A council of AI roles (CEO, CTO, Chief Analyst) discusses user inquiries from multiple perspectives to provide comprehensive answers.
+
+![AI Council 1](assets/AI%20顾问团.png)
+![AI Council 2](assets/AI顾问团2.png)
+![AI Council 3](assets/AI顾问团3.png)
 
 ---
 

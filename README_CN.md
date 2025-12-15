@@ -78,15 +78,45 @@ graph TD
 
 ---
 
-## 🧩 功能模块
+## 🧩 功能模块 (Features)
 
-| 功能模块 | 功能描述 | 实现方案 |
-| :--- | :--- | :--- |
-| **News Analysis**<br>(消息面分析) | 采用混合搜索模式实时捕捉市场动态。一方面通过 Search API 聚合主流媒体新闻，另一方面利用 LLM 操控无头浏览器 (**Browser-use/Playwright**) 深入社交论坛挖掘散户讨论热度与观点。 | **工具**: Tavily/SerpApi (主流媒体) + Browser-use (社交论坛)<br>**算法**: 多源信息融合与 LLM 情绪加权评分。 |
-| **Fundamental**<br>(基本面分析) | 深入的估值分析，包括市盈率、市净率、收入增长和利润率，以识别低估资产。 | **数据源**: AkShare (A股), YFinance (美股/港股)。<br>**逻辑**: 多因子评分模型。 |
-| **Technical**<br>(技术面分析) | 综合趋势预测，集成 **道氏理论**、**波浪理论** 和 **威科夫操盘法**。结合价格行为与量化指标 (**RSI, MACD, 布林带, KDJ**) 生成高置信度信号。 | **库**: Pandas, TA-Lib。<br>**智能体**: COT (思维链) 推理与多理论交叉验证。 |
-| **Report Analysis**<br>(财报分析) | 智能解析 PDF 年度/季度报告 (10-K/10-Q)，具有精确的引文处理。 | **引擎**: LlamaCloud (解析器) + LangChain。<br>**特性**: 带有精确源定位 (引文) 的 RAG。 |
-| **Macro**<br>(宏观分析) | 全球经济政策分析 (美联储利率，通胀数据) 及其对资产类别的影响。 | **数据**: FRED API, Web Search。<br>**模型**: 宏观经济推理引擎。 |
+### 1. 消息面分析 (News Analysis)
+采用混合搜索模式实时捕捉市场动态。一方面通过 Search API 聚合主流媒体新闻，另一方面利用 LLM 操控无头浏览器 (**Browser-use/Playwright**) 深入社交论坛挖掘散户讨论热度与观点。
+*(注：目前社交媒体论坛反爬策略较严，效果持续优化中)*
+
+![News Analysis 1](assets/消息面分析1.png)
+![News Analysis 2](assets/消息面分析2.png)
+
+### 2. 技术面分析 (Technical Analysis)
+综合道氏理论、波浪理论和威科夫操盘法，结合 RSI、MACD、布林带、KDJ 等量化指标，提供高置信度的趋势预测与买卖点分析。
+
+![Technical Analysis 1](assets/技术面分析1.png)
+![Technical Analysis 2](assets/技术面分析2.png)
+
+### 3. 宏观数据分析 (Macro Analysis)
+实时拉取并分析国内外核心宏观经济数据（如美联储利率决议、CPI/PPI 通胀数据、GDP 增长率等），研判大类资产周期与宏观趋势。
+
+![Macro Analysis 1](assets/宏观数据分析1.png)
+![Macro Analysis 2](assets/宏观数据分析2.png)
+
+### 4. 财报分析 (Financial Report Analysis)
+智能抓取美股/A股/港股财报 PDF，利用 RAG 技术精准定位并提取核心财务指标（营收、净利润、现金流等）。
+*(注：LLM 深度解读功能正在持续迭代以提升准确性)*
+
+![Financial Report 1](assets/财报分析.png)
+![Financial Report 2](assets/财报分析2.png)
+
+### 5. 模拟盘 (AI Paper Trading)
+AI 代理自动进行模拟交易下注，实时记录并跟踪策略收益表现，用于验证投资策略的有效性与稳健性。
+
+![Simulation](assets/模拟盘.png)
+
+### 6. AI 顾问团 (AI Council)
+模拟“一人公司”的决策架构。由 CEO、CTO、首席分析师等多个 AI 角色组成的顾问团队，针对用户的投资疑问进行多视角、深层次的讨论与答疑。
+
+![AI Council 1](assets/AI%20顾问团.png)
+![AI Council 2](assets/AI顾问团2.png)
+![AI Council 3](assets/AI顾问团3.png)
 
 ---
 
