@@ -24,6 +24,8 @@ api_keys:
   # SiliconFlow API (custom LLM provider - already set in code)
   siliconflow: "xxx"
   fred_api_key:xxx
+model: deepseek-ai/DeepSeek-V3.1-Terminus
+api_url: https://api.siliconflow.cn/v1
 
 # Database configuration (optional)
 database:
