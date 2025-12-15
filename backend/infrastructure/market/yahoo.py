@@ -20,7 +20,7 @@ class YahooFinanceTool:
     MACRO_SYMBOLS = {
         'VIX': '^VIX',          # CBOE Volatility Index
         'US10Y': '^TNX',        # Treasury Yield 10 Years
-        'DXY': 'DX-Y.NYB',      # US Dollar Index
+        'DXY': 'DX=F',          # US Dollar Index (Futures provides better availability than Index)
         'FED_FUNDS_FUTURES': 'ZQ=F' # Fed Funds Futures
     }
 

@@ -181,8 +181,8 @@ class AkShareTool:
                 latest = df.iloc[0]
                 return {
                     "indicator": "China PMI",
-                    "manufacturing": float(latest['制造业-PMI']),
-                    "non_manufacturing": float(latest['非制造业-商务活动指数']),
+                    "manufacturing": float(latest['制造业-指数']),
+                    "non_manufacturing": float(latest['非制造业-指数']),
                     "date": latest['月份']
                 }
             elif indicator_upper == 'PPI':

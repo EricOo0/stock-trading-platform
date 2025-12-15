@@ -11,7 +11,7 @@ export interface DeepSearchResponse {
     message?: string;
 }
 
-export const deepResearchAPI = {
+export const newsSentimentAPI = {
     /**
      * Create a new Browser Session
      */
@@ -29,7 +29,7 @@ export const deepResearchAPI = {
     },
 
     /**
-     * Start a Deep Research session
+     * Start a News Sentiment session
      * @param query The research query
      * @param sessionId Optional session ID (for browser persistence)
      */
@@ -39,13 +39,13 @@ export const deepResearchAPI = {
             // But for Browser View, we need a known session ID.
             const sid = sessionId || `session_${Math.random().toString(36).substr(2, 9)}`;
 
-            const response = await axios.post(`${API_BASE_URL}/agent/deep-search/start`, {
+            const response = await axios.post(`${API_BASE_URL}/agent/news-sentiment/start`, {
                 query: query,
                 session_id: sid
             });
             return response.data;
         } catch (error) {
-            console.error("Deep Search Error:", error);
+            console.error("News Sentiment Error:", error);
             throw error;
         }
     },

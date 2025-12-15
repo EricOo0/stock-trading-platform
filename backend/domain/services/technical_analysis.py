@@ -8,13 +8,68 @@ logger = logging.getLogger(__name__)
 class TechnicalAnalysisTool:
     """
     Technical Analysis Tool
-    Calculates key technical indicators: MA, RSI, MACD, Bollinger Bands.
+    Calculates key technical indicators: MA, EMA, RSI, MACD, Bollinger Bands, KDJ, ATR, OBV, Pivot Points.
     """
     
     def calculate_indicators(self, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Calculate technical indicators from a list of candles.
-        Expected candle format: {'close': float, ...} (from get_historical_data)
+        Calculate technical indicators from a list of candles (Basic version for legacy compatibility).
+        """
+        # Reuse advanced calculation but return simplified format
+        advanced = self.calculate_advanced_indicators(candles)
+        if "error" in advanced:
+            return advanced
+            
+        # Extract legacy format
+        tech = advanced.get("technical_indicators", {})
+        trend = tech.get("trend", {})
+        rsi = tech.get("momentum", {}).get("rsi_14", 50)
+        macd = tech.get("momentum", {}).get("macd", {})
+        boll = tech.get("volatility", {}).get("boll", {})
+        
+        # Simple trend mapping
+        ma_status = trend.get("status", "SIDEWAYS")
+        trend_status = "SIDEWAYS"
+        if ma_status == "bullish_alignment": trend_status = "UP"
+        elif ma_status == "bearish_alignment": trend_status = "DOWN"
+
+        # Simple RSI mapping
+        rsi_status = "NEUTRAL"
+        if rsi > 70: rsi_status = "OVERBOUGHT"
+        elif rsi < 30: rsi_status = "OVERSOLD"
+
+        # Simple BB mapping
+        bb_status = "NORMAL"
+        if boll.get("position") == "above_upper": bb_status = "ABOVE_UPPER"
+        elif boll.get("position") == "below_lower": bb_status = "BELOW_LOWER"
+
+        return {
+            "trend": {
+                "status": trend_status,
+                "ma5": trend.get("ma_system", {}).get("ma5"),
+                "ma20": trend.get("ma_system", {}).get("ma20"),
+                "ma60": trend.get("ma_system", {}).get("ma60")
+            },
+            "rsi": {
+                "value": rsi,
+                "status": rsi_status
+            },
+            "macd": {
+                "macd": macd.get("dif"),
+                "signal": macd.get("dea"),
+                "status": macd.get("cross_signal", "NEUTRAL").upper()
+            },
+            "bollinger": {
+                "upper": boll.get("upper"),
+                "lower": boll.get("lower"),
+                "status": bb_status
+            }
+        }
+
+    def calculate_advanced_indicators(self, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Calculate comprehensive technical indicators for Agent Context.
+        Includes: EMA, ATR, OBV, Pivot Points, Price Action.
         """
         if not candles or len(candles) < 30:
             return {"error": "Insufficient data"}
@@ -22,83 +77,204 @@ class TechnicalAnalysisTool:
         try:
             # Convert to DataFrame
             df = pd.DataFrame(candles)
-            if 'close' not in df.columns:
-                 # Try case insensitive mapping if needed, but registry returns 'close'
-                 if 'Close' in df.columns: df['close'] = df['Close']
-                 else: return {"error": "Missing close price"}
+            # Normalize columns
+            col_map = {c: c.lower() for c in df.columns}
+            df = df.rename(columns=col_map)
             
-            close = df['close'].astype(float)
+            required = ['close', 'high', 'low']
+            if not all(col in df.columns for col in required):
+                 # Try fallback for volume if missing
+                 if 'volume' not in df.columns: df['volume'] = 0
+                 # Check again for price cols
+                 if not all(col in df.columns for col in ['close', 'high', 'low']):
+                     return {"error": "Missing price data (high/low/close)"}
             
-            # 1. Moving Averages
+            # Type conversion
+            for col in ['close', 'high', 'low']:
+                df[col] = df[col].astype(float)
+            if 'volume' in df.columns:
+                df['volume'] = df['volume'].astype(float)
+            else:
+                df['volume'] = 0.0
+            
+            close = df['close']
+            high = df['high']
+            low = df['low']
+            vol = df['volume']
+            
+            # --- 1. Trend Indicators ---
+            # SMA
             ma5 = close.rolling(window=5).mean().iloc[-1]
+            ma10 = close.rolling(window=10).mean().iloc[-1]
             ma20 = close.rolling(window=20).mean().iloc[-1]
             ma60 = close.rolling(window=60).mean().iloc[-1]
             
-            trend = "SIDEWAYS"
-            if ma5 > ma20 > ma60: trend = "UP"
-            elif ma5 < ma20 < ma60: trend = "DOWN"
+            # EMA (Exponential) - More sensitive
+            ema12 = close.ewm(span=12, adjust=False).mean().iloc[-1]
+            ema26 = close.ewm(span=26, adjust=False).mean().iloc[-1]
             
-            # 2. RSI (14)
+            # Trend Status
+            ma_status = "sideways"
+            if ma5 > ma10 > ma20 > ma60: ma_status = "bullish_alignment"
+            elif ma5 < ma10 < ma20 < ma60: ma_status = "bearish_alignment"
+
+            # --- 2. Momentum Indicators ---
+            # RSI (14)
             delta = close.diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
             rs = gain / loss
-            rsi = 100 - (100 / (1 + rs)).iloc[-1]
+            rsi = 100 - (100 / (1 + rs))
+            rsi_val = rsi.iloc[-1]
             
-            # RSI Status
-            rsi_status = "NEUTRAL"
-            if rsi > 70: rsi_status = "OVERBOUGHT"
-            elif rsi < 30: rsi_status = "OVERSOLD"
-            
-            # 3. MACD (12, 26, 9)
+            # MACD (12, 26, 9)
             exp1 = close.ewm(span=12, adjust=False).mean()
             exp2 = close.ewm(span=26, adjust=False).mean()
-            macd_line = exp1 - exp2
-            signal_line = macd_line.ewm(span=9, adjust=False).mean()
+            macd_dif = exp1 - exp2
+            macd_dea = macd_dif.ewm(span=9, adjust=False).mean()
+            macd_hist = 2 * (macd_dif - macd_dea)
             
-            macd_val = macd_line.iloc[-1]
-            signal_val = signal_line.iloc[-1]
+            dif_val = macd_dif.iloc[-1]
+            dea_val = macd_dea.iloc[-1]
+            hist_val = macd_hist.iloc[-1]
             
-            macd_signal = "NEUTRAL"
-            if macd_val > signal_val: macd_signal = "GOLDEN_CROSS" # Bullish
-            elif macd_val < signal_val: macd_signal = "DEATH_CROSS" # Bearish
+            # MACD Signal
+            cross_signal = "neutral"
+            if len(macd_dif) > 2:
+                if macd_dif.iloc[-1] > macd_dea.iloc[-1] and macd_dif.iloc[-2] <= macd_dea.iloc[-2]:
+                    cross_signal = "golden_cross"
+                elif macd_dif.iloc[-1] < macd_dea.iloc[-1] and macd_dif.iloc[-2] >= macd_dea.iloc[-2]:
+                    cross_signal = "death_cross"
+                elif dif_val > dea_val:
+                    cross_signal = "bullish_zone"
+                else:
+                    cross_signal = "bearish_zone"
             
-            # 4. Bollinger Bands (20, 2)
-            ma20_series = close.rolling(window=20).mean()
+            # --- 3. Volatility ---
+            # Bollinger Bands
             std20 = close.rolling(window=20).std()
-            upper_band = ma20_series + (std20 * 2)
-            lower_band = ma20_series - (std20 * 2)
+            ma20_series = close.rolling(window=20).mean()
+            upper = ma20_series + 2 * std20
+            lower = ma20_series - 2 * std20
+            width_pct = (upper - lower) / ma20_series
             
             curr_price = close.iloc[-1]
-            bb_status = "NORMAL"
-            if curr_price > upper_band.iloc[-1]: bb_status = "ABOVE_UPPER"
-            elif curr_price < lower_band.iloc[-1]: bb_status = "BELOW_LOWER"
+            bb_pos = "within_bands"
+            if curr_price > upper.iloc[-1]: bb_pos = "above_upper"
+            elif curr_price < lower.iloc[-1]: bb_pos = "below_lower"
+            
+            # ATR (14)
+            high_low = high - low
+            high_close = (high - close.shift()).abs()
+            low_close = (low - close.shift()).abs()
+            ranges = pd.concat([high_low, high_close, low_close], axis=1)
+            true_range = ranges.max(axis=1)
+            atr = true_range.rolling(window=14).mean().iloc[-1]
 
-            return {
-                "trend": {
-                    "status": trend,
-                    "ma5": round(ma5, 2),
-                    "ma20": round(ma20, 2),
-                    "ma60": round(ma60, 2)
+            # --- 4. Volume Analysis ---
+            # OBV
+            obv_change = pd.Series(0, index=df.index)
+            obv_change.loc[close > close.shift()] = vol
+            obv_change.loc[close < close.shift()] = -vol # Use negative for obv calculation logic
+            obv = obv_change.cumsum()
+            
+            obv_slope = "flat"
+            if len(obv) > 5:
+                if obv.iloc[-1] > obv.iloc[-5]: obv_slope = "rising"
+                elif obv.iloc[-1] < obv.iloc[-5]: obv_slope = "falling"
+
+            # Volume MA
+            vol_ma5 = vol.rolling(window=5).mean().iloc[-1]
+            vol_ratio = vol.iloc[-1] / vol_ma5 if vol_ma5 > 0 else 0
+
+            # --- 5. Support / Resistance (Pivot Points) ---
+            prev = df.iloc[-2] if len(df) > 1 else df.iloc[-1]
+            pp = (prev['high'] + prev['low'] + prev['close']) / 3
+            r1 = 2 * pp - prev['low']
+            s1 = 2 * pp - prev['high']
+            
+            high_20d = high.tail(20).max()
+            low_20d = low.tail(20).min()
+
+            # --- 6. Recent Price Action ---
+            recent_data = df.tail(15).copy()
+            if 'date' in df.columns:
+                 recent_data['date_str'] = df['date'].tail(15).astype(str)
+            else:
+                 recent_data['date_str'] = [f"T-{i}" for i in range(len(recent_data)-1, -1, -1)]
+
+            price_action = []
+            for _, row in recent_data.iterrows():
+                price_action.append({
+                    "date": row.get('date_str', ''),
+                    "open": round(float(row['open']), 2),
+                    "high": round(float(row['high']), 2),
+                    "low": round(float(row['low']), 2),
+                    "close": round(float(row['close']), 2),
+                    "volume": float(row['volume'])
+                })
+
+            context = {
+                "market_status": {
+                    "current_price": round(curr_price, 2),
+                    "daily_change_pct": round((curr_price - close.iloc[-2]) / close.iloc[-2] * 100, 2) if len(close) > 1 else 0,
+                    "volume_ratio": round(vol_ratio, 2)
                 },
-                "rsi": {
-                    "value": round(rsi, 2),
-                    "status": rsi_status
+                "recent_price_action": price_action,
+                "technical_indicators": {
+                    "trend": {
+                        "ma_system": {
+                            "ma5": round(ma5, 2),
+                            "ma10": round(ma10, 2),
+                            "ma20": round(ma20, 2),
+                            "ma60": round(ma60, 2)
+                        },
+                        "ema_system": {
+                            "ema12": round(ema12, 2),
+                            "ema26": round(ema26, 2)
+                        },
+                        "status": ma_status
+                    },
+                    "momentum": {
+                        "rsi_14": round(rsi_val, 2),
+                        "macd": {
+                            "dif": round(dif_val, 3),
+                            "dea": round(dea_val, 3),
+                            "hist": round(hist_val, 3),
+                            "cross_signal": cross_signal
+                        }
+                    },
+                    "volatility": {
+                        "atr_14": round(atr, 2),
+                        "boll": {
+                            "upper": round(upper.iloc[-1], 2),
+                            "lower": round(lower.iloc[-1], 2),
+                            "width_pct": round(width_pct.iloc[-1], 4),
+                            "position": bb_pos
+                        }
+                    },
+                    "volume_analysis": {
+                        "obv_slope": obv_slope,
+                        "current_vol_vs_ma5": round(vol_ratio, 2)
+                    }
                 },
-                "macd": {
-                    "macd": round(macd_val, 4),
-                    "signal": round(signal_val, 4),
-                    "status": macd_signal
-                },
-                "bollinger": {
-                    "upper": round(upper_band.iloc[-1], 2),
-                    "lower": round(lower_band.iloc[-1], 2),
-                    "status": bb_status
+                "support_resistance": {
+                    "pivot_points": {
+                        "pivot": round(pp, 2),
+                        "r1": round(r1, 2),
+                        "s1": round(s1, 2)
+                    },
+                    "recent_extremes": {
+                        "high_20d": round(high_20d, 2),
+                        "low_20d": round(low_20d, 2)
+                    }
                 }
             }
             
+            return context
+
         except Exception as e:
-            logger.error(f"Technical analysis failed: {e}")
+            logger.error(f"Advanced analysis failed: {e}", exc_info=True)
             return {"error": str(e)}
 
     def calculate_indicators_history(self, candles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -124,19 +300,12 @@ class TechnicalAnalysisTool:
             df['ma60'] = close.rolling(window=60).mean()
             
             # 2. Bollinger Bands (20, 2)
-            # Mid = MA20
-            # Upper = Mid + 2*std
-            # Lower = Mid - 2*std
             std20 = close.rolling(window=20).std()
             df['boll_mid'] = df['ma20']
             df['boll_upper'] = df['boll_mid'] + (std20 * 2)
             df['boll_lower'] = df['boll_mid'] - (std20 * 2)
 
             # 3. MACD (12, 26, 9)
-            # DIF = EMA(12) - EMA(26)
-            # DEA = EMA(DIF, 9)
-            # BAR = 2 * (DIF - DEA) or just DIF - DEA depending on convention. 
-            # Recharts looks for macd_bar.
             exp1 = close.ewm(span=12, adjust=False).mean()
             exp2 = close.ewm(span=26, adjust=False).mean()
             df['macd_dif'] = exp1 - exp2
@@ -150,31 +319,24 @@ class TechnicalAnalysisTool:
             rs = gain / loss
             df['rsi14'] = 100 - (100 / (1 + rs))
             
-            # 5. KDJ (Classic: 9, 3, 3)
-            # RSV = (Close - Low_9) / (High_9 - Low_9) * 100
+            # 5. KDJ
             if 'high' in df.columns and 'low' in df.columns:
                 low_list = df['low'].rolling(window=9, min_periods=9).min()
                 high_list = df['high'].rolling(window=9, min_periods=9).max()
-                
-                # Check for zero text division
                 rsv = (close - low_list) / (high_list - low_list) * 100
-                
-                # K = 2/3 * PrevK + 1/3 * RSV
                 df['kdj_k'] = rsv.ewm(com=2, adjust=False).mean() 
                 df['kdj_d'] = df['kdj_k'].ewm(com=2, adjust=False).mean()
                 df['kdj_j'] = 3 * df['kdj_k'] - 2 * df['kdj_d']
 
-            # Fill NaNs
             df = df.replace({np.nan: None})
-            
             return df.to_dict(orient='records')
             
         except Exception as e:
             logger.error(f"History calculation failed: {e}")
-            return candles # Return original data on error
+            return candles 
 
 if __name__ == "__main__":
     # Test logic
-    data = [{'close': 100 + i + (i%5)*2} for i in range(100)]
+    data = [{'close': 100 + i + (i%5)*2, 'high': 105+i, 'low': 95+i, 'volume': 1000} for i in range(100)]
     tool = TechnicalAnalysisTool()
-    print(tool.calculate_indicators(data))
+    print(tool.calculate_advanced_indicators(data))

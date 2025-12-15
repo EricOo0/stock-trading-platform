@@ -116,15 +116,21 @@ class ReportContentTool:
             full_text = ""
             para_count = 0
             
-            # Find all paragraphs, headers, and tables
-            elements = soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'table'])
+            # Find all paragraphs, headers, tables, and significant spans
+            elements = soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'table', 'span'])
             
             for elem in elements:
                 text = elem.get_text(strip=True)
                 if len(text) < 10: continue
                     
                 if elem.name == 'div':
-                    if elem.find(['p', 'div', 'h1', 'h2', 'h3', 'li', 'table']): continue
+                    # Skip wrapper divs that contain other structural elements or text containers
+                    if elem.find(['p', 'div', 'h1', 'h2', 'h3', 'li', 'table', 'span']): continue
+                
+                # Check for span: only include if it's a "leaf" span or top-level text span
+                # Skip if inside another content block we already capture (p, h*, li) OR another span (nested)
+                if elem.name == 'span':
+                    if elem.find_parents(['p', 'h1', 'h2', 'h3', 'li', 'span']): continue
                 
                 anchor_id = f"html_{para_count}"
                 elem['id'] = anchor_id

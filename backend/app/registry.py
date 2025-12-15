@@ -258,11 +258,25 @@ class Tools:
                     dl = Downloader("StockTradingPlatform", "agent@example.com", dl_path)
                     
                     # Store count to check if new file arrived
-                    dl.get("10-K", symbol, limit=1)
+                    # Store count to check if new file arrived
+                    # Try 10-K first, then 10-Q if requested or if 10-K fails
+                    doc_type = "10-K"
+                    # If report_info suggests 10-Q (e.g. from title '10-Q Filing'), prefer that.
+                    # Current logic fetches 10-K. Let's make it smarter.
+                    if "10-Q" in report_info.get("title", "").upper() or "QUARTERLY" in report_info.get("title", "").upper():
+                        doc_type = "10-Q"
                     
+                    try:
+                        dl.get(doc_type, symbol, limit=1)
+                    except Exception:
+                        # Fallback to 10-K if 10-Q failed, or vice versa if needed, but for now simple fallback
+                        if doc_type == "10-Q":
+                             dl.get("10-K", symbol, limit=1)
+                             doc_type = "10-K"
+
                     # 2. Find Latest File
-                    # Path: .../sec-edgar-filings/{symbol}/10-K/{accession}/full-submission.txt
-                    search_path = os.path.join(dl_path, "sec-edgar-filings", symbol, "10-K", "*", "full-submission.txt")
+                    # Path: .../sec-edgar-filings/{symbol}/{doc_type}/{accession}/full-submission.txt
+                    search_path = os.path.join(dl_path, "sec-edgar-filings", symbol, "*", "*", "full-submission.txt")
                     files = glob.glob(search_path)
                     
                     if files:
@@ -275,30 +289,49 @@ class Tools:
                             
                         # 3. Extract Main Document (10-K HTML)
                         # full-submission.txt is SGML. We want the first <DOCUMENT> that is 10-K or just the first HTML.
-                        # Simple robust approach: Feed into BS4, it usually finds the main HTML structure.
-                        # Optimization: Extract <TEXT>...</TEXT> of the 10-K document if possible to avoid junk.
+                        # 3. Extract Main Document
+                        # Find ALL 10-K/10-Q documents and pick the largest one.
+                        # This avoids getting a small cover page or summary.
+                        doc_content = ""
+                        matches = re.findall(r'<TYPE>(?:10-K|10-Q).*?<TEXT>(.*?)</TEXT>', raw_content, re.DOTALL | re.IGNORECASE)
                         
-                        doc_content = raw_content
-                        # Regex to find <TYPE>10-K ... <TEXT>(...)</TEXT>
-                        match = re.search(r'<TYPE>10-K.*?<TEXT>(.*?)</TEXT>', raw_content, re.DOTALL | re.IGNORECASE)
-                        if match:
-                            doc_content = match.group(1)
-                            # Strip <XBRL> wrappers if present (common in iXBRL submissions)
-                            # They break browser rendering if they are the root element
-                            doc_content = re.sub(r'^\s*<XBRL>', '', doc_content, flags=re.IGNORECASE).strip()
-                            doc_content = re.sub(r'</XBRL>\s*$', '', doc_content, flags=re.IGNORECASE).strip()
+                        if matches:
+                            # Pick the largest document text
+                            doc_content = max(matches, key=len)
+                        else:
+                            # Fallback: Look for the first large HTML block
+                            html_matches = re.findall(r'<HTML>(.*?)</HTML>', raw_content, re.DOTALL | re.IGNORECASE)
+                            if html_matches:
+                                doc_content = max(html_matches, key=len)
+                                doc_content = f"<HTML>{doc_content}</HTML>"
+                        
+                        if not doc_content:
+                             # Last resort: use the whole raw content if it looks like HTML
+                             doc_content = raw_content
+                        else:
+                            # Fallback: Look for the first large HTML block
+                            # Many modern filings are just XML/HTML.
+                            # If we can't find the specific TYPE tag, try to find the first <HTML>...</HTML> block that is significant in size.
+                            html_matches = re.findall(r'<HTML>(.*?)</HTML>', raw_content, re.DOTALL | re.IGNORECASE)
+                            if html_matches:
+                                # Pick the largest one, usually the main report
+                                doc_content = max(html_matches, key=len)
+                                # Add back tags as findall removes them
+                                doc_content = f"<HTML>{doc_content}</HTML>"
+                        
+                        # Strip <XBRL> wrappers if present
+                        doc_content = re.sub(r'^\s*<XBRL>', '', doc_content, flags=re.IGNORECASE).strip()
+                        doc_content = re.sub(r'</XBRL>\s*$', '', doc_content, flags=re.IGNORECASE).strip()
                         
                         # Save and Parse
                         # Use a fake URL since we downloaded it
                         fake_url = f"https://www.sec.gov/Archives/edgar/data/{symbol}/10-k.htm"
-                        _, local_url, html_anchor_map = self.report_content.save_html_content(doc_content, symbol, fake_url)
+                        full_text_with_anchors, local_url, html_anchor_map = self.report_content.save_html_content(doc_content, symbol, fake_url)
                         pdf_url = local_url
                         anchor_map = html_anchor_map
                         
-                        # Extract Text for LLM
-                        soup = BeautifulSoup(doc_content, 'html.parser')
-                        for script in soup(["script", "style", "xml"]): script.decompose()
-                        content = soup.get_text("\n")
+                        # Use the text with anchors!
+                        content = full_text_with_anchors
                         
                     else:
                          logger.warning("sec_edgar_downloader finished but no file found.")
@@ -387,6 +420,18 @@ class Tools:
         history = self.get_historical_data(symbol, period=period)
         return self.technical.calculate_indicators(history)
 
+    def get_technical_context(self, symbol: str, period: str = "1y") -> Dict[str, Any]:
+        """Get advanced technical context for AI Agent."""
+        history = self.get_historical_data(symbol, period=period)
+        context = self.technical.calculate_advanced_indicators(history)
+        if "error" in context:
+            return context
+        
+        # Inject metadata
+        context["symbol"] = symbol
+        context["period"] = period
+        return context
+
     def get_technical_history(self, symbol: str, period: str = "1y") -> List[Dict[str, Any]]:
         """Get historical data with calculated indicators (for charts)."""
         history = self.get_historical_data(symbol, period=period)
@@ -409,12 +454,13 @@ class Tools:
         if "us cpi" in query or "cpi us" in query or "us_cpi" in query: return self.fred.get_macro_history("CPI", period)
         if "fed funds" in query or "fed_funds" in query: return self.fred.get_macro_history("FED_FUNDS", period)
         if "m2" in query and "us" in query: return self.fred.get_macro_history("M2", period)
+        if "dxy" in query: return self.fred.get_macro_history("DTWEXM", period) # FRED Major Currencies
         if "dfedtaru" in query: return self.fred.get_macro_history("DFEDTARU", period)
 
         # Yahoo macro
         indicator = None
         if "vix" in query: indicator = "VIX"
-        elif "dxy" in query: indicator = "DXY"
+        # elif "dxy" in query: indicator = "DXY"
         elif "yield" in query or "us10y" in query: indicator = "US10Y"
         elif "fed" in query and "future" in query: indicator = "FED_FUNDS_FUTURES"
         
@@ -436,20 +482,31 @@ class Tools:
             if "social" in query: return self.akshare.get_macro_data("SOCIAL_FINANCING")
 
         if "vix" in query: return self.yahoo.get_macro_data("VIX")
-        if "dxy" in query: return self.yahoo.get_macro_data("DXY")
+        # if "dxy" in query: return self.yahoo.get_macro_data("DXY") # Yahoo DXY Unreliable, used FRED below
         if "yield" in query or "us10y" in query: return self.yahoo.get_macro_data("US10Y")
         if "fed" in query and "future" in query: return self.yahoo.get_macro_data("FED_FUNDS_FUTURES")
         
+        # FRED Macro Data (Fallbacks for US Economy)
+        if "us" in query or "fed" in query or "unemployment" in query or "nonfarm" in query or "dxy" in query:
+             if "unemployment" in query: return self.fred.get_macro_history("UNEMPLOYMENT", "1y")
+             if "nonfarm" in query: return self.fred.get_macro_history("NONFARM_PAYROLLS", "1y")
+             if "cpi" in query: return self.fred.get_macro_history("CPI", "1y")
+             if "fed" in query and "funds" in query: return self.fred.get_macro_history("FED_FUNDS", "1y")
+             if "m2" in query: return self.fred.get_macro_history("M2", "1y")
+             if "dxy" in query: return self.fred.get_macro_history("DTWEXM", "1y")
+             if "dfedtaru" in query: return self.fred.get_macro_history("DFEDTARU", "1y")
+        
         return {"error": "Unknown macro indicator requested"}
 
-    def search_market_news(self, query: str, provider: str = "auto") -> List[Dict[str, Any]]:
+    def search_market_news(self, query: str, provider: str = "auto", topic: str = "news", include_domains: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """Search for market news."""
         if provider == "auto":
             if self.tavily: provider = "tavily"
             elif self.serp: provider = "serp"
             else: provider = "ddg"
 
-        if provider == "tavily" and self.tavily: return self.tavily.search(query, topic="news")
+        if provider == "tavily" and self.tavily: 
+            return self.tavily.search(query, topic=topic, include_domains=include_domains)
         if provider == "serp" and self.serp: return self.serp.search(query, topic="news")
         if provider == "ddg": return self.ddg.search(query, topic="news")
         return [{"title": "Search failed", "content": "Provider not available"}]

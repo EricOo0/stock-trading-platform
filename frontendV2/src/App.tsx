@@ -6,7 +6,7 @@ import MacroDataPage from './pages/MacroDataPage';
 import FinancialAnalysisPage from './pages/FinancialAnalysisPage';
 import MemoryVisualizationPage from './pages/MemoryVisualizationPage';
 import StockSimulationPage from './pages/StockSimulationPage';
-import DeepResearchPage from './pages/DeepResearchPage';
+import NewsSentimentPage from './pages/NewsSentimentPage';
 import CouncilRoom from './components/Council/CouncilRoom';
 
 function App() {
@@ -24,8 +24,8 @@ function App() {
         return 'AI 顾问团';
       case 'stock-simulation':
         return '股票模拟回测';
-      case 'deep-research':
-        return '深度投研';
+      case 'news-sentiment':
+        return '消息面分析';
       case 'test':
         return '测试页面';
       case 'debug':
@@ -33,7 +33,7 @@ function App() {
       case 'market-query':
         return '行情查询';
       case 'financial-analysis':
-        return '新财报分析';
+        return '财报分析';
       case 'technical-analysis':
         return '技术分析';
       case 'stock-search':
@@ -57,8 +57,8 @@ function App() {
         return <CouncilRoom />;
       case 'stock-simulation':
         return <StockSimulationPage />;
-      case 'deep-research':
-        return <DeepResearchPage />;
+      case 'news-sentiment':
+        return <NewsSentimentPage />;
       case 'market-query':
         return <MarketQueryPage />;
       case 'financial-analysis':

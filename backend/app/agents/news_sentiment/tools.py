@@ -16,10 +16,42 @@ def search_web(query: str, days: int = 7) -> str:
     Returns a list of relevant URLs with titles.
     """
     try:
+        logger.info(f"[NewsSentiment] Executing search_web with query: '{query}'")
+        
+        # 1. Parse 'site:domain.com' Logic
+        import re
+        site_pattern = r'site:([\w\.-]+)'
+        domains = re.findall(site_pattern, query)
+        
+        # Clean query if domains found
+        clean_query = re.sub(site_pattern, '', query).strip()
+        
+        # 2. Determine Search Mode
+        # If specific domains are targeted (especially social media), use 'general' topic as per best practices
+        topic = "news"
+        if domains:
+            # Check for social media domains that might benefit from 'general' topic
+            social_domains = ['reddit.com', 'twitter.com', 'x.com', 'linkedin.com']
+            if any(d in social_domains for d in domains):
+                topic = "general"
+                logger.info(f"[NewsSentiment] Social media search detected. Switched to topic='general', domains={domains}")
+            else:
+                logger.info(f"[NewsSentiment] Domain restricted search. domains={domains}")
+        
         # Use the robust registry search (Tavily/Serp/DDG)
-        results = tools.search_market_news(query)
+        if domains:
+             results = tools.search_market_news(clean_query, topic=topic, include_domains=domains)
+        else:
+             results = tools.search_market_news(query)
+        logger.info(f"[NewsSentiment] Search returned {len(results) if results else 0} results.")
+        
+        if results:
+             # logger.info(f"[NewsSentiment] First result keys: {results[0].keys()}")
+             pass
+        
         if not results:
-            return "No results found."
+            logger.warning(f"[NewsSentiment] No results found for query: '{query}'")
+            return f"No results found for query: '{query}'. Try broader keywords or check internet connection."
         
         # Format results strictly as entry points
         formatted = ["DISCOVERY RESULTS (Use inspect_page to read details):"]
@@ -27,13 +59,13 @@ def search_web(query: str, days: int = 7) -> str:
         for res in results:
             title = res.get('title', 'Unknown')
             # robustly get URL
-            url = res.get('url', res.get('link', '')).strip()
+            url = res.get('url', res.get('link', res.get('href', ''))).strip()
             
             # Skip invalid URLs
             if not url or url.startswith('http') is False:
                 continue
 
-            snippet = res.get('content', '')[:150] # Short snippet only
+            snippet = res.get('content', res.get('body', ''))[:150] # Short snippet only
             valid_count += 1
             formatted.append(f"[{valid_count}] {title}\n    URL: {url}\n    Hint: {snippet}\n")
             
@@ -42,7 +74,7 @@ def search_web(query: str, days: int = 7) -> str:
 
         return "\n".join(formatted)
     except Exception as e:
-        logger.error(f"Search failed: {e}")
+        logger.error(f"[NewsSentiment] Search failed: {e}", exc_info=True)
         return f"Error executing search: {e}"
 
 async def inspect_page(url: str) -> str:

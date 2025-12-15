@@ -11,7 +11,7 @@ from backend.infrastructure.browser.steel_browser import browser_engine
 
 logger = logging.getLogger(__name__)
 
-class DeepSearchService:
+class NewsSentimentService:
     def __init__(self):
         # Initialize with InMemorySessionService
         self.session_service = InMemorySessionService()
@@ -32,13 +32,13 @@ class DeepSearchService:
             
             # 2. Prepare Input
             adk_session_id = session_id or str(uuid.uuid4())
-            user_id = "deep_search_user"
+            user_id = "news_sentiment_user"
             input_content = types.Content(role="user", parts=[types.Part(text=query)])
             
             # 3. Create Session
             try:
                 await self.session_service.create_session(
-                    app_name="deep_search_app",
+                    app_name="news_sentiment_app",
                     user_id=user_id,
                     session_id=adk_session_id
                 )
@@ -47,7 +47,7 @@ class DeepSearchService:
 
 
             # 4. Stream Agent Execution using Queue + Callback
-            from backend.app.agents.deep_search.agent import create_deep_search_agent
+            from backend.app.agents.news_sentiment.agent import create_news_sentiment_agent
             from google.adk.runners import Runner
 
             # Queue for events
@@ -57,32 +57,26 @@ class DeepSearchService:
             async def run_agent():
                 try:
                     # Create Agent with Callbacks linked to queue
-                    local_agent = create_deep_search_agent(event_queue=event_queue)
+                    local_agent = create_news_sentiment_agent(event_queue=event_queue)
                     
                     # Create Runner
                     local_runner = Runner(
                         agent=local_agent,
-                        app_name="deep_search_app",
+                        app_name="news_sentiment_app",
                         session_service=self.session_service
                     )
                     
                     # Run it
-                    exec_events = local_runner.run_async(
+                    async for _ in local_runner.run_async(
                         user_id=user_id,
                         session_id=adk_session_id,
                         new_message=input_content
-                    )
+                    ):
+                        # Consume generator but do nothing, events are handled by callbacks
+                        pass
                     
-                    async for event in exec_events:
-                        # 其实这个可以在 on_mode_end的callback里实现
-                        # Only capture Text Chunks via the stream (thoughts)
-                        # Tools are handled by the callback side-channel
-                        if hasattr(event, 'content') and event.content and event.content.parts:
-                            for part in event.content.parts:
-                                if hasattr(part, 'text') and part.text:
-                                    # Emit 'thought' event for streaming text
-                                    msg = {"type": "thought", "content": part.text}
-                                    await event_queue.put(json.dumps(msg) + "\n")
+                    # Manual chunk parsing removed. 
+                    # All events (thoughts, tools, conclusions) are now handled by FrontendCallbackHandler.
 
                 except Exception as e:
                     logger.error(f"Agent Execution Error: {e}")
@@ -109,4 +103,4 @@ class DeepSearchService:
             logger.error(f"Deep Search Service Error: {e}")
             yield json.dumps({"type": "error", "content": str(e)}) + "\n"
 
-deep_search_service = DeepSearchService()
+news_sentiment_service = NewsSentimentService()

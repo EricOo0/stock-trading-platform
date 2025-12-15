@@ -45,7 +45,7 @@ const FinancialPDFViewer: React.FC<FinancialPDFViewerProps> = ({
   const pdfIframeRef = useRef<HTMLIFrameElement>(null);
 
   return (
-    <div className="flex-1 bg-slate-900 rounded-xl border border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
+    <div className="h-full flex-1 bg-slate-900 rounded-xl border border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
       <div className="flex items-center justify-between p-3 bg-slate-800 border-b border-slate-700">
         <div className="flex items-center gap-2">
           <FileText size={16} className="text-slate-400" />
@@ -53,43 +53,43 @@ const FinancialPDFViewer: React.FC<FinancialPDFViewerProps> = ({
             {financialData?.symbol} 财报原件
           </span>
           {pdfUrl.toLowerCase().endsWith('.pdf') && (
-              <div className="flex items-center gap-1 ml-2">
-                  <button onClick={() => changePage(-1)} disabled={currentPdfPage <= 1} className="p-1 hover:bg-slate-700 rounded text-slate-400 disabled:opacity-30">
-                      <ChevronLeft size={14} />
-                  </button>
-                  <span className="text-xs text-slate-400 min-w-[40px] text-center">
-                    {currentPdfPage} / {numPages || '--'}
-                  </span>
-                  <button onClick={() => changePage(1)} disabled={currentPdfPage >= (numPages || 1)} className="p-1 hover:bg-slate-700 rounded text-slate-400 disabled:opacity-30">
-                      <ChevronRight size={14} />
-                  </button>
-              </div>
+            <div className="flex items-center gap-1 ml-2">
+              <button onClick={() => changePage(-1)} disabled={currentPdfPage <= 1} className="p-1 hover:bg-slate-700 rounded text-slate-400 disabled:opacity-30">
+                <ChevronLeft size={14} />
+              </button>
+              <span className="text-xs text-slate-400 min-w-[40px] text-center">
+                {currentPdfPage} / {numPages || '--'}
+              </span>
+              <button onClick={() => changePage(1)} disabled={currentPdfPage >= (numPages || 1)} className="p-1 hover:bg-slate-700 rounded text-slate-400 disabled:opacity-30">
+                <ChevronRight size={14} />
+              </button>
+            </div>
           )}
         </div>
         <div className="flex items-center gap-2">
           {pdfUrl.toLowerCase().endsWith('.pdf') && (
-              <div className="flex items-center gap-1 mr-2 border-r border-slate-700 pr-2">
-                  <button onClick={() => changeScale(-0.1)} className="p-1 hover:bg-slate-700 rounded text-slate-400">
-                      <ZoomOut size={14} />
-                  </button>
-                  <span className="text-xs text-slate-400 min-w-[30px] text-center">
-                      {Math.round(scale * 100)}%
-                  </span>
-                  <button onClick={() => changeScale(0.1)} className="p-1 hover:bg-slate-700 rounded text-slate-400">
-                      <ZoomIn size={14} />
-                  </button>
-              </div>
+            <div className="flex items-center gap-1 mr-2 border-r border-slate-700 pr-2">
+              <button onClick={() => changeScale(-0.1)} className="p-1 hover:bg-slate-700 rounded text-slate-400">
+                <ZoomOut size={14} />
+              </button>
+              <span className="text-xs text-slate-400 min-w-[30px] text-center">
+                {Math.round(scale * 100)}%
+              </span>
+              <button onClick={() => changeScale(0.1)} className="p-1 hover:bg-slate-700 rounded text-slate-400">
+                <ZoomIn size={14} />
+              </button>
+            </div>
           )}
-          <a 
-            href={financialData?.latest_report?.download_url || pdfUrl} 
-            target="_blank" 
+          <a
+            href={financialData?.latest_report?.download_url || pdfUrl}
+            target="_blank"
             rel="noopener noreferrer"
             className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
             title="在新窗口打开"
           >
             <ExternalLink size={16} />
           </a>
-          <button 
+          <button
             onClick={() => setShowPdf(false)}
             className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
           >
@@ -97,48 +97,49 @@ const FinancialPDFViewer: React.FC<FinancialPDFViewerProps> = ({
           </button>
         </div>
       </div>
-      <div className="flex-1 bg-slate-500/10 relative overflow-auto flex justify-center p-4">
+      <div className="flex-1 bg-slate-500/10 relative overflow-hidden flex justify-center p-0">
         {pdfUrl.toLowerCase().includes('.pdf') ? (
-            <Document
-              file={pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
+          <Document
+            file={pdfUrl}
+            onLoadSuccess={onDocumentLoadSuccess}
+            className="shadow-lg h-full overflow-auto custom-scrollbar"
+            options={pdfOptions}
+            loading={<div className="flex items-center justify-center h-full text-slate-400"><Loader2 className="animate-spin mr-2" /> 加载PDF中...</div>}
+            error={<div className="flex items-center justify-center h-full text-red-400">无法加载PDF文件</div>}
+          >
+            <Page
+              key={`page_${currentPdfPage}_${scale}`} // Force re-render when page or scale changes
+              pageNumber={currentPdfPage}
+              scale={scale}
+              renderTextLayer={true}
+              renderAnnotationLayer={true}
               className="shadow-lg"
-              options={pdfOptions}
-              loading={<div className="flex items-center justify-center h-full text-slate-400"><Loader2 className="animate-spin mr-2"/> 加载PDF中...</div>}
-              error={<div className="flex items-center justify-center h-full text-red-400">无法加载PDF文件</div>}
-            >
-              <Page 
-                  key={`page_${currentPdfPage}_${scale}`} // Force re-render when page or scale changes
-                  pageNumber={currentPdfPage} 
-                  scale={scale} 
-                  renderTextLayer={true} 
-                  renderAnnotationLayer={true}
-                  className="shadow-lg"
-              >
-                  {highlightRect && (
-                      <div
-                          style={{
-                              position: 'absolute',
-                              left: highlightRect[0] * scale,
-                              top: highlightRect[1] * scale,
-                              width: (highlightRect[2] - highlightRect[0]) * scale,
-                              height: (highlightRect[3] - highlightRect[1]) * scale,
-                              backgroundColor: 'rgba(255, 255, 0, 0.3)',
-                              border: '2px solid orange',
-                              pointerEvents: 'none',
-                              zIndex: 10
-                          }}
-                      />
-                  )}
-              </Page>
-            </Document>
+            />
+            {highlightRect && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: highlightRect[0] * scale,
+                  top: highlightRect[1] * scale,
+                  width: (highlightRect[2] - highlightRect[0]) * scale,
+                  height: (highlightRect[3] - highlightRect[1]) * scale,
+                  backgroundColor: 'rgba(255, 255, 0, 0.3)',
+                  border: '2px solid orange',
+                  pointerEvents: 'none',
+                  zIndex: 10
+                }}
+              />
+            )}
+          </Document>
         ) : (
+          <div className="absolute inset-0 w-full h-full">
             <iframe
               ref={pdfIframeRef}
               src={pdfUrl}
-              className="w-full h-full bg-white rounded-lg shadow-lg"
+              className="w-full h-full border-none bg-white"
               title="Financial Report HTML"
             />
+          </div>
         )}
       </div>
     </div>

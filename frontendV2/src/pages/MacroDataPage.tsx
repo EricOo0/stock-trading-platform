@@ -110,6 +110,145 @@ const MacroDataPage: React.FC = () => {
     const [selectedIndicator, setSelectedIndicator] = useState<IndicatorData | null>(null);
     const [fedProbData, setFedProbData] = useState<any>(null);
 
+    // AI Analysis State
+    const [analyzing, setAnalyzing] = useState(false);
+    const [aiSignal, setAiSignal] = useState<'BULLISH' | 'BEARISH' | 'NEUTRAL' | null>(null);
+    const [aiSummary, setAiSummary] = useState<string>('');
+    const [aiReasoning, setAiReasoning] = useState<string>('');
+    const [aiContextExpanded, setAiContextExpanded] = useState(false);
+
+    const reasoningEndRef = React.useRef<HTMLDivElement>(null);
+    const aiAbortControllerRef = React.useRef<AbortController | null>(null);
+
+    const fetchAIAnalysis = async () => {
+        if (aiAbortControllerRef.current) aiAbortControllerRef.current.abort();
+        aiAbortControllerRef.current = new AbortController();
+        const signal = aiAbortControllerRef.current.signal;
+
+        setAnalyzing(true);
+        setAiSignal(null);
+        setAiSummary('');
+        setAiReasoning('');
+
+        try {
+            const response = await fetch('/api/agent/macro/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: `macro-${Date.now()}` }),
+                signal
+            });
+
+            if (!response.body) return;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullText = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (signal.aborted) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                // console.log("Buffer update:", buffer.length);
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    // console.log("Processing line:", line);
+                    try {
+                        const event = JSON.parse(line);
+                        // console.log("Parsed event:", event);
+                        if (event.type === 'agent_response') {
+                            const newContent = event.content;
+                            fullText += newContent;
+                            // Do not display raw JSON stream
+                            // Only display if we detect it's NOT JSON (unlikely with current prompt) 
+                            // or if we implement a stream parser later.
+                        } else if (event.type === 'error') {
+                            console.error("Agent returned error:", event.content);
+                            setAiReasoning(prev => prev + `\n[Error: ${event.content}]`);
+                        }
+                    } catch (e) { }
+                }
+            }
+
+            // Final Parsing to extract structured data if available
+            try {
+                // Remove markdown code blocks if present
+                let cleanText = fullText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+                // Find JSON block
+                const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+                const jsonStr = jsonMatch ? jsonMatch[0] : cleanText;
+
+                const result = JSON.parse(jsonStr);
+
+                if (result.signal) setAiSignal(result.signal);
+                if (result.summary) setAiSummary(result.summary);
+                if (result.analysis) setAiReasoning(result.analysis);
+            } catch (e) {
+                console.warn("Macro JSON parse failed, utilizing raw text", e);
+                // Keep the incrementally accumulated text as reasoning
+            }
+
+        } catch (e) {
+            if (e instanceof Error && e.name === 'AbortError') return;
+            console.error(e);
+            setAiReasoning(prev => prev + "\n[Analysis interrupted or failed]");
+        } finally {
+            if (!signal.aborted) setAnalyzing(false);
+        }
+    };
+
+    const renderAICard = () => {
+        if (!aiSignal && !analyzing && !aiReasoning) return null;
+
+        const getSignalColor = () => {
+            if (aiSignal === 'BULLISH') return 'text-red-400 border-red-500/30 bg-red-500/10';
+            if (aiSignal === 'BEARISH') return 'text-green-400 border-green-500/30 bg-green-500/10';
+            return 'text-slate-300 border-slate-600/30 bg-slate-700/30';
+        };
+
+        return (
+            <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden mb-6 shadow-lg transition-all">
+                <div
+                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-700/50 transition-colors"
+                    onClick={() => setAiContextExpanded(!aiContextExpanded)}
+                >
+                    <div className="flex items-center gap-4">
+                        <div className={`p-2 rounded-lg ${analyzing ? 'animate-pulse bg-cyan-500/20 text-cyan-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
+                            {analyzing ? <Globe className="animate-spin" size={24} /> : <Globe size={24} />}
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-3 mb-1">
+                                <h3 className="font-bold text-white text-lg">AI Macro Strategist</h3>
+                                {aiSignal && (
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getSignalColor()}`}>
+                                        {aiSignal}
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-slate-400 text-sm">
+                                {analyzing && !aiSummary ? "Analyzing global economic indicators..." : (aiSummary || "Macro analysis ready.")}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {(aiContextExpanded || analyzing || aiReasoning) && (
+                    <div className="border-t border-slate-700 bg-slate-900/50 p-4">
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Strategy Logic</h4>
+                        <div className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed font-mono text-xs whitespace-pre-wrap">
+                            {aiReasoning || (analyzing ? "Reading macro data points..." : "")}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
@@ -135,8 +274,15 @@ const MacroDataPage: React.FC = () => {
             if (defaultForTab) setSelectedIndicator(defaultForTab);
 
             setLoading(false);
+
+            // Trigger AI Analysis
+            fetchAIAnalysis();
         };
         loadData();
+
+        return () => {
+            if (aiAbortControllerRef.current) aiAbortControllerRef.current.abort();
+        };
     }, []); // Run once on mount
 
     // Filter indicators for current tab
@@ -183,6 +329,9 @@ const MacroDataPage: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-6 h-[calc(100vh-140px)]">
+
+                {/* AI Analysis Card */}
+                {renderAICard()}
 
                 {/* Top Section: Data Table & Fed Watch (Global Only) */}
                 <div className="h-1/3 flex gap-6">

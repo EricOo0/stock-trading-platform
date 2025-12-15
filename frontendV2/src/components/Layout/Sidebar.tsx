@@ -29,20 +29,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       color: 'text-violet-500'
     },
     {
-      id: 'council',
-      label: 'AI 顾问团',
-      icon: <Gamepad2 size={20} />,
-      color: 'text-pink-500'
-    },
-    {
-      id: 'macro-data',
-      label: '宏观数据',
-      icon: <Globe size={20} />,
-      color: 'text-cyan-500'
-    },
-    {
-      id: 'deep-research',
-      label: '深度研究',
+      id: 'news-sentiment',
+      label: '消息面分析',
       icon: <Search size={20} />,
       color: 'text-purple-400'
     },
@@ -53,22 +41,34 @@ const Sidebar: React.FC<SidebarProps> = ({
       color: 'text-emerald-500'
     },
     {
+      id: 'macro-data',
+      label: '宏观数据',
+      icon: <Globe size={20} />,
+      color: 'text-cyan-500'
+    },
+    {
+      id: 'financial-analysis',
+      label: '财报分析',
+      icon: <FileText size={20} />,
+      color: 'text-indigo-400'
+    },
+    {
       id: 'stock-simulation',
       label: '模拟回测',
       icon: <TrendingUp size={20} />,
       color: 'text-orange-500'
     },
     {
+      id: 'council',
+      label: 'AI 顾问团',
+      icon: <Gamepad2 size={20} />,
+      color: 'text-pink-500'
+    },
+    {
       id: 'market-query',
       label: '行情查询',
       icon: <TrendingUp size={20} />,
       color: 'text-blue-500'
-    },
-    {
-      id: 'financial-analysis',
-      label: '新财报分析',
-      icon: <FileText size={20} />,
-      color: 'text-indigo-400'
     },
     {
       id: 'stock-search',

@@ -17,6 +17,11 @@ class ReportFinderTool:
         try:
             # Set identity for SEC EDGAR
             set_identity("StockTradingPlatform <agent@example.com>")
+            
+            # Suppress noisy edgar logs (especially 304 errors which act as cache hits but log as errors)
+            logging.getLogger("edgar").setLevel(logging.CRITICAL)
+            logging.getLogger("edgar.core").setLevel(logging.CRITICAL)
+            
         except Exception as e:
             logger.warning(f"Failed to set EDGAR identity: {e}")
 

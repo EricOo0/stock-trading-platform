@@ -1,18 +1,18 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from backend.app.services.deep_search_service import deep_search_service
+from backend.app.services.news_sentiment_service import news_sentiment_service
 
-router = APIRouter(prefix="/api/agent/deep-search", tags=["Deep Search Agent"])
+router = APIRouter(prefix="/api/agent/news-sentiment", tags=["News Sentiment Agent"])
 
-class DeepSearchRequest(BaseModel):
+class NewsSentimentRequest(BaseModel):
     query: str
     session_id: str
 
 @router.post("/start")
-async def start_deep_search(request: DeepSearchRequest):
-    """Starts the Deep Search Agent (Streaming)."""
+async def start_news_sentiment(request: NewsSentimentRequest):
+    """Starts the News Sentiment Agent (Streaming)."""
     from fastapi.responses import StreamingResponse
     return StreamingResponse(
-        deep_search_service.start_research(request.session_id, request.query),
+        news_sentiment_service.start_research(request.session_id, request.query),
         media_type="application/x-ndjson"
     )

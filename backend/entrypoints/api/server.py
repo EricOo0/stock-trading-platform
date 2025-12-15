@@ -15,7 +15,20 @@ logger = logging.getLogger(__name__)
 configure_environment()
 
 # Routers
-from backend.entrypoints.api.routers import market, agent, adk, browser, macro, search, report, simulation
+from backend.entrypoints.api.routers import (
+    market,
+    agent,
+    adk,
+    browser,
+    macro,
+    search,
+    report,
+    simulation,
+    agent_financial,
+    agent_technical,
+    agent_macro,
+    agent_sentiment,
+)
 
 app = FastAPI(title="AI Funding Backend", version="2.0")
 
@@ -44,6 +57,10 @@ app.include_router(macro.router)
 app.include_router(search.router)
 app.include_router(report.router)
 app.include_router(simulation.router) # /api/simulation
+app.include_router(agent_financial.router)
+app.include_router(agent_technical.router)
+app.include_router(agent_macro.router)
+app.include_router(agent_sentiment.router)
 
 @app.get("/health")
 def health_check():
