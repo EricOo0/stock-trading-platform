@@ -8,6 +8,7 @@
 
 
 > [!WARNING]
+> **Disclaimer**: 本项目代码完全由AI生成，暂时只跑了流程，不保证数据准确性和可靠性
 > **Disclaimer**: This software is for **educational and research purposes only**. It comes with no guarantees or warranties. Using this software for live financial trading involves significant risk. The authors are not responsible for any financial losses incurred.
 
 ---
@@ -166,7 +167,3 @@ Contributions are what make the open source community such an amazing place to l
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ## 📅 Roadmap
-
-- [ ] Add support for crypto market data (Binance/Coinbase).
-- [ ] Implement automated trading execution (Paper Trading).
-- [ ] Enhance Backtesting module with visual charts.
