@@ -1,0 +1,41 @@
+{
+  "user_persona": {
+    "risk_preference": "激进型",
+    "investment_style": [
+      "成长投资"
+    ],
+    "interested_sectors": [
+      "半导体",
+      "AI"
+    ],
+    "analysis_habits": [
+      "基本面",
+      "偏好行业分析（如AI算力领域）"
+    ],
+    "observed_traits": [
+      "关注技术壁垒和行业地位（如'绝对统治力'）",
+      "明确自我认知为激进型投资者",
+      "高度自信",
+      "行业专注",
+      "偏好行业龙头",
+      "明确表达偏好"
+    ],
+    "last_updated": "2025-12-28T13:17:48.122821"
+  },
+  "core_principles": [
+    {
+      "user_id": "test_user_001",
+      "agent_id": "research_agent",
+      "content": "Principle: Aggressive investors favor high-growth sectors like semiconductors and AI, with strong convictions about dominant players such as NVIDIA in AI computing.",
+      "importance": 1.0,
+      "timestamp": "2025-12-28T13:11:21.670940"
+    },
+    {
+      "user_id": "test_user_001",
+      "agent_id": "research_agent",
+      "content": "Principle: Users consistently express aggressive investment preferences focused on growth stocks in semiconductor and AI sectors, with strong conviction in NVIDIA's dominance in AI computing.",
+      "importance": 1.0,
+      "timestamp": "2025-12-28T13:17:51.327556"
+    }
+  ]
+}

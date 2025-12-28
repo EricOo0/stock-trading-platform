@@ -1,196 +1,110 @@
-# Multi-Agent Memory System
+# 🧠 独立三层记忆系统 (Triple-Layer Memory System)
 
-![Memory System Intro](docs/images/intro.png)
-
-Independently deployed cognitive engine enabling infinite memory retention and evolution for AI Agents.
-
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Chroma](https://img.shields.io/badge/vector_db-Chroma-green.svg)](https://www.trychroma.com/)
-[![NetworkX](https://img.shields.io/badge/graph-NetworkX-orange.svg)](https://networkx.org/)
-
-## 📋 Table of Contents
-
-- [Overview](#-overview)
-- [Architecture](#-architecture)
-- [Automated Pipeline](#-automated-pipeline)
-- [API Reference](#-api-reference)
-- [Configuration](#-configuration)
-- [Quick Start](#-quick-start)
+这是一个独立部署的认知微服务，模拟人类大脑的记忆分层与进化机制，为外部系统提供具备人格化特征、时效感知和逻辑自省能力的记忆存储方案。
 
 ---
 
-## 🌟 Overview
+## 🏗️ 系统架构 (Architecture)
 
-The **Multi-Agent Memory System** is a standalone microservice designed to provide a shared, evolving memory brain for multiple AI Agents. Unlike traditional stateless agents or simple vector retrievers, this system implements a **human-like, three-tier memory architecture** that automatically condenses, extracts, and evolves information over time.
+系统采用三层隔离存储架构，实现信息从“原始素材”到“人格抽象”的演进：
 
-### Key Capabilities
+1.  **短期记忆 (STM - Working Memory)**
+    *   **定位**: 相当于 CPU 高速缓存。
+    *   **载体**: 内存 `deque` + 本地 `JSON` 持久化。
+    *   **内容**: 最近的原始会话语料、实时上下文、未结算的思考过程。
+    *   **策略**: 默认保留最近 5-10 轮对话，超过 Token 限制时由 `manager` 触发压缩。
 
-- ✅ **Self-Driving Pipeline**: Automated promotion from Working -> Episodic -> Semantic memory.
-- ✅ **Simplified Integration**: Agents just send "content"; the system handles storage logic.
-- ✅ **Hybrid Intelligence**: Combines Vector Search (Similarity) with Knowledge Graphs (Relations).
-- ✅ **Cognitive Evolution**: Automatically clusters episodic events to form high-level semantic principles.
-- ✅ **Agent Isolation**: Secure, separate memory namespaces for different agents (e.g., `market_agent`, `news_agent`).
+2.  **中期记忆 (MTM - Episodic Memory)**
+    *   **定位**: 相当于 内存/硬盘。
+    *   **载体**: `ChromaDB` (向量) + `NetworkX` (知识图谱)。
+    *   **内容**: 结构化事件、投资见解 (`InvestmentInsight`)、金融事实。
+    *   **策略**: 支持语义搜索、**图谱联想扩展**以及**时间衰减算法**（Temporal Decay）。
 
----
-
-## 🏗️ Architecture
-
-![System Architecture](docs/images/architecture.png)
-
-### Three-Tier Memory Model
-
-| Tier | Storage | Capacity | Function |
-|------|---------|----------|----------|
-| **Working Memory** | RAM (Deque) | Small (e.g., 50 items) | **Short-term context**. Stores raw conversation logs. Automatically compresses when full. |
-| **Episodic Memory** | Chroma (Vector) + NetworkX (Graph) | Large (Unlimited) | **Events & Facts**. Structured summaries and extracted entities (e.g., "AAPL earnings up"). |
-| **Semantic Memory** | Chroma + SQLite | Abstract | **Principles & Knowledge**. High-level rules derived from clustering events (e.g., "User prefers verified data"). |
+3.  **长期记忆 (LTM - Semantic Memory)**
+    *   **定位**: 相当于 人格核心/元认知。
+    *   **载体**: `JSON` (本地持久化) + `ChromaDB` (向量经验)。
+    *   **内容**: **用户画像 (User Persona)**、投资原则、核心价值观、通用经验法则。
+    *   **策略**: 通过对 MTM 进行聚类分析和 LLM 总结蒸馏产生，具有最高的稳定性和指导意义。
 
 ---
 
-## 🔄 Automated Pipeline
+## 🔄 数据流 (Data Flow)
 
-The system manages memory lifecycle without Agent intervention:
+记忆系统中的信息流转遵循以下三个核心过程：
 
-1.  **Ingestion**: Logic accepts inputs into **Working Memory**.
-2.  **Compression (Trigger: Overflow)**:
-    *   When Working Memory exceeds token/item limits, older items are **Summarized**.
-    *   **Event Extractor** (LLM) pulls structured entities/relations.
-    *   Result: Stored as **Episodic Event**.
-3.  **Clustering (Trigger: Accumulation)**:
-    *   As Episodic Events grow, the system runs **K-Means Clustering**.
-    *   Cluster centers are abstracted into **Core Principles**.
-    *   Result: Stored as **Semantic Memory**.
+### 1. 采集流 (Ingestion Pipeline)
+用户/Agent 的对话通过 `/add` 接口实时进入 **STM**。系统会自动根据 Token 预算管理近期上下文，确保 STM 始终保持在热状态且不溢出。
 
----
+### 2. 检索流 (Retrieval Pipeline)
+调用 `/context` 时，系统执行“记忆检索增强” (RAG+)：
+- **实体提取**: 从 Query 中提取股票代码或金融概念。
+- **多层检索**: 同步从 STM、LTM（用户画像/原则）和 MTM（向量检索+图谱扩展）中获取数据。
+- **冲突检测**: 自动检查历史记忆中的观点一致性（例如：用户曾看多 NVDA 但现在看空，系统将注入 `[Memory Reflection]`）。
+- **重排序**: 应用时间衰减函数，确保新鲜资讯权重更高。
 
-## 📡 API Reference
-
-### 1. Add Memory
-**POST** `/memory/add`
-
-Streamlined endpoint. The agent simply reports what happened.
-
-```json
-{
-  "agent_id": "market_agent",
-  "content": "Analyst report suggests AAPL is undervalued due to AI adoption.",
-  "metadata": {
-    "role": "user",
-    "source": "bloomberg",
-    "importance": 0.9
-  }
-}
-```
-
-*Note: You no longer need to specify `memory_type`. The system allows simplified input.*
-
-### 2. Get Context
-**POST** `/memory/context` (or GET)
-
-Retrieve the full cognitive context for a new query.
-
-```json
-{
-  "agent_id": "market_agent",
-  "query": "Should I buy Apple stock?"
-}
-```
-
-**Response**:
-```json
-{
-  "status": "success",
-  "context": {
-    "core_principles": "User prefers aggressive growth...",
-    "working_memory": [...],
-    "episodic_memory": [...],
-    "semantic_memory": [...]
-  },
-  "token_usage": {
-    "total": 4500
-  }
-}
-```
-
-### 3. Get Stats
-**GET** `/memory/stats?agent_id=market_agent`
-
-View the current state of memory tiers.
+### 3. 进化流 (Evolution Pipeline)
+这是一个异步沉淀过程，由 `/finalize` 触发：
+- **蒸馏**: 将 STM 中的原始文本提炼为结构化的 Episodic Events。
+- **画像更新**: 基于新增会话增量更新 LTM 中的用户投资风格、风险偏好等画像。
+- **聚类与抽象**: 定期将大量 MTM 条目聚类，抽象为通用的长期经验法则。
 
 ---
 
-## ⚙️ Configuration
+## 📡 暴露接口 (API Reference)
 
-The system is configured via `.config.yaml` in the root directory.
+服务默认监听 `10000` 端口，基础路径为 `/api/v1`：
 
-```yaml
-# memory_system/.config.yaml
-
-# 1. LLM Provider (for internal logic)
-model: deepseek-ai/DeepSeek-V3.1-Terminus
-api_url: https://api.siliconflow.cn/v1
-api_keys:
-  siliconflow: "sk-..."
-
-# 2. Embedding Model (Local or API)
-embedding_provider: huggingface
-embedding_model: BAAI/bge-large-zh  # Supports 1024-dim high-quality embeddings
-```
-
-### Environment Variables
-For docker or deployment overrides:
-*   `HF_ENDPOINT`: Set to `https://hf-mirror.com` for China access.
-*   `CHROMA_PERSIST_DIR`: Path to vector data.
+| 接口 | 方法 | 功能描述 | 关键参数 |
+| :--- | :--- | :--- | :--- |
+| `/memory/add` | `POST` | 实时同步语料至 STM | `user_id`, `agent_id`, `content`, `metadata` |
+| `/memory/context` | `POST` | 获取增强后的复合上下文 | `user_id`, `agent_id`, `query`, `session_id` |
+| `/memory/finalize` | `POST` | 异步启动记忆结算（STM -> MTM/LTM） | `user_id`, `agent_id` |
+| `/memory/task/{id}`| `GET` | 查询异步结算任务状态 | `task_id` |
+| `/memory/stats` | `GET` | 获取存储统计与画像摘要 | `user_id`, `agent_id` |
 
 ---
 
-## 🚀 Quick Start
+## 🚀 快速上手 (Usage)
 
-### Installation
-
+### 1. 启动服务
+确保已安装 `requirements.txt` 依赖，在 `memory_system` 目录下运行：
 ```bash
-cd memory_system
-pip install -r requirements.txt
-```
-
-### Running
-
-```bash
-# Verify system status
-python verify_system.py
-
-# Start API Server
 python -m api.server
-# Server running at http://0.0.0.0:10000
+```
+
+### 2. 核心配置
+编辑 `memory_system/.config.yaml` (参考 `example.config.yaml`)：
+- **LLM**: 配置 API Key 和 Base URL 用于记忆蒸馏和自省。
+- **Chroma**: 设置向量数据库存储路径。
+- **Decay**: 调整时间衰减常数以控制记忆淡忘速度。
+
+### 3. 客户端集成 (Python)
+使用内置 `MemoryClient` 实现无感集成：
+```python
+from backend.infrastructure.adk.core.memory_client import MemoryClient
+
+# 1. 初始化
+client = MemoryClient(user_id="user_001", agent_id="researcher")
+
+# 2. 会话中：添加语料
+client.add_memory("关注特斯拉最近的自动驾驶进展", role="user")
+
+# 3. 决策前：获取上下文
+context = client.get_context("分析 TSLA")
+# context 包含: persona, principles, stm, mtm, reflection...
+
+# 4. 结束后：启动结算（异步）
+client.finalize()
 ```
 
 ---
 
-## 📝 TODO & Roadmap
+## 🛡️ 核心特性 (Features)
 
-### High Priority
-
-- [ ] **Graph Retrieval Expansion** (图检索扩展相关实体)
-  - Implement entity expansion in `episodic_memory.retrieve()`
-  - Add `use_graph_expansion` parameter (default: False)
-  - Extract entities from query using LLM or NER
-  - Use `GraphStore.get_related_entities()` to expand search
-  - Merge and re-rank results based on graph distance + semantic similarity
-  - **Benefit**: Automatically retrieve memories related to connected entities (e.g., searching "Tesla" also returns "Elon Musk", "EV industry")
-
-### Medium Priority
-
-- [ ] Memory visualization in frontend (✅ Completed - see `frontendV2/`)
-- [ ] Batch import/export functionality
-- [ ] Memory analytics dashboard
-- [ ] Multi-tenant memory isolation improvements
-
-### Low Priority
-
-- [ ] WebSocket real-time memory updates
-- [ ] Memory garbage collection strategies
-- [ ] Distributed memory system (Redis/Kafka)
+- **冲突自省 (Reflection)**: 系统会自动识别记忆中的观点反转，提示 LLM 关注用户的思维转变。
+- **跨会话连贯性**: 会话结算后，STM 默认保留最近 5 轮数据，为下一次新会话提供“热启动”背景。
+- **时间重排**: 采用 $Score = Sim \times \frac{1}{1 + \ln(1 + \Delta days)}$ 算法平衡语义相关性与时效性。
+- **Token 精确管控**: 基于 `tiktoken` 实现 STM > Persona > MTM > Principles 的动态截断优先级。
 
 ---
-
-**Last Updated**: 2025-12-07
+**最近更新**: 2025-12-27 (v1.7 完善架构说明、数据流定义及 API 文档)

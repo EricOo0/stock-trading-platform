@@ -1,0 +1,36 @@
+{
+  "directed": true,
+  "multigraph": true,
+  "graph": {},
+  "nodes": [
+    {
+      "type": "entity",
+      "id": "NVDA"
+    },
+    {
+      "type": "entity",
+      "id": "NVIDIA"
+    },
+    {
+      "type": "entity",
+      "id": "AI算力"
+    },
+    {
+      "type": "entity",
+      "id": "半导体"
+    },
+    {
+      "type": "entity",
+      "id": "AI"
+    },
+    {
+      "type": "entity",
+      "id": "激进型投资者"
+    },
+    {
+      "type": "entity",
+      "id": "成长股"
+    }
+  ],
+  "edges": []
+}

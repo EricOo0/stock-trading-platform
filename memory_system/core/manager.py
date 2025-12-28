@@ -1,294 +1,352 @@
+import asyncio
+import uuid
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from .working_memory import WorkingMemory
 from .episodic_memory import EpisodicMemory
 from .semantic_memory import SemanticMemory
-from .compressor import MemoryCompressor
-from .extractor import EventExtractor
+from .compressor import compressor
+from .extractor import extractor
 from .cluster import ConceptCluster
 from config import settings
 from utils.logger import logger
 from utils.tokenizer import tokenizer
+
 
 class MemoryManager:
     """
     记忆系统核心管理器
     负责协调三层记忆系统，为每个 Agent 维护独立的记忆实例
     """
-    
-    _instances: Dict[str, 'MemoryManager'] = {}
+
+    _instances: Dict[str, "MemoryManager"] = {}
 
     def __init__(self):
-        # 按 agent_id 存储记忆实例
+        # 按 user_id:agent_id 存储记忆实例
         self.working_memories: Dict[str, WorkingMemory] = {}
         self.episodic_memories: Dict[str, EpisodicMemory] = {}
         self.semantic_memories: Dict[str, SemanticMemory] = {}
+        
+        # 异步任务队列与状态追踪
+        self.task_queue = asyncio.Queue()
+        self.task_states: Dict[str, Dict] = {}
+        self._worker_task = None
+        
         logger.info("MemoryManager initialized")
 
     @classmethod
-    def get_instance(cls) -> 'MemoryManager':
-        """单例模式获取管理器"""
+    def get_instance(cls) -> "MemoryManager":
         if "default" not in cls._instances:
             cls._instances["default"] = cls()
         return cls._instances["default"]
 
-    def _get_working_memory(self, agent_id: str) -> WorkingMemory:
-        if agent_id not in self.working_memories:
-            wm = WorkingMemory(agent_id)
-            # 设置压缩回调
-            wm.set_compression_callback(lambda items: self._handle_compression(agent_id, items))
-            self.working_memories[agent_id] = wm
-        return self.working_memories[agent_id]
+    def _ensure_worker_started(self):
+        """确保后台 Worker 已启动"""
+        if self._worker_task is None or self._worker_task.done():
+            try:
+                loop = asyncio.get_running_loop()
+                self._worker_task = loop.create_task(self._background_worker())
+                logger.info("Background Memory Worker started")
+            except RuntimeError:
+                logger.warning("No running event loop found, worker not started")
 
-    def _get_episodic_memory(self, agent_id: str) -> EpisodicMemory:
-        if agent_id not in self.episodic_memories:
-            self.episodic_memories[agent_id] = EpisodicMemory(agent_id)
-        return self.episodic_memories[agent_id]
+    async def _background_worker(self):
+        """后台任务处理器"""
+        logger.info("Memory Worker loop started")
+        while True:
+            task = await self.task_queue.get()
+            task_id = task.get("task_id")
+            try:
+                task_type = task.get("type")
+                user_id = task.get("user_id")
+                agent_id = task.get("agent_id")
+                
+                self.task_states[task_id] = {
+                    "status": "processing",
+                    "start_time": datetime.now().isoformat()
+                }
+                
+                if task_type == "finalize":
+                    await self._process_finalize_task(user_id, agent_id)
+                
+                self.task_states[task_id]["status"] = "completed"
+                self.task_states[task_id]["end_time"] = datetime.now().isoformat()
+                logger.info(f"Task {task_id} ({task_type}) completed")
+                
+            except Exception as e:
+                logger.error(f"Error in background task {task_id}: {e}")
+                self.task_states[task_id] = {
+                    "status": "failed",
+                    "error": str(e),
+                    "end_time": datetime.now().isoformat()
+                }
+            finally:
+                self.task_queue.task_done()
 
-    def _get_semantic_memory(self, agent_id: str) -> SemanticMemory:
-        if agent_id not in self.semantic_memories:
-            self.semantic_memories[agent_id] = SemanticMemory(agent_id)
-        return self.semantic_memories[agent_id]
-
-    def add_memory(self, agent_id: str, content: Any, role: str = "user", memory_type: str = "conversation", metadata: Dict = None) -> Dict[str, Any]:
-        """
-        添加记忆 - 简化版统一接口
+    async def _process_finalize_task(self, user_id: str, agent_id: str):
+        """实际执行结算逻辑的私有方法"""
+        wm = self._get_working_memory(user_id, agent_id)
         
-        Args:
-            agent_id: Agent ID
-            content: 记忆内容 (通常是字符串)
-            role: 角色 (user/agent/system)
-            memory_type: 类型 (默认 conversation, 系统自动处理流转)
-            metadata: 元数据
-        """
-        if metadata is None:
-            metadata = {}
-            
-        stored_locations = []
-        memory_id = None
+        # 仅获取尚未结算的新增语料
+        new_items = wm.get_unfinalized_details()
+        if not new_items:
+            logger.info(f"No new items to finalize for {user_id}")
+            return
+
+        # 使用 asyncio.to_thread 将同步阻塞的 LLM/DB 操作移出主事件循环，防止阻塞其他用户请求
+        # 1. 触发压缩与提取流水线 (MTM 转化) - 基于新增内容
+        await asyncio.to_thread(self._handle_compression, user_id, agent_id, new_items)
+
+        # 2. 触发用户画像更新 (LTM 转化) - 基于新增内容
+        await asyncio.to_thread(self._handle_persona_update, user_id, agent_id, new_items)
+
+        # 3. 触发长期原则聚类 (LTM 转化)
+        await asyncio.to_thread(self.run_clustering, user_id, agent_id)
+
+        # 4. 执行垃圾回收 (GC)
+        await asyncio.to_thread(self.perform_garbage_collection, user_id, agent_id)
+
+        # 5. 标记为已结算
+        wm.mark_finalized()
         
-        # 1. 默认全部进入 Working Memory (近期记忆)
-        if memory_type == "conversation":
-            wm = self._get_working_memory(agent_id)
-            wm.add({
-                "role": role,
-                "content": content,
-                "timestamp": datetime.now().isoformat(),
-                "metadata": metadata
-            })
-            stored_locations.append("working_memory")
-            
-            # 2. 检查是否需要触发 Episodic -> Semantic 的提升 (维护检查)
-            # 这里的触发频率可以降低，例如 random 1% 或者计数器
-            # 简化起见，每次添加都 check 一下 (内部有计数器/阈值判断)
-            self._check_and_promote_to_semantic(agent_id)
-            
-        # 3. 兼容旧的 'event' 类型 (直接存入 Episodic)，但建议通过 pipeline 自动产生
-        # 这里保留是为了测试方便，或者极少数确定的关键事件
-        elif memory_type == "event":
-            # 复用之前的自动提取逻辑
-            if isinstance(content, str):
-                extracted_data = extractor.extract(content)
-                if extracted_data:
-                    content_data = {
-                        "summary": extracted_data["summary"],
-                        "key_findings": extracted_data["key_findings"]
-                    }
-                    entities = extracted_data["entities"]
-                    relations = extracted_data["relations"]
-                    if "event_type" not in metadata:
-                        metadata["event_type"] = extracted_data.get("event_type", "unknown_event")
-                else:
-                    content_data = {"raw_content": content}
-                    entities = []
-                    relations = []
-            else:
-                 # 结构化数据
-                 if isinstance(content, dict):
-                     content_data = content.get("content", content)
-                     entities = content.get("entities", [])
-                     relations = content.get("relations", [])
-                 else:
-                     content_data = str(content)
-                     entities = []
-                     relations = []
+        # 6. 清理陈旧记忆，但保留最近 5 轮作为热启动上下文 (Cross-session continuity)
+        wm.clear(keep_last_n=5)
 
-            em = self._get_episodic_memory(agent_id)
-            memory_id = em.add_event(
-                event_type=metadata.get("event_type", "manual_event"),
-                content=content_data,
-                entities=entities,
-                relations=relations,
-                importance=metadata.get("importance", 0.5)
-            )
-            stored_locations.append("episodic_memory")
-            # 同样检查提升
-            self._check_and_promote_to_semantic(agent_id)
+    def perform_garbage_collection(self, user_id: str, agent_id: str):
+        """
+        执行记忆清理 (GC)
+        移除低重要度且陈旧的中期记忆，保持系统轻量
+        """
+        try:
+            em = self._get_episodic_memory(user_id, agent_id)
+            count = em.vector_store.count()
+            
+            # 设定软上限，超过则触发清理
+            SOFT_LIMIT = 1000
+            if count > SOFT_LIMIT:
+                logger.info(f"Memory GC triggered for {user_id}:{agent_id} (Count: {count})")
+                # 简单策略：按索引顺序（通常是时间顺序）删除最旧的 10%
+                to_delete_count = int(count * 0.1)
+                results = em.vector_store.collection.get(
+                    limit=to_delete_count,
+                    include=["metadatas"]
+                )
+                if results["ids"]:
+                    em.vector_store.delete(ids=results["ids"])
+                    logger.info(f"GC deleted {len(results['ids'])} old episodic memories")
+        except Exception as e:
+            logger.error(f"Memory GC failed: {e}")
 
+    def finalize_session(self, user_id: str, agent_id: str) -> Dict[str, Any]:
+        """
+        结算当前会话 (异步化改版)：
+        将结算任务压入队列并立即返回
+        """
+        try:
+            self._ensure_worker_started()
+            task_id = str(uuid.uuid4())
+            
+            task = {
+                "task_id": task_id,
+                "type": "finalize",
+                "user_id": user_id,
+                "agent_id": agent_id,
+                "created_at": datetime.now().isoformat()
+            }
+            
+            # 将任务放入队列 (同步方法中使用 put_nowait)
+            self.task_queue.put_nowait(task)
+            
+            self.task_states[task_id] = {
+                "status": "queued",
+                "created_at": task["created_at"]
+            }
+            
+            logger.info(f"🏁 Finalize session queued for user {user_id}. Task ID: {task_id}")
+            
+            return {
+                "status": "accepted",
+                "task_id": task_id,
+                "message": "Session finalization started in background"
+            }
+        except Exception as e:
+            logger.error(f"Failed to queue finalize session: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def add_memory(self, user_id: str, agent_id: str, content: Any, role: str = "user", memory_type: str = "conversation", metadata: Dict = None) -> Dict:
+        """添加新记忆到 Working Memory"""
+        wm = self._get_working_memory(user_id, agent_id)
+        
+        # 绑定压缩回调 (如果还没绑定)
+        if not wm.compression_callback:
+            wm.set_compression_callback(lambda items: self._handle_compression(user_id, agent_id, items))
+            
+        memory_id = str(uuid.uuid4())
+        memory_item = {
+            "id": memory_id,
+            "content": content,
+            "role": role,
+            "metadata": metadata or {}
+        }
+        wm.add(memory_item)
+        
         return {
-            "status": "success",
-            "memory_id": memory_id or "wm_latest",
-            "stored_in": stored_locations
+            "status": "success", 
+            "memory_id": memory_id,
+            "stored_in": ["working_memory"],
+            "tokens": wm.total_tokens()
         }
 
-    def get_context(self, agent_id: str, query: str, session_id: str = None) -> Dict:
-        """
-        获取完整上下文
-        """
-        wm = self._get_working_memory(agent_id)
-        em = self._get_episodic_memory(agent_id)
-        sm = self._get_semantic_memory(agent_id)
+    def get_context(self, user_id: str, agent_id: str, query: str, session_id: str = None) -> Dict:
+        """获取三层记忆复合上下文，包含 Token 预算控制"""
+        wm = self._get_working_memory(user_id, agent_id)
+        em = self._get_episodic_memory(user_id, agent_id)
+        sm = self._get_semantic_memory(user_id, agent_id)
         
-        # 1. 核心原则
-        core_principles = sm.get_core_principles()
-        core_tokens = tokenizer.count_tokens(core_principles)
+        budget = settings.TOKEN_BUDGET
         
-        # 2. 近期记忆 (完整)
-        working_context = wm.get_details() # 返回结构化数据供前端处理
-        # 计算 working memory tokens (直接使用 wm 中维护的总数或重新计算)
-        # 这里使用 wm.total_tokens() 更准确，因为它维护了内部 count
+        # 1. STM - 近期对话 (Working Memory)
+        working_items = wm.get_details()
+        # WM 已经在 add 时保证了总额，这里直接获取
         working_tokens = wm.total_tokens()
         
-        # 3. 中期记忆 (相关性检索)
-        episodic_context = em.retrieve(query, top_k=5)
-        # 计算 episodic tokens
-        episodic_str = str(episodic_context) # 简单估算，或者遍历计算
-        episodic_tokens = tokenizer.count_tokens(episodic_str)
+        # 2. MTM - 相关见解 (Episodic Memory)
+        episodic_results = em.retrieve(query, top_k=10) # 先多取一点用于预算控制
+        episodic_items = []
+        episodic_tokens = 0
+        for m in episodic_results:
+            item_tokens = tokenizer.count_tokens(m["content"])
+            if episodic_tokens + item_tokens > budget.get("episodic_memory", 20000):
+                break
+            episodic_items.append({
+                "content": m["content"], 
+                "metadata": m["metadata"], 
+                "score": m["score"]
+            })
+            episodic_tokens += item_tokens
+            
+        # 3. LTM - 画像、原则与经验 (Semantic Memory)
+        core_principles = sm.get_core_principles()
+        principles_tokens = tokenizer.count_tokens(core_principles)
         
-        # 4. 长期记忆 (经验检索) - 返回结构化数据
-        semantic_context = sm.retrieve_relevant_experiences(query, top_k=3)
-        # semantic_context 现在是 List[Dict]，需要格式化字符串来计算 tokens
-        semantic_str = "\n".join([exp.get("content", "") for exp in semantic_context])
-        semantic_tokens = tokenizer.count_tokens(semantic_str)
+        user_persona_data = sm.user_persona
+        persona_summary = sm.get_persona_summary()
+        persona_tokens = tokenizer.count_tokens(persona_summary)
         
-        total_tokens = core_tokens + working_tokens + episodic_tokens + semantic_tokens
+        # 语义检索相关经验 (Semantic Results)
+        semantic_results = sm.retrieve_relevant_experiences(query, top_k=5)
+        semantic_items = []
+        semantic_tokens = 0
+        for m in semantic_results:
+            item_tokens = tokenizer.count_tokens(m["content"])
+            if semantic_tokens + item_tokens > budget.get("semantic_memory", 500):
+                break
+            semantic_items.append(f"- {m['content']}")
+            semantic_tokens += item_tokens
+            
+        semantic_context = "\n".join(semantic_items)
+        
+        # 合并 Semantic Memory 部分
+        full_semantic = f"{persona_summary}\n\nPrinciples:\n{core_principles}\n\nRelevant Experience:\n{semantic_context}"
+        total_semantic_tokens = persona_tokens + principles_tokens + semantic_tokens
         
         return {
+            "working_memory": working_items,
+            "episodic_memory": episodic_items,
+            "semantic_memory": full_semantic,
+            "user_persona": user_persona_data,
             "core_principles": core_principles,
-            "working_memory": working_context,
-            "episodic_memory": episodic_context,
-            "semantic_memory": semantic_context,  # 现在是 List[Dict]
             "token_usage": {
-                "core_principles": core_tokens,
                 "working_memory": working_tokens,
+                "core_principles": principles_tokens,
                 "episodic_memory": episodic_tokens,
-                "semantic_memory": semantic_tokens,
-                "total": total_tokens
+                "semantic_memory": total_semantic_tokens,
+                "total": working_tokens + episodic_tokens + total_semantic_tokens
             }
         }
 
-    def _handle_compression(self, agent_id: str, items: List[Dict]):
-        """
-        处理近期记忆压缩 (Working -> Episodic)
-        Pipeline: Summary + Event Extraction
-        """
-        try:
-            logger.info(f"Starting compression pipeline for agent {agent_id} ({len(items)} items)")
-            em = self._get_episodic_memory(agent_id)
+    def get_task_status(self, task_id: str) -> Dict[str, Any]:
+        """获取异步任务执行状态"""
+        return self.task_states.get(task_id, {"status": "not_found"})
 
-            # 1. 生成对话摘要 (Conversation Summary)
-            summary = compressor.summarize_conversation(items)
-            if summary:
-                em.add_event(
-                    event_type="conversation_summary",
-                    content={"summary": summary, "source_items_count": len(items)},
-                    importance=0.4
-                )
-            
-            # 2. 提取结构化事件 (Event Extraction)
-            # 将多条消息合并为文本进行提取 (或逐条提取，视 contexts 长度而定)
-            # 这里选择合并后提取，以捕捉上下文
-            combined_text = "\n".join([f"{item['role']}: {item['content']}" for item in items])
-            
-            event_data = extractor.extract(combined_text)
-            if event_data:
-                # 只有当提取出有意义的信息时才保存
-                if event_data.get("entities") or event_data.get("key_findings"):
-                     em.add_event(
-                        event_type=event_data["event_type"],
-                        content={
-                            "summary": event_data["summary"],
-                            "key_findings": event_data["key_findings"]
-                        },
-                        entities=event_data["entities"],
-                        relations=event_data["relations"],
-                        importance=0.7 # 自动提取的事件重要性适中
-                    )
-            
-            logger.info(f"Compression pipeline completed for {agent_id}")
-
-        except Exception as e:
-            logger.error(f"Compression handler failed: {e}")
-
-    def _check_and_promote_to_semantic(self, agent_id: str):
-        """
-        检查并提升到长期记忆 (Episodic -> Semantic)
-        简单策略：如果有 10 条以上的新 Episodic Memory，触发聚类
-        """
-        # 注意：这里需要一个计数器或者状态来避免每次都触发
-        # 简化实现：使用 random 采样模拟 "每隔一段时间"
-        import random
-        if random.random() < 0.05: # 5% 的概率触发维护
-             logger.info(f"Triggering periodic Semantic promotion for {agent_id}")
-             # 异步或同步？为了不阻塞 add_memory，最好是异步
-             # 但这里是在 manager 内部，无法直接用 background tasks
-             # 实际生产中应抛出事件或放到任务队列
-             # 这里暂且同步执行 (因为是 demo/mvp)
-             self.run_clustering(agent_id)
-
-    def extract_and_save_event(self, agent_id: str, text: str) -> Optional[str]:
-        """主动提取事件并保存"""
-        try:
-            event_data = extractor.extract(text)
-            if event_data:
-                em = self._get_episodic_memory(agent_id)
-                memory_id = em.add_event(
-                    event_type=event_data["event_type"],
-                    content={
-                        "summary": event_data["summary"],
-                        "key_findings": event_data["key_findings"]
-                    },
-                    entities=event_data["entities"],
-                    relations=event_data["relations"],
-                    importance=0.8 # 提取出的事件通常较重要
-                )
-                return memory_id
-            return None
-        except Exception as e:
-            logger.error(f"Extract and save failed: {e}")
-            return None
-
-    def run_clustering(self, agent_id: str) -> List[str]:
-        """运行即时聚类并更新长期记忆"""
-        try:
-            cluster = ConceptCluster(agent_id)
-            new_principles = cluster.cluster_and_abstract()
-            
-            if new_principles:
-                sm = self._get_semantic_memory(agent_id)
-                for principle in new_principles:
-                    sm.add_core_principle(principle, importance=1.0)
-                return new_principles
-            return []
-        except Exception as e:
-            logger.error(f"Clustering run failed: {e}")
-            return []
-
-    def get_stats(self, agent_id: str) -> Dict:
+    def get_stats(self, user_id: str, agent_id: str) -> Dict:
         """获取统计信息"""
-        wm = self._get_working_memory(agent_id)
-        sm = self._get_semantic_memory(agent_id)
-        
+        wm = self._get_working_memory(user_id, agent_id)
+        sm = self._get_semantic_memory(user_id, agent_id)
+
         return {
-            "working_memory": {
-                "count": len(wm.items),
-                "tokens": wm.total_tokens()
-            },
-            "episodic_memory": {
-                # Chroma count 需要在 episodic memory 暴露接口，这里简化
-                "count": "dynamic"
-            },
-            "semantic_memory": {
-                "core_principles": len(sm.core_principles)
-            }
+            "working_memory": {"count": len(wm.items), "tokens": wm.total_tokens()},
+            "episodic_memory": {"count": "dynamic"},
+            "semantic_memory": {"core_principles": len(sm.core_principles)},
         }
+
+    def _get_working_memory(self, user_id: str, agent_id: str) -> WorkingMemory:
+        key = f"{user_id}:{agent_id}"
+        if key not in self.working_memories:
+            self.working_memories[key] = WorkingMemory(user_id, agent_id)
+        return self.working_memories[key]
+
+    def _get_episodic_memory(self, user_id: str, agent_id: str) -> EpisodicMemory:
+        key = f"{user_id}:{agent_id}"
+        if key not in self.episodic_memories:
+            self.episodic_memories[key] = EpisodicMemory(user_id, agent_id)
+        return self.episodic_memories[key]
+
+    def _get_semantic_memory(self, user_id: str, agent_id: str) -> SemanticMemory:
+        key = f"{user_id}:{agent_id}"
+        if key not in self.semantic_memories:
+            self.semantic_memories[key] = SemanticMemory(user_id, agent_id)
+        return self.semantic_memories[key]
+
+    def _handle_compression(self, user_id: str, agent_id: str, items: List[Dict]):
+        """处理记忆压缩与中期记忆提取"""
+        em = self._get_episodic_memory(user_id, agent_id)
+        
+        # 提取投资见解
+        full_text = "\n".join([f"{item['role']}: {item['content']}" for item in items])
+        insight = extractor.extract_investment_insight(full_text)
+        
+        if insight and insight.get("symbol"):
+            # 将关键维度存入 metadata 以便后续分析
+            metadata = {
+                "symbol": insight["symbol"],
+                "viewpoint": insight.get("viewpoint"),
+                "confidence": insight.get("confidence", 0.5)
+            }
+            em.add_event(
+                event_type="InvestmentInsight",
+                content=insight,
+                entities=[insight["symbol"]],
+                importance=insight.get("confidence", 0.5),
+                metadata_extra=metadata # 假设 add_event 支持这个
+            )
+            logger.info(f"Extracted investment insight for {insight['symbol']} ({insight.get('viewpoint')})")
+
+        # 提取通用事件
+        event = extractor.extract(full_text)
+        if event:
+            em.add_event(
+                event_type=event.get("event_type", "General"),
+                content=event,
+                entities=event.get("entities", []),
+                importance=0.4
+            )
+
+    def _handle_persona_update(self, user_id: str, agent_id: str, items: List[Dict]):
+        """从对话中提取并更新用户画像"""
+        sm = self._get_semantic_memory(user_id, agent_id)
+        conversation_text = "\n".join([f"{item['role']}: {item['content']}" for item in items])
+        
+        new_traits = extractor.extract_user_persona(conversation_text)
+        if new_traits:
+            sm.update_persona(new_traits)
+
+    def run_clustering(self, user_id: str, agent_id: str):
+        """运行聚类算法提取长期原则"""
+        clusterer = ConceptCluster(user_id, agent_id)
+        principles = clusterer.cluster_and_abstract()
+        
+        if principles:
+            sm = self._get_semantic_memory(user_id, agent_id)
+            for p in principles:
+                sm.add_core_principle(p)

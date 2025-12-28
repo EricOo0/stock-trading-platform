@@ -12,16 +12,16 @@ class EmbeddingService:
     def __init__(self):
         self.provider = settings.EMBEDDING_PROVIDER
         self.is_mock = False
+        self.model_name = settings.HF_EMBEDDING_MODEL if self.provider == "huggingface" else settings.EMBEDDING_MODEL
         
         try:
+            logger.info(f"⏳ 正在启动 Embedding 服务 (Provider: {self.provider}, Model: {self.model_name})...")
             if self.provider == "huggingface":
                 from sentence_transformers import SentenceTransformer
-                self.model_name = settings.HF_EMBEDDING_MODEL
-                # 延迟加载，第一次调用时下载/加载模型
+                logger.info(f"⏳ 正在加载本地模型 {self.model_name}，这可能需要几十秒，请稍候...")
                 self.client = SentenceTransformer(self.model_name)
-                logger.info(f"Embedding Service initialized with HF model: {self.model_name}")
+                logger.info(f"✅ 模型 {self.model_name} 加载成功！")
             else:
-                self.model_name = settings.EMBEDDING_MODEL
                 self.client = openai.AzureOpenAI(
                     api_key=settings.OPENAI_API_KEY or "dummy",
                     api_version="2023-05-15",
@@ -30,9 +30,9 @@ class EmbeddingService:
                     api_key=settings.OPENAI_API_KEY or "dummy",
                     base_url=settings.OPENAI_API_BASE
                 )
-                logger.info(f"Embedding Service initialized with OpenAI model: {self.model_name}")
+                logger.info(f"✅ OpenAI Embedding 客户端初始化成功！")
         except Exception as e:
-            logger.warning(f"Failed to initialize embedding client ({self.provider}): {e}. Using MockEmbeddingService.")
+            logger.warning(f"❌ 初始化 Embedding 客户端失败: {e}。将使用 Mock 服务。")
             self.is_mock = True
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))

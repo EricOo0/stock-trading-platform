@@ -1,0 +1,82 @@
+[
+  {
+    "id": "e464155a-8686-4db3-9563-decbc3e085f1",
+    "timestamp": "2025-12-27T23:14:07.046670",
+    "role": "user",
+    "content": "我是一个激进型投资者，喜欢投资半导体和AI领域的成长股。我认为NVIDIA (NVDA) 在AI算力领域有绝对统治力。",
+    "tokens": 39,
+    "metadata": {
+      "role": "user",
+      "importance": 0.8,
+      "user_id": "test_user_001",
+      "agent_id": "research_agent"
+    },
+    "importance": 0.5,
+    "protected": false,
+    "finalized": true
+  },
+  {
+    "id": "a64fbf7d-bdeb-4364-a827-f19bbda1cda8",
+    "timestamp": "2025-12-28T13:07:19.765046",
+    "role": "user",
+    "content": "我是一个激进型投资者，喜欢投资半导体和AI领域的成长股。我认为NVIDIA (NVDA) 在AI算力领域有绝对统治力。",
+    "tokens": 39,
+    "metadata": {
+      "role": "user",
+      "importance": 0.8,
+      "user_id": "test_user_001",
+      "agent_id": "research_agent"
+    },
+    "importance": 0.5,
+    "protected": false,
+    "finalized": true
+  },
+  {
+    "id": "cad39354-99b9-457c-9f56-cb7c3195db0a",
+    "timestamp": "2025-12-28T13:09:12.966861",
+    "role": "user",
+    "content": "我是一个激进型投资者，喜欢投资半导体和AI领域的成长股。我认为NVIDIA (NVDA) 在AI算力领域有绝对统治力。",
+    "tokens": 39,
+    "metadata": {
+      "role": "user",
+      "importance": 0.8,
+      "user_id": "test_user_001",
+      "agent_id": "research_agent"
+    },
+    "importance": 0.5,
+    "protected": false,
+    "finalized": true
+  },
+  {
+    "id": "4fed78a4-5754-48ee-b190-539393ae573f",
+    "timestamp": "2025-12-28T13:10:42.330699",
+    "role": "user",
+    "content": "我是一个激进型投资者，喜欢投资半导体和AI领域的成长股。我认为NVIDIA (NVDA) 在AI算力领域有绝对统治力。",
+    "tokens": 39,
+    "metadata": {
+      "role": "user",
+      "importance": 0.8,
+      "user_id": "test_user_001",
+      "agent_id": "research_agent"
+    },
+    "importance": 0.5,
+    "protected": false,
+    "finalized": true
+  },
+  {
+    "id": "a2aff98f-2a18-400c-b905-9f432e70be0d",
+    "timestamp": "2025-12-28T13:17:06.022320",
+    "role": "user",
+    "content": "我是一个激进型投资者，喜欢投资半导体和AI领域的成长股。我认为NVIDIA (NVDA) 在AI算力领域有绝对统治力。",
+    "tokens": 39,
+    "metadata": {
+      "role": "user",
+      "importance": 0.8,
+      "user_id": "test_user_001",
+      "agent_id": "research_agent"
+    },
+    "importance": 0.5,
+    "protected": false,
+    "finalized": true
+  }
+]

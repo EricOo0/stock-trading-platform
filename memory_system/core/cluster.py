@@ -12,11 +12,12 @@ class ConceptCluster:
     分析中期记忆，通过聚类提取长期原则 (Core Principles)
     """
     
-    def __init__(self, agent_id: str):
+    def __init__(self, user_id: str, agent_id: str):
+        self.user_id = user_id
         self.agent_id = agent_id
         self.llm_client = LLMClient.get_instance()
         # 复用已有的向量存储读取数据
-        self.vector_store = VectorStore(collection_name=f"episodic_{agent_id}")
+        self.vector_store = VectorStore(collection_name=f"episodic_{user_id}_{agent_id}")
         
     def cluster_and_abstract(self, k: int = 5) -> List[str]:
         """
@@ -37,8 +38,12 @@ class ConceptCluster:
             embeddings = result.get("embeddings")
             documents = result.get("documents")
             
-            if embeddings is None or len(embeddings) < k:
-                logger.info(f"Not enough memories to cluster (Count: {len(embeddings) if embeddings else 0}, K: {k})")
+            # 强化空值检查，处理 numpy 数组的情况
+            has_embeddings = embeddings is not None and len(embeddings) > 0
+            
+            if not has_embeddings or len(embeddings) < k:
+                count = len(embeddings) if embeddings is not None else 0
+                logger.info(f"Not enough memories to cluster (Count: {count}, K: {k})")
                 return []
                 
             # 2. 执行 K-Means 聚类

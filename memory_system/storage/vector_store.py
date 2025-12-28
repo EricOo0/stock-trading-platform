@@ -82,7 +82,7 @@ class VectorStore:
             query_embedding = embedding_service.embed_query(query_text)
             
             # 检查 embedding 是否有效
-            if not query_embedding or len(query_embedding) == 0:
+            if query_embedding is None or len(query_embedding) == 0:
                 logger.warning("Empty embedding generated for query")
                 return {
                     'ids': [[]],

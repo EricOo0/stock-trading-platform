@@ -28,10 +28,10 @@ class Settings(BaseSettings):
     # === 记忆参数 ===
     # 近期记忆
     WORKING_MEMORY_MAX_ITEMS: int = 50
-    WORKING_MEMORY_MAX_TOKENS: int = 8000
+    WORKING_MEMORY_MAX_TOKENS: int = 80000
     
     # 中期记忆
-    EPISODIC_COMPRESSION_THRESHOLD: int = 5000
+    EPISODIC_COMPRESSION_THRESHOLD: int = 50000
     TIME_DECAY_RATE: float = 0.1
     
     # 长期记忆
@@ -43,21 +43,21 @@ class Settings(BaseSettings):
     OPENAI_API_BASE: str = Field(default="https://api.openai.com/v1")
     
     # Embedding 配置
-    EMBEDDING_PROVIDER: str = Field(default="openai", description="openai or huggingface")
+    EMBEDDING_PROVIDER: str = Field(default="huggingface", description="openai or huggingface")
     HF_EMBEDDING_MODEL: str = "BAAI/bge-large-zh"
-    EMBEDDING_MODEL: str = "BAAI/bge-large-zh"
+    EMBEDDING_MODEL: str = "BAAI/bge-large-zh" # SiliconFlow 常用模型
     
     LLM_MODEL: str = "gpt-4o"
     
     # === Token 预算 ===
     TOKEN_BUDGET: dict = {
-        "system_base": 800,
-        "core_principles": 500,
-        "working_memory": 8000,
-        "episodic_memory": 2000,
-        "semantic_memory": 500,
-        "tools": 2000,
-        "response": 4000
+        "system_base": 80000,
+        "core_principles": 50000,
+        "working_memory": 80000,
+        "episodic_memory": 20000,
+        "semantic_memory": 50000,
+        "tools": 20000,
+        "response": 40000
     }
     
     from pydantic import model_validator

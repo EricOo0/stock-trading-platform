@@ -59,6 +59,7 @@ app = create_app()
 
 def start():
     """启动服务器"""
+    logger.info(f"Starting server on port 10000")
     uvicorn.run(
         "api.server:app",
         host="0.0.0.0",
