@@ -26,7 +26,7 @@ class ResearchAgentCallback(AsyncCallbackHandler):
         self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
     ) -> None:
         """Run when LLM starts running."""
-        # print(f"LLM start running with prompts: {prompts}")
+        print(f"LLM start running with prompts: {prompts}")
         self.current_thought_buffer = ""  # Reset buffer
         pass
 
