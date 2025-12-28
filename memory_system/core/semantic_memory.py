@@ -147,6 +147,27 @@ class SemanticMemory:
 
     def retrieve_relevant_experiences(self, query: str, top_k: int = 3) -> List[Dict]:
         """检索相关经验，返回结构化数据"""
+        # 如果 query 为空，默认检索最近的经验
+        if not query or query.strip() == "":
+            logger.info("Empty query received for semantic retrieval, returning recent items")
+            results = self.experience_store.collection.get(
+                limit=top_k,
+                include=["documents", "metadatas"]
+            )
+            experiences = []
+            if results["ids"]:
+                for i, doc_id in enumerate(results["ids"]):
+                    doc = results["documents"][i]
+                    metadata = results["metadatas"][i]
+                    experiences.append({
+                        "content": doc,
+                        "importance": metadata.get("importance", 0.5),
+                        "category": metadata.get("category", "general"),
+                        "timestamp": metadata.get("timestamp"),
+                    })
+                return experiences
+            return []
+
         results = self.experience_store.query(query_text=query, n_results=top_k)
 
         experiences = []
@@ -166,6 +187,7 @@ class SemanticMemory:
                         "content": doc,
                         "importance": metadata.get("importance", 0.5),
                         "category": metadata.get("category", "general"),
+                        "timestamp": metadata.get("timestamp"),
                     }
                 )
 

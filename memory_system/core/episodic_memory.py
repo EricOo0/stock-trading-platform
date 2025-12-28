@@ -72,6 +72,32 @@ class EpisodicMemory:
         """
         检索中期记忆 (包含图扩展与时间衰减)
         """
+        # 如果 query 为空，默认检索最近的记忆
+        if not query or query.strip() == "":
+            logger.info("Empty query received for episodic retrieval, returning recent items")
+            results = self.vector_store.collection.get(
+                limit=top_k * 2,
+                include=["documents", "metadatas", "embeddings"] # 注意：Chroma get() 默认不含 embeddings，但在某些版本中可以请求
+            )
+            # 格式化结果以匹配 query 的输出格式
+            memories = []
+            if results["ids"]:
+                for i, doc_id in enumerate(results["ids"]):
+                    doc = results["documents"][i]
+                    meta = results["metadatas"][i]
+                    
+                    memories.append({
+                        "id": doc_id,
+                        "content": doc,
+                        "metadata": meta,
+                        "score": 1.0, # 默认最高分
+                        "timestamp": meta.get("timestamp")
+                    })
+                # 按时间排序
+                memories.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+                return memories[:top_k]
+            return []
+
         # 1. 提取查询中的潜在实体 (简单正则提取大写字母单词)
         import re
         potential_entities = re.findall(r'\b[A-Z]{2,}\b', query)
@@ -127,6 +153,7 @@ class EpisodicMemory:
                         "semantic_score": semantic_score,
                         "decay_factor": decay_factor,
                         "score": final_score,
+                        "timestamp": meta.get("timestamp"),
                     }
                 )
 
@@ -141,7 +168,8 @@ class EpisodicMemory:
                     "id": f"conflict_{symbol}",
                     "content": conflict_text,
                     "metadata": {"type": "conflict_alert"},
-                    "score": 2.0  # 极高分数确保被选中
+                    "score": 2.0,  # 极高分数确保被选中
+                    "timestamp": datetime.now().isoformat()
                 })
 
         # 按最终分数重排

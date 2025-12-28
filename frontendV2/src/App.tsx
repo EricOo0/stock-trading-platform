@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layout } from './components/Layout';
-import { MarketQueryPage, HomePage, StockSearchPage } from './pages';
+import { MarketQueryPage, HomePage, StockSearchPage, InspiringPage } from './pages';
 import TechnicalAnalysisPage from './pages/TechnicalAnalysisPage';
 import MacroDataPage from './pages/MacroDataPage';
 import FinancialAnalysisPage from './pages/FinancialAnalysisPage';
@@ -22,6 +22,8 @@ function App() {
         return '首页';
       case 'council':
         return 'AI 顾问团';
+      case 'inspiring':
+        return '深度投研';
       case 'stock-simulation':
         return '股票模拟回测';
       case 'news-sentiment':
@@ -55,6 +57,8 @@ function App() {
         return <HomePage onNavigate={handleTabChange} />;
       case 'council':
         return <CouncilRoom />;
+      case 'inspiring':
+        return <InspiringPage />;
       case 'stock-simulation':
         return <StockSimulationPage />;
       case 'news-sentiment':

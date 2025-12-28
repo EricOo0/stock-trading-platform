@@ -1,63 +1,65 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Brain, Loader2, AlertCircle, Database } from 'lucide-react';
+import { Search, Brain, Loader2, AlertCircle, Database, User as UserIcon, Tag, Info } from 'lucide-react';
 import AgentSelector from '../components/Memory/AgentSelector';
 import MemoryCard from '../components/Memory/MemoryCard';
 import { memoryService } from '../services/memoryService';
 import type { MemoryData, AgentInfo } from '../types/memory';
 
-const AGENTS: AgentInfo[] = [
-    {
-        id: 'chairman_agent',
-        name: 'Chairman',
-        displayName: '董事长 (Chairman)',
-        color: 'bg-violet-500',
-    },
-    {
-        id: 'marketdatainvestigator_agent',
-        name: 'MarketDataInvestigator',
-        displayName: '市场数据调查员',
-        color: 'bg-blue-500',
-    },
-    {
-        id: 'macrodatainvestigator_agent',
-        name: 'MacroDataInvestigator',
-        displayName: '宏观数据调查员',
-        color: 'bg-cyan-500',
-    },
-    {
-        id: 'sentimentinvestigator_agent',
-        name: 'SentimentInvestigator',
-        displayName: '情绪调查员',
-        color: 'bg-pink-500',
-    },
-    {
-        id: 'newsinvestigator_agent',
-        name: 'NewsInvestigator',
-        displayName: '新闻调查员',
-        color: 'bg-amber-500',
-    },
-    {
-        id: 'financialreportagent_agent',
-        name: 'FinancialReportAgent',
-        displayName: '财报分析员',
-        color: 'bg-emerald-500',
-    },
-];
+const AGENT_METADATA: Record<string, { displayName: string, color: string }> = {
+    'chairman': { displayName: '董事长 (Chairman)', color: 'bg-violet-500' },
+    'receptionist': { displayName: '接待员 (Receptionist)', color: 'bg-indigo-500' },
+    'market': { displayName: '市场数据调查员', color: 'bg-blue-500' },
+    'macro': { displayName: '宏观数据调查员', color: 'bg-cyan-500' },
+    'sentiment': { displayName: '情绪调查员', color: 'bg-pink-500' },
+    'web_search': { displayName: '网络搜索员', color: 'bg-amber-500' },
+    'research_agent': { displayName: '科研Agent (Research)', color: 'bg-emerald-500' },
+};
+
+const DEFAULT_USERS = ['test_user_001'];
+const DEFAULT_AGENTS = ['chairman'];
 
 const MemoryVisualizationPage: React.FC = () => {
-    const [selectedAgent, setSelectedAgent] = useState(AGENTS[0].id);
+    const [availableUsers, setAvailableUsers] = useState<string[]>(DEFAULT_USERS);
+    const [availableAgents, setAvailableAgents] = useState<AgentInfo[]>([]);
+    const [selectedAgent, setSelectedAgent] = useState(DEFAULT_AGENTS[0]);
+    const [selectedUser, setSelectedUser] = useState(DEFAULT_USERS[0]);
     const [searchQuery, setSearchQuery] = useState('');
     const [memoryData, setMemoryData] = useState<MemoryData | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Fetch memories when agent changes
+    // Fetch identities on mount
+    useEffect(() => {
+        const fetchIdentities = async () => {
+            try {
+                const { users, agents } = await memoryService.getIdentities();
+                if (users.length > 0) setAvailableUsers(users);
+                
+                const agentInfos: AgentInfo[] = agents.map(id => ({
+                    id,
+                    name: id,
+                    displayName: AGENT_METADATA[id]?.displayName || `Agent: ${id}`,
+                    color: AGENT_METADATA[id]?.color || 'bg-slate-500'
+                }));
+                setAvailableAgents(agentInfos);
+                
+                // If current selection is not in new lists, update them
+                if (users.length > 0 && !users.includes(selectedUser)) setSelectedUser(users[0]);
+                if (agents.length > 0 && !agents.includes(selectedAgent)) setSelectedAgent(agents[0]);
+            } catch (err) {
+                console.error('Failed to fetch identities', err);
+            }
+        };
+        fetchIdentities();
+    }, []);
+
+    // Fetch memories when agent or user changes
     useEffect(() => {
         const fetchMemories = async () => {
             setLoading(true);
             setError(null);
             try {
-                const data = await memoryService.getAgentMemories(selectedAgent);
+                const data = await memoryService.getAgentMemories(selectedAgent, selectedUser);
                 setMemoryData(data);
             } catch (err) {
                 setError('获取记忆数据失败，请稍后重试');
@@ -67,8 +69,10 @@ const MemoryVisualizationPage: React.FC = () => {
             }
         };
 
-        fetchMemories();
-    }, [selectedAgent]);
+        if (selectedAgent && selectedUser) {
+            fetchMemories();
+        }
+    }, [selectedAgent, selectedUser]);
 
     // Filter and sort memories
     const filteredMemories = useMemo(() => {
@@ -128,12 +132,27 @@ const MemoryVisualizationPage: React.FC = () => {
                     </div>
 
                     {/* Controls */}
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <AgentSelector
-                            agents={AGENTS}
-                            selectedAgent={selectedAgent}
-                            onAgentChange={setSelectedAgent}
-                        />
+                    <div className="flex flex-col xl:flex-row gap-4">
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/80 border border-slate-700 rounded-xl">
+                                <UserIcon size={18} className="text-slate-400" />
+                                <select
+                                    value={selectedUser}
+                                    onChange={(e) => setSelectedUser(e.target.value)}
+                                    className="bg-transparent text-white border-none focus:ring-0 text-sm min-w-[120px]"
+                                >
+                                    {availableUsers.map(id => (
+                                        <option key={id} value={id} className="bg-slate-800">{id}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <AgentSelector
+                                agents={availableAgents}
+                                selectedAgent={selectedAgent}
+                                onAgentChange={setSelectedAgent}
+                            />
+                        </div>
 
                         <div className="flex-1 relative">
                             <Search
@@ -155,6 +174,67 @@ const MemoryVisualizationPage: React.FC = () => {
                             />
                         </div>
                     </div>
+
+                    {/* User Persona Banner */}
+                    {memoryData?.user_persona && (
+                        <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border border-purple-500/20 backdrop-blur-sm">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Brain size={18} className="text-purple-400" />
+                                <h3 className="text-sm font-semibold text-white">用户画像 (User Persona)</h3>
+                                <div className="ml-auto flex items-center gap-2">
+                                    <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                        风险偏好: {memoryData.user_persona.risk_preference || '未知'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                                        <Tag size={12} className="text-blue-400" />
+                                        投资风格
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {memoryData.user_persona.investment_style?.map((s, i) => (
+                                            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">{s}</span>
+                                        )) || <span className="text-[10px] text-slate-500 italic">暂无数据</span>}
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                                        <Info size={12} className="text-cyan-400" />
+                                        感兴趣领域
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {memoryData.user_persona.interested_sectors?.map((s, i) => (
+                                            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">{s}</span>
+                                        )) || <span className="text-[10px] text-slate-500 italic">暂无数据</span>}
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                                        <Brain size={12} className="text-purple-400" />
+                                        观察特质
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {memoryData.user_persona.observed_traits?.map((s, i) => (
+                                            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">{s}</span>
+                                        )) || <span className="text-[10px] text-slate-500 italic">暂无数据</span>}
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                                        <Search size={12} className="text-pink-400" />
+                                        分析习惯
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {memoryData.user_persona.analysis_habits?.map((s, i) => (
+                                            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">{s}</span>
+                                        )) || <span className="text-[10px] text-slate-500 italic">暂无数据</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

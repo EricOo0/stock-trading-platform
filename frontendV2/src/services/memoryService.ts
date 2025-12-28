@@ -6,9 +6,9 @@ const MEMORY_API_BASE = 'http://localhost:10000/api/v1';
 
 export const memoryService = {
     /**
-     * Get all memories for a specific agent
+     * Get all memories for a specific agent and user
      */
-    async getAgentMemories(agentId: string): Promise<MemoryData> {
+    async getAgentMemories(agentId: string, userId: string = 'test_user_001'): Promise<MemoryData> {
         try {
             const response = await fetch(`${MEMORY_API_BASE}/memory/context`, {
                 method: 'POST',
@@ -16,6 +16,7 @@ export const memoryService = {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    user_id: userId,
                     agent_id: agentId,
                     query: '', // Empty query to get all memories
                 }),
@@ -40,7 +41,7 @@ export const memoryService = {
     /**
      * Search memories with a query
      */
-    async searchMemories(agentId: string, query: string): Promise<MemoryData> {
+    async searchMemories(agentId: string, query: string, userId: string = 'test_user_001'): Promise<MemoryData> {
         try {
             const response = await fetch(`${MEMORY_API_BASE}/memory/context`, {
                 method: 'POST',
@@ -48,6 +49,7 @@ export const memoryService = {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    user_id: userId,
                     agent_id: agentId,
                     query: query,
                 }),
@@ -70,11 +72,28 @@ export const memoryService = {
     },
 
     /**
+     * Get all active users and agents in the system
+     */
+    async getIdentities(): Promise<{ users: string[], agents: string[] }> {
+        try {
+            const response = await fetch(`${MEMORY_API_BASE}/memory/identities`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch identities: ${response.statusText}`);
+            }
+            const data = await response.json();
+            return data.data || { users: [], agents: [] };
+        } catch (error) {
+            console.error('Error fetching identities:', error);
+            return { users: ['test_user_001'], agents: ['research_agent'] };
+        }
+    },
+
+    /**
      * Get memory statistics
      */
-    async getMemoryStats(agentId: string) {
+    async getMemoryStats(agentId: string, userId: string = 'test_user_001') {
         try {
-            const memories = await this.getAgentMemories(agentId);
+            const memories = await this.getAgentMemories(agentId, userId);
             return {
                 working_count: memories.working_memory?.length || 0,
                 episodic_count: memories.episodic_memory?.length || 0,

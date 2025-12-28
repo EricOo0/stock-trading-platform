@@ -269,6 +269,62 @@ class MemoryManager:
         """获取异步任务执行状态"""
         return self.task_states.get(task_id, {"status": "not_found"})
 
+    def get_all_identities(self) -> Dict[str, List[str]]:
+        """获取系统中存在的所有 User 和 Agent 列表 (通过扫描数据文件)"""
+        import os
+        from config import settings
+        
+        users = set()
+        agents = set()
+        
+        # 1. 扫描 Working Memory 文件 (最准确)
+        data_dir = settings.DATA_DIR
+        if os.path.exists(data_dir):
+            for filename in os.listdir(data_dir):
+                if filename.startswith("working_") and filename.endswith(".json"):
+                    # working_{user_id}_{agent_id}.json
+                    # 去掉前缀 working_ (8 chars) 和后缀 .json (5 chars)
+                    content_part = filename[8:-5]
+                    
+                    # 尝试匹配已知 Agent
+                    known_agents = ["research_agent", "chairman", "market", "macro", "sentiment", "web_search", "receptionist", "researcher"]
+                    found_agent = None
+                    for ka in known_agents:
+                        if content_part.endswith(f"_{ka}"):
+                            found_agent = ka
+                            break
+                    
+                    if found_agent:
+                        agent_id = found_agent
+                        user_id = content_part[: -(len(found_agent) + 1)]
+                        if user_id:
+                            users.add(user_id)
+                            agents.add(agent_id)
+                    else:
+                        # 降级：假设最后一节是 agent_id
+                        parts = content_part.split("_")
+                        if len(parts) >= 2:
+                            agents.add(parts[-1])
+                            users.add("_".join(parts[:-1]))
+
+        # 2. 补充内存中当前的
+        for key in self.working_memories.keys():
+            if ":" in key:
+                u, a = key.split(":", 1)
+                users.add(u)
+                agents.add(a)
+                
+        # 3. 确保默认值存在
+        if not users: users.add("test_user_001")
+        if not agents: 
+            agents.add("research_agent")
+            agents.add("chairman")
+                
+        return {
+            "users": sorted(list(users)),
+            "agents": sorted(list(agents))
+        }
+
     def get_stats(self, user_id: str, agent_id: str) -> Dict:
         """获取统计信息"""
         wm = self._get_working_memory(user_id, agent_id)

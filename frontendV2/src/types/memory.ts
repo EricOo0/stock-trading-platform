@@ -24,6 +24,7 @@ export interface SemanticMemoryItem {
     content: string;
     category?: string;
     importance?: number;
+    timestamp?: string;
     metadata?: Record<string, any>;
 }
 
@@ -32,6 +33,14 @@ export interface MemoryData {
     episodic_memory: EpisodicMemoryItem[];
     semantic_memory: SemanticMemoryItem[];
     core_principles?: string;
+    user_persona?: {
+        risk_preference?: string;
+        investment_style?: string[];
+        interested_sectors?: string[];
+        analysis_habits?: string[];
+        observed_traits?: string[];
+        [key: string]: any;
+    };
     system_prompt?: string;
     token_usage?: {
         working_memory: number;

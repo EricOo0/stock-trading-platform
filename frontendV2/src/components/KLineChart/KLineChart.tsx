@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createChart } from 'lightweight-charts';
+import { createChart, CandlestickSeries } from 'lightweight-charts';
 import type { UTCTimestamp } from 'lightweight-charts';
 
 interface KLineData {
@@ -40,7 +40,7 @@ const KLineChart: React.FC<KLineChartProps> = ({ data, width = 800, height = 400
 
     try {
       console.log('Creating chart with data length:', data.length); // 调试信息
-      
+
       // 创建图表
       chart = createChart(chartContainerRef.current, {
         width: width,
@@ -67,7 +67,7 @@ const KLineChart: React.FC<KLineChartProps> = ({ data, width = 800, height = 400
       });
 
       // 添加K线系列 - 使用更通用的API
-      const candlestickSeries = (chart as any).addCandlestickSeries({
+      const candlestickSeries = chart.addSeries(CandlestickSeries, {
         upColor: '#10b981',
         downColor: '#ef4444',
         borderVisible: false,
@@ -78,7 +78,7 @@ const KLineChart: React.FC<KLineChartProps> = ({ data, width = 800, height = 400
       // 设置数据
       candlestickSeries.setData(data);
       console.log('KLineChart data set successfully'); // 调试信息
-      
+
       // 自适应大小
       chart.timeScale().fitContent();
 
@@ -91,7 +91,7 @@ const KLineChart: React.FC<KLineChartProps> = ({ data, width = 800, height = 400
       if (onError) {
         onError(error instanceof Error ? error : new Error('Unknown chart error'));
       }
-      
+
       // 清理
       if (chart) {
         try {
@@ -113,11 +113,11 @@ const KLineChart: React.FC<KLineChartProps> = ({ data, width = 800, height = 400
   // 如果没有数据，显示一个占位符
   if (!data || data.length === 0) {
     return (
-      <div style={{ 
-        width: width, 
-        height: height, 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        width: width,
+        height: height,
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#f5f5f5',
         border: '1px solid #ddd',
@@ -131,11 +131,11 @@ const KLineChart: React.FC<KLineChartProps> = ({ data, width = 800, height = 400
   // 如果有错误，显示错误信息
   if (hasError) {
     return (
-      <div style={{ 
-        width: width, 
-        height: height, 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        width: width,
+        height: height,
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#fef2f2',
         border: '1px solid #fecaca',

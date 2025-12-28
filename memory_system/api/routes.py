@@ -131,6 +131,13 @@ async def get_task_status(task_id: str):
     return {"task_id": task_id, "data": status}
 
 
+@router.get("/memory/identities")
+async def get_identities():
+    """获取系统中所有活跃的 User 和 Agent 列表"""
+    identities = manager.get_all_identities()
+    return {"status": "success", "data": identities}
+
+
 @router.get("/memory/stats", response_model=GetStatsResponse)
 async def get_stats(user_id: str, agent_id: str):
     """获取统计信息"""
