@@ -231,34 +231,6 @@ async def run_agent(job_id: str, query: str):
         result = await graph.ainvoke(inputs, config={"callbacks": [callback]})
         logger.info(f"Agent finished with result: {result}")
 
-        # Manually stream completion status since callback is unreliable with LangGraph
-        # This ensures the frontend receives the final "completed" signal with the answer
-        from backend.app.services.research.stream_manager import stream_manager
-        import json
-
-        output_content = ""
-        # Handle different output formats from the graph/agent
-        if "messages" in result and result["messages"]:
-            last_msg = result["messages"][-1]
-            if hasattr(last_msg, "content"):
-                output_content = str(last_msg.content)
-        elif "output" in result:
-            output_content = str(result["output"])
-
-        # Save to DB
-        # JobManager().append_event(job_id, "status", {
-        #     "status": "completed", "output": output_content})
-
-        # Update Job Status in DB
-        job_manager.update_job_status(job_id, "completed", output=output_content)
-
-        # Stream to frontend
-        await stream_manager.push_event(
-            job_id,
-            "status",
-            json.dumps({"status": "completed", "output": output_content}, default=str),
-        )
-
     except Exception as e:
         logger.error(f"Agent failed: {e}")
         # JobManager().append_event(job_id, "status", {

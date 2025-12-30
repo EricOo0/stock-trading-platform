@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
+from fastapi.encoders import jsonable_encoder
 from typing import Dict, Any, List
+import math
 from sse_starlette.sse import EventSourceResponse
 from backend.app.services.research.job_manager import JobManager
 from backend.app.services.research.stream_manager import stream_manager
@@ -8,6 +10,21 @@ from backend.app.agents.research.research_agent import run_agent
 
 router = APIRouter(prefix="/api/research", tags=["Research"])
 job_manager = JobManager()
+
+
+def sanitize_for_json(obj: Any) -> Any:
+    """
+    Recursively replace NaN and Infinity with None to ensure JSON compliance.
+    """
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(v) for v in obj]
+    return obj
 
 
 @router.post("/start")
@@ -106,11 +123,14 @@ async def get_job_state(job_id: str):
     # Sort by created_at
     unified_history.sort(key=lambda x: x['created_at'] or "")
 
-    return {
+    response_data = {
         "status": "success",
         "job": job,
         "events": unified_history
     }
+    
+    # Ensure all data is JSON compliant (handle NaN/Infinity)
+    return sanitize_for_json(jsonable_encoder(response_data))
 
 
 @router.post("/{job_id}/remark")

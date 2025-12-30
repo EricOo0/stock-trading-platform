@@ -1,5 +1,17 @@
 import React from 'react';
-import { TrendingUp, BarChart2, Search, Eye } from 'lucide-react';
+import { 
+  Users, 
+  Brain, 
+  TrendingUp, 
+  Activity, 
+  Github, 
+  Database, 
+  Globe, 
+  Newspaper,
+  ArrowRight,
+  LineChart,
+  Zap
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface HomePageProps {
@@ -7,162 +19,231 @@ interface HomePageProps {
 }
 
 const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
-  const features = [
-    {
-      icon: <TrendingUp size={32} className="text-blue-500" />,
-      title: '实时行情',
-      description: 'A股、美股、港股实时数据',
-      color: 'border-blue-500'
-    },
-    {
-      icon: <BarChart2 size={32} className="text-emerald-500" />,
-      title: '技术分析',
-      description: '专业K线图和技术指标',
-      color: 'border-emerald-500'
-    },
-    {
-      icon: <Search size={32} className="text-violet-500" />,
-      title: '智能搜索',
-      description: '多方式股票搜索',
-      color: 'border-violet-500'
-    },
-    {
-      icon: <Eye size={32} className="text-amber-500" />,
-      title: '自选管理',
-      description: '个性化股票监控',
-      color: 'border-amber-500'
-    }
-  ];
-
-  const stats = [
-    { label: '支持市场', value: '3+', suffix: '个' },
-    { label: '股票数据', value: '10000+', suffix: '只' },
-    { label: '实时更新', value: '1', suffix: '秒' },
-    { label: '用户信赖', value: '10000+', suffix: '人' }
-  ];
-
-  const handleExperienceClick = () => {
-    if (onNavigate) {
-      onNavigate('market-query');
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
     }
   };
 
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1
+    }
+  };
+
+  const coreModules = [
+    {
+      id: 'council',
+      title: 'AI 顾问团',
+      subtitle: 'Council of Agents',
+      description: '多智能体协同决策系统。模拟专业投委会，集成宏观、技术、舆情等多维度专家Agent，提供全方位的投资建议。',
+      icon: <Users size={32} className="text-blue-400" />,
+      color: 'from-blue-500/20 to-indigo-500/20',
+      border: 'hover:border-blue-500/50',
+      action: '进入会议室'
+    },
+    {
+      id: 'inspiring',
+      title: '深度投研 Agent',
+      subtitle: 'Deep Research',
+      description: '具备长短期记忆的自主研究员。自动拆解任务，搜集全网信息，通过反思与迭代生成深度的研报内容。',
+      icon: <Brain size={32} className="text-purple-400" />,
+      color: 'from-purple-500/20 to-pink-500/20',
+      border: 'hover:border-purple-500/50',
+      action: '开始研究'
+    }
+  ];
+
+  const functionalModules = [
+    {
+      id: 'market-query',
+      title: '市场全景',
+      description: '实时行情与资金流向',
+      icon: <TrendingUp size={24} className="text-emerald-400" />,
+      delay: 0.2
+    },
+    {
+      id: 'macro-data',
+      title: '宏观数据',
+      description: '经济指标与政策追踪',
+      icon: <Globe size={24} className="text-cyan-400" />,
+      delay: 0.3
+    },
+    {
+      id: 'news-sentiment',
+      title: '舆情分析',
+      description: '全网新闻情感量化',
+      icon: <Newspaper size={24} className="text-orange-400" />,
+      delay: 0.4
+    },
+    {
+      id: 'stock-simulation',
+      title: '模拟回测',
+      description: '策略验证与沙盘推演',
+      icon: <Activity size={24} className="text-red-400" />,
+      delay: 0.5
+    },
+    {
+      id: 'technical-analysis',
+      title: '技术分析',
+      description: '专业K线与指标系统',
+      icon: <LineChart size={24} className="text-yellow-400" />,
+      delay: 0.6
+    },
+    {
+      id: 'memory-viz',
+      title: '记忆可视化',
+      description: 'Agent 记忆库透视',
+      icon: <Database size={24} className="text-teal-400" />,
+      delay: 0.7
+    }
+  ];
+
   return (
-    <div className="min-h-full flex flex-col bg-slate-900">
-      {/* Hero Section */}
-      <div className="relative bg-slate-900 text-white py-20 px-6 text-center overflow-hidden flex-shrink-0 border-b border-slate-700">
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1611974765270-ca12586343bb?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80')] opacity-5 bg-cover bg-center" />
-
-        <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center">
-          <motion.div 
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            className="w-16 h-16 bg-blue-600/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-6 border border-blue-500/30"
-          >
-            <TrendingUp size={36} className="text-blue-400" />
-          </motion.div>
-
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-5xl md:text-6xl font-bold mb-2 leading-tight tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400"
-          >
-            AI-Fundin
-          </motion.h1>
-
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="text-xl md:text-2xl font-medium text-white mb-6"
-          >
-            智能行情查询系统
-          </motion.p>
-
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="text-lg text-slate-300 mb-8 max-w-lg leading-relaxed"
-          >
-            专业的金融市场数据平台，为您提供实时、准确、全面的股票行情信息
-          </motion.p>
-
-          <motion.button
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-            onClick={handleExperienceClick}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:bg-blue-700 hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-2 group"
-          >
-            立即体验
-            <span className="group-hover:translate-x-1 transition-transform">→</span>
-          </motion.button>
-        </div>
+    <div className="min-h-full flex flex-col bg-[#0B1120] text-slate-200">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px]" />
       </div>
 
-      {/* Features Section */}
-      <div className="py-16 px-6 max-w-6xl mx-auto w-full">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-white mb-3">
-            核心功能
-          </h2>
-          <p className="text-slate-400">
-            全方位的金融数据服务
+      <div className="relative z-10 flex-1 flex flex-col max-w-7xl mx-auto w-full px-6 py-12">
+        
+        {/* Header Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="text-center mb-16 space-y-6"
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-4">
+            <Zap size={12} />
+            <span>Next-Gen AI Investment Platform</span>
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">
+              AI-Driven
+            </span> Financial Intelligence
+          </h1>
+          
+          <p className="max-w-2xl mx-auto text-lg text-slate-400 leading-relaxed">
+            融合多智能体协作、深度记忆系统与实时市场数据的下一代投资研究平台。
+            让 AI 成为您的私人首席投资官。
+          </p>
+
+          <div className="flex items-center justify-center gap-4 pt-4">
+            <button 
+              onClick={() => window.open('https://github.com/EricOo0/stock-trading-platform', '_blank')}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition-all hover:scale-105"
+            >
+              <Github size={20} />
+              <span>View on GitHub</span>
+            </button>
+            <button 
+              onClick={() => onNavigate && onNavigate('inspiring')}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 font-medium"
+            >
+              <Brain size={20} />
+              <span>开始深度投研</span>
+            </button>
+          </div>
+        </motion.div>
+
+        {/* Core Modules (Big Cards) */}
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16"
+        >
+          {coreModules.map((module) => (
+            <motion.div
+              key={module.id}
+              variants={itemVariants}
+              onClick={() => onNavigate && onNavigate(module.id)}
+              className={`group relative overflow-hidden rounded-3xl bg-slate-800/50 border border-slate-700/50 p-8 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-900/10 ${module.border}`}
+            >
+              <div className={`absolute inset-0 bg-gradient-to-br ${module.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+              
+              <div className="relative z-10 flex flex-col h-full">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="p-3 rounded-2xl bg-slate-900/50 border border-slate-700/50 group-hover:border-slate-600 transition-colors">
+                    {module.icon}
+                  </div>
+                  <div className="flex items-center gap-1 text-slate-500 text-sm font-medium group-hover:text-blue-400 transition-colors">
+                    <span>{module.action}</span>
+                    <ArrowRight size={16} />
+                  </div>
+                </div>
+                
+                <h3 className="text-2xl font-bold text-white mb-1 group-hover:text-blue-200 transition-colors">
+                  {module.title}
+                </h3>
+                <p className="text-sm text-blue-400/80 font-mono mb-4">{module.subtitle}</p>
+                
+                <p className="text-slate-400 leading-relaxed group-hover:text-slate-300 transition-colors">
+                  {module.description}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Functional Modules (Grid) */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-700 to-transparent" />
+            <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">Analysis Tools</span>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-700 to-transparent" />
+          </div>
+
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          >
+            {functionalModules.map((module) => (
+              <motion.div
+                key={module.id}
+                variants={itemVariants}
+                onClick={() => onNavigate && onNavigate(module.id)}
+                className="group flex items-center gap-4 p-4 rounded-xl bg-slate-800/30 border border-slate-700/30 hover:bg-slate-800/80 hover:border-slate-600 transition-all cursor-pointer"
+              >
+                <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 group-hover:border-slate-600 transition-colors">
+                  {module.icon}
+                </div>
+                <div>
+                  <h4 className="text-base font-semibold text-slate-200 group-hover:text-white transition-colors">
+                    {module.title}
+                  </h4>
+                  <p className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">
+                    {module.description}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-auto pt-20 pb-6 text-center">
+          <div className="flex items-center justify-center gap-2 text-slate-500 mb-4 hover:text-blue-400 transition-colors cursor-pointer" onClick={() => window.open('https://github.com/EricOo0/stock-trading-platform', '_blank')}>
+            <Github size={16} />
+            <span className="text-sm font-medium">EricOo0/stock-trading-platform</span>
+          </div>
+          <p className="text-xs text-slate-600">
+            © 2025 AI Investment Research Platform. Open Source Community Edition.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              className={`bg-slate-800 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 border-t-4 ${feature.color} group border-x border-b border-slate-700`}
-            >
-              <div className="mb-4 transform group-hover:scale-110 transition-transform duration-300 inline-block">
-                {feature.icon}
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                {feature.title}
-              </h3>
-              <p className="text-slate-400 text-sm leading-relaxed">
-                {feature.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Stats Section */}
-      <div className="bg-slate-800 py-12 border-y border-slate-700">
-        <div className="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          {stats.map((stat, index) => (
-            <div key={index} className="p-4">
-              <div className="text-3xl font-bold text-blue-400 mb-1">
-                {stat.value}
-                <span className="text-sm text-slate-400 ml-1 font-normal">{stat.suffix}</span>
-              </div>
-              <div className="text-sm text-slate-400 font-medium">
-                {stat.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="bg-slate-900 text-slate-400 py-3 flex items-center justify-center gap-3 mt-auto border-t border-slate-700">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-violet-600 rounded-md flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-            <TrendingUp size={12} strokeWidth={3} />
-          </div>
-          <span className="font-semibold text-slate-300 text-sm tracking-wide">智能行情查询系统</span>
-        </div>
-        <div className="w-px h-3 bg-slate-700" />
-        <p className="text-xs text-slate-500 font-medium">
-          © 2024 保留所有权利
-        </p>
       </div>
     </div>
   );

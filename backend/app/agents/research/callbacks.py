@@ -109,7 +109,71 @@ class ResearchAgentCallback(AsyncCallbackHandler):
 
     async def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
         """Run when chain ends running."""
-        pass
+        # 识别是否为根 Chain 的结束
+        # 1. 如果 parent_run_id 为 None，通常是根
+        # 2. 如果 outputs 包含最终回答的特征
+        
+        parent_run_id = kwargs.get("parent_run_id")
+        if parent_run_id is not None:
+            # 忽略子链（如工具调用、内部节点等）
+            return
+
+        logger.info(f"on_chain_end triggered for job {self.job_id}. Processing memory sync.")
+        
+        output_content = ""
+        # 尝试从 LangGraph 输出中提取最终回答
+        # 常见格式: {"messages": [...]} 或 {"output": "..."}
+        if isinstance(outputs, dict):
+            if "messages" in outputs and isinstance(outputs["messages"], list) and outputs["messages"]:
+                last_msg = outputs["messages"][-1]
+                if hasattr(last_msg, "content"):
+                    output_content = str(last_msg.content)
+            elif "output" in outputs:
+                output_content = str(outputs["output"])
+        
+        if not output_content:
+            logger.warning(f"on_chain_end: Could not extract output content for job {self.job_id}")
+            return
+
+        # 执行记忆同步 (STM)
+        try:
+            self.memory_client.add_memory(
+                str(output_content), role="agent", metadata={"job_id": self.job_id}
+            )
+            logger.info(f"Saved agent output to STM for job {self.job_id} (via on_chain_end)")
+        except Exception as e:
+            logger.error(f"Failed to save STM in on_chain_end: {e}")
+
+        # 更新 Job 状态
+        try:
+            self.job_manager.update_job_status(self.job_id, "completed", output=output_content)
+            logger.info(f"Updated job status to completed for job {self.job_id}")
+        except Exception as e:
+            logger.error(f"Failed to update job status in on_chain_end: {e}")
+
+        # 推流给前端
+        try:
+            await stream_manager.push_event(
+                self.job_id,
+                "status",
+                json.dumps(
+                    {"status": "completed", "output": output_content}, default=str
+                ),
+            )
+            logger.info(f"Streamed completed status for job {self.job_id}")
+        except Exception as e:
+            logger.error(f"Failed to stream completion status in on_chain_end: {e}")
+
+        # 触发记忆结算 (STM -> MTM/LTM)
+        try:
+            task_id = self.memory_client.finalize()
+            if task_id:
+                logger.info(f"Memory Finalize Task started for job {self.job_id}. Task ID: {task_id}")
+            else:
+                logger.warning(f"Memory Finalize Task failed to start for job {self.job_id}")
+        except Exception as e:
+            logger.error(f"Failed to finalize memory in on_chain_end: {e}")
+
 
     async def on_agent_action(self, action: Any, **kwargs: Any) -> Any:
         # Log agent thinking process (Action)
@@ -120,54 +184,12 @@ class ResearchAgentCallback(AsyncCallbackHandler):
         )
 
     async def on_agent_finish(self, finish: Any, **kwargs: Any) -> Any:
-        # print(f"Agent finish running with result: {finish.return_values}")
-        # Save to DB
-        self.job_manager.append_event(
-            self.job_id,
-            "status",
-            {"status": "completed", "output": finish.return_values},
-        )
-
-        # Sync to Memory STM
-        output_content = finish.return_values.get("output", "")
-        if output_content:
-            self.memory_client.add_memory(
-                str(output_content), role="agent", metadata={"job_id": self.job_id}
-            )
-            
-        # 触发记忆异步结算 (STM -> MTM/LTM)
-        task_id = self.memory_client.finalize()
-        if task_id:
-            logger.info(f"Memory Finalize Task started for job {self.job_id}. Task ID: {task_id}")
-        else:
-            logger.warning(f"Memory Finalize Task failed to start for job {self.job_id}")
-
-        # Stream the full completion status including the final answer
-        try:
-            output_content = finish.return_values.get("output", "")
-            # Ensure output_content is a string
-            if not isinstance(output_content, str):
-                output_content = str(output_content)
-
-            await stream_manager.push_event(
-                self.job_id,
-                "status",
-                json.dumps(
-                    {"status": "completed", "output": output_content}, default=str
-                ),
-            )  # Use default=str to handle non-serializable objects
-        except Exception as e:
-            print(f"Error streaming finish status: {e}")
-            await stream_manager.push_event(
-                self.job_id,
-                "status",
-                json.dumps(
-                    {
-                        "status": "completed",
-                        "output": "Task completed (output serialization failed)",
-                    }
-                ),
-            )
+        """
+        Run on agent end.
+        Note: With LangGraph, this callback is typically NOT triggered.
+        The logic has been migrated to `on_chain_end` (for memory and status streaming).
+        """
+        pass
 
     async def _try_create_artifact(self, tool_name: str, output_str: str):
         """
