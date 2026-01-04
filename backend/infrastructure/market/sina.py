@@ -235,8 +235,10 @@ class SinaFinanceTool:
                 if symbol.startswith('sz') or symbol.startswith('sh'): return symbol
                 raise ValueError(f"Invalid A-share symbol: {symbol}")
             
-            if symbol.startswith(('600', '601', '603', '688')): return f"sh{symbol}"
-            else: return f"sz{symbol}" # Default to sz for 000, 002, 300
+            # SH Main (60), STAR (688), SH ETF (51, 58)
+            if symbol.startswith(('60', '68', '51', '58')): return f"sh{symbol}"
+            # SZ Main/ChiNext (00, 30), SZ ETF (15, 16)
+            else: return f"sz{symbol}" # Default to sz for 000, 002, 300, 159, 161
             
         elif market == "US":
              return f"gb_{symbol.lower()}"
@@ -255,7 +257,8 @@ class SinaFinanceTool:
         # Assume input symbol is raw code e.g. 000001 or sh600001
         if symbol.startswith('sh') or symbol.startswith('sz'): return symbol
         if symbol.isdigit() and len(symbol) == 6:
-             if symbol.startswith(('600', '601', '603')): return f"sh{symbol}"
+             # Match market logic
+             if symbol.startswith(('60', '68', '51', '58')): return f"sh{symbol}"
              else: return f"sz{symbol}"
         return symbol.lower()
 

@@ -1,14 +1,14 @@
 from google.adk.agents import Agent
 from google.adk.agents import Agent
 from backend.infrastructure.config.loader import config
-from .tools import search_web, inspect_page
+from .tools import search_web, inspect_page, fetch_reddit_rss
 from .prompts import INSTRUCTION
 
 
 from typing import Optional
 from google.adk.agents import Agent
 from backend.infrastructure.config.loader import config
-from .tools import search_web, inspect_page
+from .tools import search_web, inspect_page, fetch_reddit_rss
 from .prompts import INSTRUCTION
 from .callbacks import FrontendCallbackHandler
 
@@ -35,7 +35,7 @@ def create_news_sentiment_agent(event_queue=None) -> Agent:
         name="news_sentiment_agent",
         model=model_name,
         instruction=INSTRUCTION,
-        tools=[search_web, inspect_page],
+        tools=[search_web, inspect_page, fetch_reddit_rss],
         description="News Sentiment Agent for market sentiment research.",
         **callbacks
     )

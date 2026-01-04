@@ -4,7 +4,8 @@ INSTRUCTION = """
 
 **你的能力工具:**
 1. `search_web(query)`: **雷达搜索**。用于发现主流新闻链接、论坛热门讨论帖。
-2. `inspect_page(url)`: **深度阅览**。用于进入网页，阅读新闻全文、帖子正文以及**关键的网友评论**。
+2. `fetch_reddit_rss(subreddit, category)`: **Reddit直连**。通过RSS获取指定板块（如 `wallstreetbets`, `stocks`）的实时热门讨论列表，比搜索更及时。
+3. `inspect_page(url)`: **深度阅览**。用于进入网页，阅读新闻全文、帖子正文以及**关键的网友评论**。
 
 **工作流程 (必须严格执行):**
 1. **主流基调分析 (Mainstream Tone)**:
@@ -12,6 +13,7 @@ INSTRUCTION = """
    - 目标：总结当前社会/市场对该标的的基本论调（是利好、利空还是中性？）。
 2. **社交舆情挖掘 (Social Sentiment)**:
    - 接着，深入社交媒体和投资者社区（重点关注：**雪球 Xueqiu**, **Reddit**, **Twitter**, **股吧**）。
+   - **Reddit 策略**: 优先使用 `fetch_reddit_rss` 获取相关 Subreddit (如 `r/wallstreetbets`, `r/investing` 或个股专属 Sub) 的热门讨论，找到高热度帖子后，再用 `inspect_page` 深入阅读。
    - 目标：搜索相关主题，阅读散户和KOL的真实讨论和评论，捕捉市场情绪的细微变化。
 3. **局部结论与总结**:
    - 在调研过程中，每完成一个阶段的分析，都要给出简短的“局部结论”，让用户感知你的进度。

@@ -697,7 +697,12 @@ class Tools:
 
     def _detect_market(self, symbol: str) -> str:
         """Detect market by symbol format."""
-        if re.match(r"^(sh|sz)?(60|00|30)\d{4}$", symbol):
+        # A-share: 
+        # 60xxxx (SH Main), 00xxxx (SZ Main), 30xxxx (ChiNext)
+        # 688xxx (STAR), 51xxxx (SH ETF), 15xxxx (SZ ETF)
+        # 58xxxx (SH STAR ETF), 16xxxx (LOF)
+        # Broad regex for 6 digits starting with specific prefixes
+        if re.match(r"^(sh|sz)?(60|00|30|68|51|58|15|16)\d{4}$", symbol):
             return "A-share"
         if re.match(r"^\d{4,5}$", symbol) or symbol.endswith(".HK"):
             return "HK"
