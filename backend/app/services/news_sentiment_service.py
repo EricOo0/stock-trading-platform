@@ -1,11 +1,8 @@
 import logging
 import asyncio
 import uuid
+import json
 from typing import Dict, Any, Optional, AsyncGenerator
-
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
 
 from backend.infrastructure.browser.steel_browser import browser_engine
 
@@ -13,15 +10,15 @@ logger = logging.getLogger(__name__)
 
 class NewsSentimentService:
     def __init__(self):
-        # Initialize with InMemorySessionService
-        self.session_service = InMemorySessionService()
+        # We don't strictly need session service if we are bypassing Runner for now
+        # But keeping it if we want to store history later
+        pass
 
     async def start_research(self, session_id: str, query: str) -> AsyncGenerator[str, None]:
         """
-        Streaming version of start_research.
-        Yields NDJSON events: {'type': 'thought'|'tool'|'result', 'content': ...}
+        Streaming version of start_research using Master-Worker Orchestrator.
+        Yields NDJSON events.
         """
-        import json
         try:
             # 1. Attach Browser Engine
             if session_id:
@@ -30,65 +27,32 @@ class NewsSentimentService:
                 except Exception:
                     pass
             
-            # 2. Prepare Input
-            adk_session_id = session_id or str(uuid.uuid4())
-            user_id = "news_sentiment_user"
-            input_content = types.Content(role="user", parts=[types.Part(text=query)])
-            
-            # 3. Create Session
-            try:
-                await self.session_service.create_session(
-                    app_name="news_sentiment_app",
-                    user_id=user_id,
-                    session_id=adk_session_id
-                )
-            except:
-                pass
-
-
-            # 4. Stream Agent Execution using Queue + Callback
-            from backend.app.agents.news_sentiment.agent import create_news_sentiment_agent
-            from google.adk.runners import Runner
-
-            # Queue for events
+            # 2. Setup Queue
             event_queue = asyncio.Queue()
             
-            # Helper to run the agent and signal finish
-            async def run_agent():
+            # 3. Define Orchestrator Runner
+            async def run_orchestrator():
                 try:
-                    # Create Agent with Callbacks linked to queue
-                    local_agent = create_news_sentiment_agent(event_queue=event_queue)
+                    from backend.app.agents.news_sentiment.agent import create_news_sentiment_agent
                     
-                    # Create Runner
-                    local_runner = Runner(
-                        agent=local_agent,
-                        app_name="news_sentiment_app",
-                        session_service=self.session_service
-                    )
+                    # Create the custom Orchestrator
+                    orchestrator = create_news_sentiment_agent(event_queue=event_queue)
                     
-                    # Run it
-                    async for _ in local_runner.run_async(
-                        user_id=user_id,
-                        session_id=adk_session_id,
-                        new_message=input_content
-                    ):
-                        # Consume generator but do nothing, events are handled by callbacks
-                        pass
+                    # Execute
+                    await orchestrator.run(user_query=query)
                     
-                    # Manual chunk parsing removed. 
-                    # All events (thoughts, tools, conclusions) are now handled by FrontendCallbackHandler.
-
                 except Exception as e:
-                    logger.error(f"Agent Execution Error: {e}")
-                    await event_queue.put(json.dumps({"type": "error", "content": str(e)}) + "\n")
+                    logger.error(f"Orchestrator Execution Error: {e}", exc_info=True)
+                    error_event = {"type": "error", "content": f"Internal Error: {str(e)}"}
+                    await event_queue.put(json.dumps(error_event) + "\n")
                 finally:
-                    # Send special stop signal
+                    # Send stop signal
                     await event_queue.put(None)
 
-            # Start background task
-            asyncio.create_task(run_agent())
+            # 4. Start Background Task
+            asyncio.create_task(run_orchestrator())
 
-            # Consume Queue
+            # 5. Consume Queue & Yield
             while True:
                 item = await event_queue.get()
                 if item is None:
@@ -96,11 +60,7 @@ class NewsSentimentService:
                 yield item
 
         except Exception as e:
-            logger.error(f"Deep Search Service Error: {e}")
-            yield json.dumps({"type": "error", "content": str(e)}) + "\n"
-            
-        except Exception as e:
-            logger.error(f"Deep Search Service Error: {e}")
+            logger.error(f"News Sentiment Service Error: {e}", exc_info=True)
             yield json.dumps({"type": "error", "content": str(e)}) + "\n"
 
 news_sentiment_service = NewsSentimentService()

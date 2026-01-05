@@ -50,6 +50,11 @@ const ConclusionCard: React.FC<ConclusionCardProps> = ({ data }) => {
                 </p>
             </div>
 
+            {/* Summary */}
+            <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10 text-sm leading-relaxed opacity-95">
+                {data.summary}
+            </div>
+
             {/* Wave Decoration (CSS based or SVG) */}
             <div className="absolute bottom-0 right-0 opacity-10 pointer-events-none">
                 <svg width="300" height="100" viewBox="0 0 300 100" fill="none" xmlns="http://www.w3.org/2000/svg">

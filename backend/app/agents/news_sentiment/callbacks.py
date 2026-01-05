@@ -1,92 +1,74 @@
 import asyncio
 import json
 import time
+import logging
 from typing import Dict, Any, Optional
-from google.adk.models import LlmResponse, LlmRequest
+from .schemas import EventType, TaskUpdateType, TaskUpdatePayload
 
-class FrontendCallbackHandler:
-    def __init__(self, event_queue: asyncio.Queue):
+logger = logging.getLogger(__name__)
+
+class TaskCallbackHandler:
+    """
+    Callback handler that emits events bound to a specific task_id.
+    """
+    def __init__(self, event_queue: asyncio.Queue, task_id: str):
         self.event_queue = event_queue
+        self.task_id = task_id
+        self.last_response_text = ""
+
+    async def _emit(self, update_type: TaskUpdateType, content: str, **kwargs):
+        try:
+            logger.info(f"[Callback] Emitting {update_type} for task {self.task_id} (content len={len(content)})")
+            payload = TaskUpdatePayload(
+                task_id=self.task_id,
+                type=update_type,
+                content=content,
+                timestamp=int(time.time() * 1000),
+                **kwargs
+            )
+            
+            event = {
+                "type": EventType.TASK_UPDATE,
+                "payload": payload.model_dump()
+            }
+            
+            await self.event_queue.put(json.dumps(event) + "\n")
+        except Exception as e:
+            logger.error(f"Error emitting callback event: {e}")
 
     async def on_model_start(self, *args, **kwargs):
         """Called before the LLM is invoked. Use as 'Thinking' state."""
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"[Callback Debug] on_model_start args: {args}")
-        print(f"[Callback Debug] on_model_start args: {args}")
-        logger.info(f"[Callback Debug] on_model_start kwargs: {kwargs.keys()}")
-        print(f"[Callback Debug] on_model_start kwargs: {kwargs.keys()}")
-        if 'llm_request' in kwargs:
-             logger.info(f"[Callback Debug] llm_request type: {type(kwargs['llm_request'])}")
-             logger.info(f"[Callback Debug] llm_request vars: {vars(kwargs['llm_request']) if hasattr(kwargs['llm_request'], '__dict__') else 'no dict'}")
-             print(f"[Callback Debug] llm_request type: {type(kwargs['llm_request'])}")
-             print(f"[Callback Debug] llm_request vars: {vars(kwargs['llm_request']) if hasattr(kwargs['llm_request'], '__dict__') else 'no dict'}")
-
-        # ADK passes: callback_context, llm_request
+        # Extract user message if possible
         request = kwargs.get('llm_request')
         if not request and len(args) >= 2:
-            request = args[1] # fallback
+            request = args[1]
+            
+        content = "Thinking..."
+        # Try to get more detail if needed, but "Thinking..." is usually enough for UI state
         
-        user_msg = ""
-        # Official Reference: request.contents[-1].parts[0].text
-        if request and hasattr(request, 'contents') and request.contents:
-            last_msg = request.contents[-1]
-            if hasattr(last_msg, 'role') and last_msg.role == 'user':
-                if hasattr(last_msg, 'parts') and last_msg.parts:
-                    # Check first part for text
-                    if hasattr(last_msg.parts[0], 'text'):
-                        user_msg = last_msg.parts[0].text
-        
-        # Emit a THOUGHT event so frontend renders it
-        # If user_msg is found, show it. Otherwise generic message.
-        content = f"Thinking Process: Analyzing request '{user_msg}'..." if user_msg else "Thinking Process: Analyzing..."
-        
-        event = {
-            "type": "thought",
-            "content": content + "\n",
-            "timestamp": int(time.time() * 1000)
-        }
-        await self.event_queue.put(json.dumps(event) + "\n")
+        await self._emit(TaskUpdateType.THOUGHT, content)
 
     async def on_model_end(self, *args, **kwargs):
         """Called after LLM generates a response."""
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"[Callback Debug] on_model_end args: {args}")
-        logger.info(f"[Callback Debug] on_model_end kwargs: {kwargs.keys()}")
-        print(f"[Callback Debug] on_model_end kwargs: {kwargs.keys()}")
-        print(f"[Callback Debug] on_model_end args: {args}")
-        # ADK passes: callback_context, llm_response
         response = kwargs.get('llm_response')
-        logger.info(f"[Callback Debug] llm_response: {response}")
         if not response and len(args) >= 2:
-            response = args[1] # fallback
+            response = args[1]
 
         content = ""
-        # Official Reference: response.content.parts[0].text
         if response and hasattr(response, 'content'):
             if hasattr(response.content, 'parts') and response.content.parts:
                 for part in response.content.parts:
-                    # Capture Text
                     if hasattr(part, 'text') and part.text:
                         content += part.text
-                    # Ignore function_call (handled by tool callbacks)
-                    
-        # Check for error message
-        if response and hasattr(response, 'error_message') and response.error_message:
-             content = f"Error: {response.error_message}"
-
+        
+        # We handle tool calls separately via on_tool_start
+        # If content is empty (pure tool call), we might skip or show "Calling tool..."
         if content:
-            event = {
-                "type": "thought",
-                "content": content,
-                "timestamp": int(time.time() * 1000)
-            }
-            await self.event_queue.put(json.dumps(event) + "\n")
+            self.last_response_text = content
+            await self._emit(TaskUpdateType.THOUGHT, content) # Treat model output as thought/text
 
     async def on_tool_start(self, *args, **kwargs):
         """Called when a tool starts execution."""
-        # ADK likely passes: tool, args, tool_context
         tool_obj = kwargs.get('tool')
         tool_args = kwargs.get('args')
         
@@ -95,34 +77,33 @@ class FrontendCallbackHandler:
 
         tool_name = getattr(tool_obj, 'name', 'unknown_tool') if tool_obj else 'unknown_tool'
         
-        event = {
-            "type": "tool",
-            "status": "start",
-            "tool": tool_name.upper(),
-            "input": str(tool_args),
-            "timestamp": int(time.time() * 1000)
-        }
-        await self.event_queue.put(json.dumps(event) + "\n")
+        await self._emit(
+            TaskUpdateType.TOOL_CALL, 
+            f"Calling {tool_name}...", 
+            tool_name=tool_name, 
+            tool_input=str(tool_args)
+        )
 
     async def on_tool_end(self, *args, **kwargs):
         """Called when a tool finishes execution."""
-        # ADK passes: tool, args, tool_context, tool_response
         tool_obj = kwargs.get('tool')
         result = kwargs.get('tool_response')
         
         if result is None and len(args) >= 4:
-             result = args[3] # dangerous guess, fallback
+             result = args[3]
         
         tool_name = getattr(tool_obj, 'name', 'unknown_tool') if tool_obj else 'unknown_tool'
         
-        event = {
-            "type": "tool",
-            "status": "end",
-            "tool": tool_name.upper(),
-            "output": str(result)[:500] + "..." if len(str(result)) > 500 else str(result),
-            "timestamp": int(time.time() * 1000)
-        }
-        await self.event_queue.put(json.dumps(event) + "\n")
+        # Truncate result for display
+        output_str = str(result)
+        display_output = output_str[:500] + "..." if len(output_str) > 500 else output_str
+        
+        await self._emit(
+            TaskUpdateType.TOOL_RESULT,
+            f"Tool {tool_name} finished.",
+            tool_name=tool_name,
+            tool_output=display_output
+        )
 
     async def on_agent_end(self, *args, **kwargs):
         pass

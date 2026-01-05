@@ -5,7 +5,7 @@ import httpx
 import feedparser
 from typing import Dict, Any, List, Optional
 from backend.app.registry import Tools
-from backend.infrastructure.browser.steel_browser import browser_engine
+# from backend.infrastructure.browser.steel_browser import browser_engine
 
 logger = logging.getLogger(__name__)
 tools = Tools()
@@ -126,12 +126,8 @@ async def fetch_reddit_rss(subreddit: str, category: str = "hot", limit: int = 1
 
 async def inspect_page(url: str) -> str:
     """
-    INSPECTION TOOL: Deeply inspects a specific URL using the cloud browser.
-    
-    MUST be used for:
-    - Reddit threads (Auto-extracts comments)
-    - Xueqiu posts (Auto-scrolls for dynamic content)
-    - Any news article requiring full reading
+    INSPECTION TOOL: Inspects a specific URL using simple HTTP fetching.
+    Note: Browser automation (Steel) is currently disabled.
     """
     if not url or not url.strip():
         return "Error: Empty URL provided. Please provide a valid URL from the search results."
@@ -144,7 +140,8 @@ async def inspect_page(url: str) -> str:
             
         # Special Handler: Xueqiu
         if "xueqiu.com" in url:
-            return await _inspect_xueqiu(url)
+            # Fallback for Xueqiu if browser is disabled
+            return f"Xueqiu inspection via browser is currently disabled. Please use search snippets for '{url}'."
 
         # Default Handler
         return await _inspect_generic(url)
@@ -202,44 +199,53 @@ async def _inspect_reddit(url: str) -> str:
     except Exception as e:
         return f"Reddit inspection error: {e}"
 
-async def _inspect_xueqiu(url: str) -> str:
-    """Handling Xueqiu with aggressive scrolling for comments."""
-    try:
-        await browser_engine.visit(url)
-        page = await browser_engine.get_page()
-        
-        # Xueqiu loads comments on scroll.
-        # Scroll down significantly.
-        for _ in range(3):
-            await page.evaluate("window.scrollBy(0, 800)")
-            await asyncio.sleep(1.0) # Wait for hydration
-            
-        # Extract main post and comments
-        # Heuristic: Main content usually in 'article__content' or similar, comments in 'comment-list'
-        # For general robustness, we dump text but formatted.
-        
-        return await page.evaluate("""() => {
-            // Simple text extraction for now, can be optimized with selectors if needed
-            return document.body.innerText;
-        }""")
-    except Exception as e:
-        return f"Xueqiu inspection error: {e}"
+# async def _inspect_xueqiu(url: str) -> str:
+#     """Handling Xueqiu with aggressive scrolling for comments."""
+#     try:
+#         await browser_engine.visit(url)
+#         page = await browser_engine.get_page()
+#         
+#         # Xueqiu loads comments on scroll.
+#         # Scroll down significantly.
+#         for _ in range(3):
+#             await page.evaluate("window.scrollBy(0, 800)")
+#             await asyncio.sleep(1.0) # Wait for hydration
+#             
+#         # Extract main post and comments
+#         # Heuristic: Main content usually in 'article__content' or similar, comments in 'comment-list'
+#         # For general robustness, we dump text but formatted.
+#         
+#         return await page.evaluate("""() => {
+#             // Simple text extraction for now, can be optimized with selectors if needed
+#             return document.body.innerText;
+#         }""")
+#     except Exception as e:
+#         return f"Xueqiu inspection error: {e}"
 
 async def _inspect_generic(url: str, scroll_steps: int = 1) -> str:
-    """Generic page inspection with scrolling."""
-    await browser_engine.visit(url)
-    page = await browser_engine.get_page()
-    
-    # Scroll to trigger lazy images/content
-    for _ in range(scroll_steps):
-        await page.evaluate("window.scrollBy(0, window.innerHeight)")
-        await asyncio.sleep(0.5)
-        
-    content = await page.evaluate("() => document.body.innerText")
-    
-    # Check for common blocking/security messages
-    blocked_keywords = ["blocked", "security", "captcha", "access denied", "403 forbidden", "cloudflare"]
-    if any(keyword in content.lower()[:200] for keyword in blocked_keywords):
-        return f"Content unavailable: The site blocked the automated inspection ({content[:50]}...)."
-        
-    return content[:15000] # Return reasonable amount of text
+    """Generic page inspection via HTTP GET (Lightweight)."""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            
+            # Simple text extraction
+            # In a real scenario, use readability-lxml or beautifulsoup
+            # For now, we return a simple stripped text or raw HTML snippet if too long
+            text = resp.text
+            
+            # Very basic cleanup (this is not perfect but works for simple fallback)
+            import re
+            text = re.sub(r'<script.*?>.*?</script>', '', text, flags=re.DOTALL)
+            text = re.sub(r'<style.*?>.*?</style>', '', text, flags=re.DOTALL)
+            text = re.sub(r'<[^>]+>', ' ', text)
+            text = re.sub(r'\s+', ' ', text).strip()
+            
+            return text[:15000]
+            
+    except Exception as e:
+        logger.error(f"Generic inspection failed for {url}: {e}")
+        return f"Error fetching content: {e}"
