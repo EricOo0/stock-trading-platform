@@ -1,6 +1,7 @@
 import React from "react";
 import { useResearchStream } from "../hooks/useResearchStream";
 import { ChatPanel } from "../components/research/ChatPanel";
+import { DeepResearchCard } from "../components/research/DeepResearchCard";
 import { DashboardPanel } from "../components/research/DashboardPanel";
 import { HistoryDrawer } from "../components/research/HistoryDrawer";
 
@@ -49,6 +50,30 @@ const InspiringPage: React.FC = () => {
   }, [job?.id]);
 
   const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<'result' | 'process'>('result');
+
+  // Parse the latest DeepResearchReport from artifacts
+  // We look for an artifact event with type 'deep_research_report'
+  const latestReport = React.useMemo(() => {
+    const reportEvent = [...events].reverse().find(
+      e => e.type === 'artifact' && e.payload?.type === 'deep_research_report'
+    );
+    if (reportEvent && reportEvent.payload?.data) {
+      // If the data is a string (JSON stringified), parse it. 
+      // The hook might have already parsed the payload, but let's be safe about 'data' field.
+      const data = reportEvent.payload.data;
+      // Pydantic .json() returns a string, so we might need to parse if it wasn't auto-parsed
+      return typeof data === 'string' ? JSON.parse(data) : data;
+    }
+    return null;
+  }, [events]);
+
+  // Auto-switch to result tab when a report arrives
+  React.useEffect(() => {
+    if (latestReport) {
+      setActiveTab('result');
+    }
+  }, [latestReport]);
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden relative">
@@ -96,8 +121,63 @@ const InspiringPage: React.FC = () => {
         />
       </div>
       {/* Right Panel: Dashboard (35%) */}
-      <div className="flex-1 h-full border-l border-gray-200">
-        <DashboardPanel events={events} />
+      <div className="flex-1 h-full border-l border-gray-200 relative flex flex-col bg-gray-900">
+
+        {/* Fixed Header Row */}
+        <div className="flex-shrink-0 h-14 border-b border-gray-800 flex items-center justify-between px-4 bg-gray-900/50 backdrop-blur z-20">
+          <div className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
+            Research Hub
+          </div>
+          <div className="flex bg-gray-800 rounded-lg p-1 border border-gray-700">
+            <button
+              onClick={() => setActiveTab('result')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${activeTab === 'result' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              Deep Research
+            </button>
+            <button
+              onClick={() => setActiveTab('process')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${activeTab === 'process' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              Process Log
+            </button>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-hidden relative">
+
+          {/* View: Deep Research Result */}
+          {activeTab === 'result' && (
+            <div className="absolute inset-0 overflow-y-auto p-6 flex flex-col items-center">
+              {latestReport ? (
+                <div className="w-full max-w-md pb-10">
+                  <DeepResearchCard
+                    signals={latestReport.signals}
+                    analysis={latestReport.analysis}
+                    outlook={latestReport.outlook}
+                    references={latestReport.references}
+                  />
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 mt-20">
+                  <div className="animate-pulse mb-3 text-4xl">🔍</div>
+                  <p>Analysis in progress...</p>
+                  <p className="text-xs mt-2 opacity-60">Wait for the agent to submit the final report.</p>
+                  <button onClick={() => setActiveTab('process')} className="mt-4 text-blue-400 hover:underline text-xs">View Process</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* View: Process Log */}
+          {activeTab === 'process' && (
+            <div className="h-full">
+              <DashboardPanel events={events} />
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );

@@ -17,7 +17,8 @@ class ResearchAgentCallback(AsyncCallbackHandler):
         self.job_id = job_id
         self.user_id = user_id
         self.job_manager = JobManager()
-        self.memory_client = MemoryClient(user_id=user_id, agent_id="research_agent")
+        self.memory_client = MemoryClient(
+            user_id=user_id, agent_id="research_agent")
         # run_id -> {name, input}
         self.tool_runs: Dict[UUID, Dict[str, str]] = {}
         self.current_thought_buffer: str = ""
@@ -67,7 +68,8 @@ class ResearchAgentCallback(AsyncCallbackHandler):
     ) -> None:
         """Run when tool starts running."""
         tool_name = serialized.get("name")
-        print(f"Tool start running with input: {input_str}, tool_name: {tool_name}")
+        print(
+            f"Tool start running with input: {input_str}, tool_name: {tool_name}")
 
         # Track tool run for artifact generation in on_tool_end
         self.tool_runs[run_id] = {"name": tool_name, "input": input_str}
@@ -90,12 +92,14 @@ class ResearchAgentCallback(AsyncCallbackHandler):
         else:
             output_str = str(output)
 
-        self.job_manager.append_event(self.job_id, "tool_end", {"output": output_str})
+        self.job_manager.append_event(
+            self.job_id, "tool_end", {"output": output_str})
         await stream_manager.push_event(
             self.job_id,
             "log",
             json.dumps(
-                {"level": "success", "message": f"Tool finished: {output_str[:100]}..."}
+                {"level": "success",
+                    "message": f"Tool finished: {output_str[:100]}..."}
             ),
         )
 
@@ -112,14 +116,15 @@ class ResearchAgentCallback(AsyncCallbackHandler):
         # 识别是否为根 Chain 的结束
         # 1. 如果 parent_run_id 为 None，通常是根
         # 2. 如果 outputs 包含最终回答的特征
-        
+
         parent_run_id = kwargs.get("parent_run_id")
         if parent_run_id is not None:
             # 忽略子链（如工具调用、内部节点等）
             return
 
-        logger.info(f"on_chain_end triggered for job {self.job_id}. Processing memory sync.")
-        
+        logger.info(
+            f"on_chain_end triggered for job {self.job_id}. Processing memory sync.")
+
         output_content = ""
         # 尝试从 LangGraph 输出中提取最终回答
         # 常见格式: {"messages": [...]} 或 {"output": "..."}
@@ -130,9 +135,10 @@ class ResearchAgentCallback(AsyncCallbackHandler):
                     output_content = str(last_msg.content)
             elif "output" in outputs:
                 output_content = str(outputs["output"])
-        
+
         if not output_content:
-            logger.warning(f"on_chain_end: Could not extract output content for job {self.job_id}")
+            logger.warning(
+                f"on_chain_end: Could not extract output content for job {self.job_id}")
             return
 
         # 执行记忆同步 (STM)
@@ -140,14 +146,17 @@ class ResearchAgentCallback(AsyncCallbackHandler):
             self.memory_client.add_memory(
                 str(output_content), role="agent", metadata={"job_id": self.job_id}
             )
-            logger.info(f"Saved agent output to STM for job {self.job_id} (via on_chain_end)")
+            logger.info(
+                f"Saved agent output to STM for job {self.job_id} (via on_chain_end)")
         except Exception as e:
             logger.error(f"Failed to save STM in on_chain_end: {e}")
 
         # 更新 Job 状态
         try:
-            self.job_manager.update_job_status(self.job_id, "completed", output=output_content)
-            logger.info(f"Updated job status to completed for job {self.job_id}")
+            self.job_manager.update_job_status(
+                self.job_id, "completed", output=output_content)
+            logger.info(
+                f"Updated job status to completed for job {self.job_id}")
         except Exception as e:
             logger.error(f"Failed to update job status in on_chain_end: {e}")
 
@@ -162,18 +171,20 @@ class ResearchAgentCallback(AsyncCallbackHandler):
             )
             logger.info(f"Streamed completed status for job {self.job_id}")
         except Exception as e:
-            logger.error(f"Failed to stream completion status in on_chain_end: {e}")
+            logger.error(
+                f"Failed to stream completion status in on_chain_end: {e}")
 
         # 触发记忆结算 (STM -> MTM/LTM)
         try:
             task_id = self.memory_client.finalize()
             if task_id:
-                logger.info(f"Memory Finalize Task started for job {self.job_id}. Task ID: {task_id}")
+                logger.info(
+                    f"Memory Finalize Task started for job {self.job_id}. Task ID: {task_id}")
             else:
-                logger.warning(f"Memory Finalize Task failed to start for job {self.job_id}")
+                logger.warning(
+                    f"Memory Finalize Task failed to start for job {self.job_id}")
         except Exception as e:
             logger.error(f"Failed to finalize memory in on_chain_end: {e}")
-
 
     async def on_agent_action(self, action: Any, **kwargs: Any) -> Any:
         # Log agent thinking process (Action)
@@ -221,6 +232,9 @@ class ResearchAgentCallback(AsyncCallbackHandler):
             elif tool_name == "search_google":
                 artifact_type = "search_results"
                 title = "Search References"
+            elif tool_name == "submit_research_report":
+                artifact_type = "deep_research_report"
+                title = "Final Research Report"
 
             if not artifact_type:
                 return
@@ -253,7 +267,8 @@ class ResearchAgentCallback(AsyncCallbackHandler):
                 self.job_id, "artifact", json.dumps(payload, default=str)
             )
 
-            logger.info(f"Generated artifact {artifact_type} from tool {tool_name}")
+            logger.info(
+                f"Generated artifact {artifact_type} from tool {tool_name}")
 
         except json.JSONDecodeError:
             pass  # Not JSON, ignore

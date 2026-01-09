@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+import { SectorFlowCard } from '../components/Home/SectorFlowCard';
+
 interface HomePageProps {
   onNavigate?: (tab: string) => void;
 }
@@ -120,81 +122,46 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="text-center mb-16 space-y-6"
+          className="text-center mb-8 space-y-4"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-2">
             <Zap size={12} />
             <span>Next-Gen AI Investment Platform</span>
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">
               AI-Driven
             </span> Financial Intelligence
           </h1>
           
-          <p className="max-w-2xl mx-auto text-lg text-slate-400 leading-relaxed">
+          <p className="max-w-2xl mx-auto text-base text-slate-400 leading-relaxed">
             融合多智能体协作、深度记忆系统与实时市场数据的下一代投资研究平台。
             让 AI 成为您的私人首席投资官。
           </p>
 
-          <div className="flex items-center justify-center gap-4 pt-4">
+          <div className="flex items-center justify-center gap-4 pt-2">
             <button 
               onClick={() => window.open('https://github.com/EricOo0/stock-trading-platform', '_blank')}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition-all hover:scale-105"
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition-all hover:scale-105 text-sm"
             >
-              <Github size={20} />
+              <Github size={18} />
               <span>View on GitHub</span>
             </button>
             <button 
               onClick={() => onNavigate && onNavigate('inspiring')}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 font-medium"
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 font-medium text-sm"
             >
-              <Brain size={20} />
+              <Brain size={18} />
               <span>开始深度投研</span>
             </button>
           </div>
         </motion.div>
 
+        {/* Sector Analysis Card */}
+        <SectorFlowCard />
+
         {/* Core Modules (Big Cards) */}
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16"
-        >
-          {coreModules.map((module) => (
-            <motion.div
-              key={module.id}
-              variants={itemVariants}
-              onClick={() => onNavigate && onNavigate(module.id)}
-              className={`group relative overflow-hidden rounded-3xl bg-slate-800/50 border border-slate-700/50 p-8 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-900/10 ${module.border}`}
-            >
-              <div className={`absolute inset-0 bg-gradient-to-br ${module.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-              
-              <div className="relative z-10 flex flex-col h-full">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="p-3 rounded-2xl bg-slate-900/50 border border-slate-700/50 group-hover:border-slate-600 transition-colors">
-                    {module.icon}
-                  </div>
-                  <div className="flex items-center gap-1 text-slate-500 text-sm font-medium group-hover:text-blue-400 transition-colors">
-                    <span>{module.action}</span>
-                    <ArrowRight size={16} />
-                  </div>
-                </div>
-                
-                <h3 className="text-2xl font-bold text-white mb-1 group-hover:text-blue-200 transition-colors">
-                  {module.title}
-                </h3>
-                <p className="text-sm text-blue-400/80 font-mono mb-4">{module.subtitle}</p>
-                
-                <p className="text-slate-400 leading-relaxed group-hover:text-slate-300 transition-colors">
-                  {module.description}
-                </p>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
 
         {/* Functional Modules (Grid) */}
         <div className="space-y-6">

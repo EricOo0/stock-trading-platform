@@ -146,6 +146,117 @@ class AkShareTool:
             logger.error(f"AkShare get_financial_indicators failed: {e}")
             return self._empty_indicators()
 
+    # ========================== Sector Data ==========================
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+    def get_sector_fund_flow_rank(self) -> List[Dict[str, Any]]:
+        """Get sector fund flow ranking (hot/cold sectors)."""
+        try:
+            # 东方财富-行业资金流
+            df = ak.stock_fund_flow_industry(symbol="即时")
+            if df.empty: return []
+            
+            # Columns usually: 序号, 行业, 行业指数, 行业-涨跌幅, 流入资金, 流出资金, 净额, 公司家数, 领涨股, 领涨股-涨跌幅, 当前价
+            rankings = []
+            for _, row in df.iterrows():
+                rankings.append({
+                    "rank": int(row.get('序号', 0)),
+                    "name": str(row.get('行业', '')),
+                    "change_percent": self._safe_get(row, '行业-涨跌幅'),
+                    "flow_in": self._safe_get(row, '流入资金'),
+                    "flow_out": self._safe_get(row, '流出资金'),
+                    "net_flow": self._safe_get(row, '净额'),
+                    "company_count": int(row.get('公司家数', 0)),
+                    "leading_stock": str(row.get('领涨股', '')),
+                    "leading_stock_change": self._safe_get(row, '领涨股-涨跌幅')
+                })
+            return rankings
+        except Exception as e:
+            logger.error(f"AkShare get_sector_fund_flow_rank failed: {e}")
+            return []
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+    def get_sector_components(self, sector_name: str) -> List[Dict[str, Any]]:
+        """Get components stocks of a sector."""
+        try:
+            # 东方财富-行业板块-成份股
+            df = ak.stock_board_industry_cons_em(symbol=sector_name)
+            if df.empty: return []
+            
+            # Columns usually: 序号, 代码, 名称, 最新价, 涨跌幅, 涨跌额, 成交量, 成交额, 振幅, 最高, 最低, 今开, 昨收, 换手率, 市盈率-动态, 市净率
+            components = []
+            for _, row in df.iterrows():
+                components.append({
+                    "symbol": str(row.get('代码', '')),
+                    "name": str(row.get('名称', '')),
+                    "price": self._safe_get(row, '最新价'),
+                    "change_percent": self._safe_get(row, '涨跌幅'),
+                    "volume": self._safe_get(row, '成交量'),
+                    "amount": self._safe_get(row, '成交额'),
+                    "turnover_rate": self._safe_get(row, '换手率'),
+                    "pe": self._safe_get(row, '市盈率-动态'),
+                    "pb": self._safe_get(row, '市净率')
+                })
+            return components
+        except Exception as e:
+            logger.error(f"AkShare get_sector_components failed for {sector_name}: {e}")
+            return []
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+    def get_concept_fund_flow_rank(self) -> List[Dict[str, Any]]:
+        """Get concept board fund flow ranking."""
+        try:
+            # 东方财富-概念资金流
+            df = ak.stock_fund_flow_concept(symbol="即时")
+            if df.empty: return []
+            
+            # Columns usually: 序号, 行业, 行业指数, 行业-涨跌幅, 流入资金, 流出资金, 净额, 公司家数, 领涨股, 领涨股-涨跌幅, 当前价
+            # Note: For concept fund flow, column '行业' actually means '概念名称'
+            rankings = []
+            for _, row in df.iterrows():
+                rankings.append({
+                    "rank": int(row.get('序号', 0)),
+                    "name": str(row.get('行业', '')),
+                    "change_percent": self._safe_get(row, '行业-涨跌幅'),
+                    "flow_in": self._safe_get(row, '流入资金'),
+                    "flow_out": self._safe_get(row, '流出资金'),
+                    "net_flow": self._safe_get(row, '净额'),
+                    "company_count": int(row.get('公司家数', 0)),
+                    "leading_stock": str(row.get('领涨股', '')),
+                    "leading_stock_change": self._safe_get(row, '领涨股-涨跌幅')
+                })
+            return rankings
+        except Exception as e:
+            logger.error(f"AkShare get_concept_fund_flow_rank failed: {e}")
+            return []
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+    def get_concept_components(self, sector_name: str) -> List[Dict[str, Any]]:
+        """Get components stocks of a concept board."""
+        try:
+            # 东方财富-概念板块-成份股
+            df = ak.stock_board_concept_cons_em(symbol=sector_name)
+            if df.empty: return []
+            
+            # Columns usually: 序号, 代码, 名称, 最新价, 涨跌幅, 涨跌额, 成交量, 成交额, 振幅, 最高, 最低, 今开, 昨收, 换手率, 市盈率-动态, 市净率
+            components = []
+            for _, row in df.iterrows():
+                components.append({
+                    "symbol": str(row.get('代码', '')),
+                    "name": str(row.get('名称', '')),
+                    "price": self._safe_get(row, '最新价'),
+                    "change_percent": self._safe_get(row, '涨跌幅'),
+                    "volume": self._safe_get(row, '成交量'),
+                    "amount": self._safe_get(row, '成交额'),
+                    "turnover_rate": self._safe_get(row, '换手率'),
+                    "pe": self._safe_get(row, '市盈率-动态'),
+                    "pb": self._safe_get(row, '市净率')
+                })
+            return components
+        except Exception as e:
+            logger.error(f"AkShare get_concept_components failed for {sector_name}: {e}")
+            return []
+
     # ========================== Macro Data ==========================
     
     @retry(stop=stop_after_attempt(3))

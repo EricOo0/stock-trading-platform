@@ -5,8 +5,9 @@ import AnalysisPanel from '../components/TechnicalAnalysis/AnalysisPanel';
 import IndicatorSelector from '../components/TechnicalAnalysis/IndicatorSelector';
 
 const TechnicalAnalysisPage: React.FC = () => {
-    const [symbol, setSymbol] = useState('AAPL');
+    const [symbol, setSymbol] = useState('');
     const [loading, setLoading] = useState(false);
+    const [mode, setMode] = useState<'ANALYSIS' | 'REVIEW'>('ANALYSIS');
     const [error, setError] = useState<string | null>(null);
     const [data, setData] = useState<StockData[]>([]);
     const [period, setPeriod] = useState('1y');
@@ -28,6 +29,8 @@ const TechnicalAnalysisPage: React.FC = () => {
     const aiAbortControllerRef = useRef<AbortController | null>(null);
 
     const fetchData = async () => {
+        if (!symbol) return;
+
         // Cancel previous request
         if (fetchAbortControllerRef.current) {
             fetchAbortControllerRef.current.abort();
@@ -77,12 +80,14 @@ const TechnicalAnalysisPage: React.FC = () => {
         setAiReasoning('');
 
         try {
-            const response = await fetch('/api/agent/technical/analyze', {
+            const endpoint = mode === 'REVIEW' ? '/api/agent/review/analyze' : '/api/agent/technical/analyze';
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     symbol: symbol,
-                    session_id: `tech-${Date.now()}`
+                    session_id: `${mode.toLowerCase()}-${Date.now()}`,
+                    user_id: "user" // Add user_id for Review Agent
                 }),
                 signal
             });
@@ -251,8 +256,28 @@ const TechnicalAnalysisPage: React.FC = () => {
                     <p className="text-slate-400">AI-Enhanced Technical Research Platform</p>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <form onSubmit={handleSearch} className="flex gap-2">
+                <div className="flex flex-col gap-4 items-end">
+                    <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700 w-fit">
+                        <button
+                            onClick={() => setMode('ANALYSIS')}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                                mode === 'ANALYSIS' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                            }`}
+                        >
+                            实时分析
+                        </button>
+                        <button
+                            onClick={() => setMode('REVIEW')}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                                mode === 'REVIEW' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                            }`}
+                        >
+                            每日复盘
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <form onSubmit={handleSearch} className="flex gap-2">
                         <div className="relative">
                             <input
                                 type="text"
@@ -285,6 +310,7 @@ const TechnicalAnalysisPage: React.FC = () => {
                         ))}
                     </div>
                 </div>
+                </div>
             </header>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
@@ -300,6 +326,12 @@ const TechnicalAnalysisPage: React.FC = () => {
                         {/* Skeletons */}
                         <div className="h-32 bg-slate-800 rounded-xl border border-slate-700"></div>
                         <div className="h-[500px] bg-slate-800 rounded-xl border border-slate-700"></div>
+                    </div>
+                ) : !symbol ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-500">
+                        <Search size={48} className="mb-4 opacity-50" />
+                        <h2 className="text-xl font-medium mb-2">Enter a stock symbol to start {mode === 'REVIEW' ? 'Review' : 'Analysis'}</h2>
+                        <p>Search for any US/HK/CN stock code (e.g. AAPL, 00700, 600519)</p>
                     </div>
                 ) : (
                     <>

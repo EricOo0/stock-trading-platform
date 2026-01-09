@@ -130,5 +130,62 @@ class MarketService:
             "timestamp": datetime.now().isoformat()
         }
 
+    # ========================== Sector Analysis ==========================
+
+    def get_sector_fund_flow_ranking(self, sort_by: str = "net_flow", limit: int = 10, sector_type: str = "industry") -> List[Dict[str, Any]]:
+        """
+        Get sector ranking based on fund flow.
+        sort_by: "net_flow" (hot), "net_flow_asc" (cold), "rise_fall" (gainers)
+        sector_type: "industry" (default) or "concept"
+        """
+        if sector_type == "concept":
+            rankings = self.tools.akshare.get_concept_fund_flow_rank()
+        else:
+            rankings = self.tools.akshare.get_sector_fund_flow_rank()
+            
+        if not rankings:
+            return []
+            
+        if sort_by == "net_flow":
+            # Sort by net_flow desc (Hot)
+            rankings.sort(key=lambda x: x.get("net_flow", 0), reverse=True)
+        elif sort_by == "net_flow_asc":
+             # Sort by net_flow asc (Cold)
+             rankings.sort(key=lambda x: x.get("net_flow", 0), reverse=False)
+        elif sort_by == "rise_fall":
+            rankings.sort(key=lambda x: x.get("change_percent", 0), reverse=True)
+            
+        return rankings[:limit]
+
+    def get_hot_sectors(self, limit: int = 10, sector_type: str = "industry") -> List[Dict[str, Any]]:
+        """Get sectors with highest net fund inflow."""
+        return self.get_sector_fund_flow_ranking(sort_by="net_flow", limit=limit, sector_type=sector_type)
+
+    def get_cold_sectors(self, limit: int = 10, sector_type: str = "industry") -> List[Dict[str, Any]]:
+        """Get sectors with highest net fund outflow."""
+        return self.get_sector_fund_flow_ranking(sort_by="net_flow_asc", limit=limit, sector_type=sector_type)
+
+    def get_sector_details(self, sector_name: str, sort_by: str = "amount", limit: int = 5, sector_type: str = "industry") -> Dict[str, Any]:
+        """
+        Get details of a sector including top stocks.
+        """
+        if sector_type == "concept":
+            components = self.tools.akshare.get_concept_components(sector_name)
+        else:
+            components = self.tools.akshare.get_sector_components(sector_name)
+            
+        if not components:
+            return {"error": f"Sector {sector_name} not found or empty"}
+            
+        if sort_by == "amount":
+            components.sort(key=lambda x: x.get("amount", 0), reverse=True)
+        elif sort_by == "percent":
+            components.sort(key=lambda x: x.get("change_percent", 0), reverse=True)
+            
+        return {
+            "sector_name": sector_name,
+            "stocks": components[:limit]
+        }
+
 market_service = MarketService()
 

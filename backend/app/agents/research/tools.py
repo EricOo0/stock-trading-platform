@@ -1,3 +1,4 @@
+from backend.app.agents.research.models import DeepResearchReport
 from langchain_core.tools import tool
 import asyncio
 import logging
@@ -156,6 +157,44 @@ async def get_discussion_wordcloud(query: str) -> str:
         return f"Error getting word cloud data: {str(e)}"
 
 
+@tool
+async def get_sector_fund_flow(limit: int = 10, sort_by: str = "hot", sector_type: str = "industry") -> str:
+    """
+    Get A-share sector fund flow ranking to identify hot or cold sectors.
+    Args:
+        limit: Number of sectors to return (default 10).
+        sort_by: 'hot' (highest net inflow) or 'cold' (highest net outflow).
+        sector_type: 'industry' (default) or 'concept'. Use 'concept' to find hot themes/topics.
+    """
+    from backend.app.services.market_service import market_service
+    try:
+        if sort_by == "cold":
+            data = await asyncio.to_thread(market_service.get_cold_sectors, limit, sector_type)
+        else:
+            data = await asyncio.to_thread(market_service.get_hot_sectors, limit, sector_type)
+            
+        return json.dumps(data, ensure_ascii=False)
+    except Exception as e:
+        return f"Error getting sector fund flow: {str(e)}"
+
+
+@tool
+async def get_sector_top_stocks(sector_name: str, limit: int = 5, sector_type: str = "industry") -> str:
+    """
+    Get top component stocks (leaders) of a specific A-share sector.
+    Args:
+        sector_name: Exact name of the sector (e.g. '软件开发', 'Sora概念').
+        limit: Number of stocks to return (default 5).
+        sector_type: 'industry' (default) or 'concept'. Must match the type of sector_name.
+    """
+    from backend.app.services.market_service import market_service
+    try:
+        data = await asyncio.to_thread(market_service.get_sector_details, sector_name, sort_by="amount", limit=limit, sector_type=sector_type)
+        return json.dumps(data, ensure_ascii=False)
+    except Exception as e:
+        return f"Error getting sector stocks: {str(e)}"
+
+
 # Export tools list
 tools = [
     search_google,
@@ -165,4 +204,39 @@ tools = [
     get_financial_metrics,
     get_company_report,
     get_discussion_wordcloud,
+    get_sector_fund_flow,
+    get_sector_top_stocks,
 ]
+
+
+@tool
+async def submit_research_report(
+    signals: List[Dict[str, str]],
+    analysis: str,
+    outlook: Dict[str, Any],
+    references: List[Dict[str, str]]
+) -> str:
+    """
+    Submit the FINAL Deep Research Report. You MUST call this tool when you have completed your analysis.
+
+    Args:
+        signals: List of key signals, e.g. [{"condition": "High Volume", "result": "Buy"}].
+        analysis: The main text summary of your trend analysis (1-2 paragraphs).
+        outlook: The market outlook, e.g. {"score": 80, "label": "Optimism"}. Score 0-100.
+        references: List of sources, e.g. [{"id": "1", "title": "News Title", "source": "Bloomberg", "url": "..."}].
+    """
+    try:
+        # Validate using Pydantic model
+        report = DeepResearchReport(
+            signals=signals,
+            analysis=analysis,
+            outlook=outlook,
+            references=references
+        )
+        # Return the JSON string. The callback will catch this specific tool and parse it.
+        return report.json()
+    except Exception as e:
+        return f"Error submitting report: {str(e)}. Please ensure your arguments match the required schema."
+
+# Add to tools list
+tools.append(submit_research_report)

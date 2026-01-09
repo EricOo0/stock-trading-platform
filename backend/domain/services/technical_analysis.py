@@ -66,13 +66,86 @@ class TechnicalAnalysisTool:
             }
         }
 
+    def calculate_td_sequential(self, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Calculate TD Sequential (Tom DeMark) indicators.
+        Focuses on Setup phase (9 counts).
+        """
+        if not candles or len(candles) < 15:
+            return {"status": "insufficient_data"}
+
+        try:
+            df = pd.DataFrame(candles)
+            if 'close' not in df.columns:
+                 # Normalize if needed
+                 col_map = {c: c.lower() for c in df.columns}
+                 df = df.rename(columns=col_map)
+            
+            close = df['close'].astype(float)
+            
+            # TD Setup: Compare Close with Close 4 periods ago
+            # Buy Setup: Close < Close[i-4] for 9 consecutive bars
+            # Sell Setup: Close > Close[i-4] for 9 consecutive bars
+            
+            shift_4 = close.shift(4)
+            
+            buy_setup_count = 0
+            sell_setup_count = 0
+            
+            # Iterate backwards from the latest candle
+            # We want to know the status of the *current* sequence
+            
+            # 1. Check Buy Setup (Bearish exhaustion -> Bullish reversal)
+            # Need 9 consecutive Close < Close_minus_4
+            current_idx = len(close) - 1
+            for i in range(current_idx, current_idx - 9, -1):
+                if i < 4: break
+                if close.iloc[i] < shift_4.iloc[i]:
+                    buy_setup_count += 1
+                else:
+                    break
+            
+            # 2. Check Sell Setup (Bullish exhaustion -> Bearish reversal)
+            # Need 9 consecutive Close > Close_minus_4
+            for i in range(current_idx, current_idx - 9, -1):
+                if i < 4: break
+                if close.iloc[i] > shift_4.iloc[i]:
+                    sell_setup_count += 1
+                else:
+                    break
+            
+            # Determine status
+            td_status = "neutral"
+            count = 0
+            
+            if buy_setup_count > 0:
+                td_status = "buy_setup"
+                count = buy_setup_count
+            elif sell_setup_count > 0:
+                td_status = "sell_setup"
+                count = sell_setup_count
+                
+            # Perfect 9 check
+            is_perfect = (count == 9)
+            
+            return {
+                "setup_type": td_status,
+                "count": count,
+                "is_perfect_9": is_perfect,
+                "description": f"TD {td_status.replace('_', ' ').title()} Count: {count}"
+            }
+
+        except Exception as e:
+            logger.error(f"TD Sequential calculation failed: {e}")
+            return {"error": str(e)}
+
     def calculate_advanced_indicators(self, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Calculate comprehensive technical indicators for Agent Context.
         Includes: EMA, ATR, OBV, Pivot Points, Price Action.
         """
-        if not candles or len(candles) < 30:
-            return {"error": "Insufficient data"}
+        if not candles or len(candles) < 5:
+            return {"error": "Insufficient data (minimum 5 candles required)"}
             
         try:
             # Convert to DataFrame
@@ -102,99 +175,154 @@ class TechnicalAnalysisTool:
             low = df['low']
             vol = df['volume']
             
+            # Helper for safe iloc
+            def get_last(series):
+                if len(series) > 0:
+                    val = series.iloc[-1]
+                    if pd.isna(val): return 0
+                    return val
+                return 0
+
             # --- 1. Trend Indicators ---
             # SMA
-            ma5 = close.rolling(window=5).mean().iloc[-1]
-            ma10 = close.rolling(window=10).mean().iloc[-1]
-            ma20 = close.rolling(window=20).mean().iloc[-1]
-            ma60 = close.rolling(window=60).mean().iloc[-1]
+            ma5 = get_last(close.rolling(window=5).mean())
+            ma10 = get_last(close.rolling(window=10).mean())
+            ma20 = get_last(close.rolling(window=20).mean())
+            ma60 = get_last(close.rolling(window=60).mean())
             
             # EMA (Exponential) - More sensitive
-            ema12 = close.ewm(span=12, adjust=False).mean().iloc[-1]
-            ema26 = close.ewm(span=26, adjust=False).mean().iloc[-1]
+            ema12 = get_last(close.ewm(span=12, adjust=False).mean())
+            ema26 = get_last(close.ewm(span=26, adjust=False).mean())
             
             # Trend Status
             ma_status = "sideways"
-            if ma5 > ma10 > ma20 > ma60: ma_status = "bullish_alignment"
-            elif ma5 < ma10 < ma20 < ma60: ma_status = "bearish_alignment"
+            if ma5 > 0 and ma10 > 0 and ma20 > 0 and ma60 > 0:
+                if ma5 > ma10 > ma20 > ma60: ma_status = "bullish_alignment"
+                elif ma5 < ma10 < ma20 < ma60: ma_status = "bearish_alignment"
 
             # --- 2. Momentum Indicators ---
             # RSI (14)
-            delta = close.diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / loss
-            rsi = 100 - (100 / (1 + rs))
-            rsi_val = rsi.iloc[-1]
+            rsi_val = 50
+            try:
+                delta = close.diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rs = gain / loss
+                rsi = 100 - (100 / (1 + rs))
+                rsi_val = get_last(rsi)
+                if pd.isna(rsi_val): rsi_val = 50
+            except: pass
             
             # MACD (12, 26, 9)
-            exp1 = close.ewm(span=12, adjust=False).mean()
-            exp2 = close.ewm(span=26, adjust=False).mean()
-            macd_dif = exp1 - exp2
-            macd_dea = macd_dif.ewm(span=9, adjust=False).mean()
-            macd_hist = 2 * (macd_dif - macd_dea)
-            
-            dif_val = macd_dif.iloc[-1]
-            dea_val = macd_dea.iloc[-1]
-            hist_val = macd_hist.iloc[-1]
-            
-            # MACD Signal
+            dif_val = 0
+            dea_val = 0
+            hist_val = 0
             cross_signal = "neutral"
-            if len(macd_dif) > 2:
-                if macd_dif.iloc[-1] > macd_dea.iloc[-1] and macd_dif.iloc[-2] <= macd_dea.iloc[-2]:
-                    cross_signal = "golden_cross"
-                elif macd_dif.iloc[-1] < macd_dea.iloc[-1] and macd_dif.iloc[-2] >= macd_dea.iloc[-2]:
-                    cross_signal = "death_cross"
-                elif dif_val > dea_val:
-                    cross_signal = "bullish_zone"
-                else:
-                    cross_signal = "bearish_zone"
+            
+            try:
+                exp1 = close.ewm(span=12, adjust=False).mean()
+                exp2 = close.ewm(span=26, adjust=False).mean()
+                macd_dif = exp1 - exp2
+                macd_dea = macd_dif.ewm(span=9, adjust=False).mean()
+                macd_hist = 2 * (macd_dif - macd_dea)
+                
+                dif_val = get_last(macd_dif)
+                dea_val = get_last(macd_dea)
+                hist_val = get_last(macd_hist)
+                
+                # MACD Signal
+                if len(macd_dif) > 2:
+                    if macd_dif.iloc[-1] > macd_dea.iloc[-1] and macd_dif.iloc[-2] <= macd_dea.iloc[-2]:
+                        cross_signal = "golden_cross"
+                    elif macd_dif.iloc[-1] < macd_dea.iloc[-1] and macd_dif.iloc[-2] >= macd_dea.iloc[-2]:
+                        cross_signal = "death_cross"
+                    elif dif_val > dea_val:
+                        cross_signal = "bullish_zone"
+                    else:
+                        cross_signal = "bearish_zone"
+            except: pass
             
             # --- 3. Volatility ---
             # Bollinger Bands
-            std20 = close.rolling(window=20).std()
-            ma20_series = close.rolling(window=20).mean()
-            upper = ma20_series + 2 * std20
-            lower = ma20_series - 2 * std20
-            width_pct = (upper - lower) / ma20_series
-            
-            curr_price = close.iloc[-1]
+            upper_val = 0
+            lower_val = 0
+            width_pct_val = 0
             bb_pos = "within_bands"
-            if curr_price > upper.iloc[-1]: bb_pos = "above_upper"
-            elif curr_price < lower.iloc[-1]: bb_pos = "below_lower"
+
+            try:
+                std20 = close.rolling(window=20).std()
+                ma20_series = close.rolling(window=20).mean()
+                upper = ma20_series + 2 * std20
+                lower = ma20_series - 2 * std20
+                width_pct = (upper - lower) / ma20_series
+                
+                upper_val = get_last(upper)
+                lower_val = get_last(lower)
+                width_pct_val = get_last(width_pct)
+                
+                curr_price = get_last(close)
+                if upper_val > 0 and curr_price > upper_val: bb_pos = "above_upper"
+                elif lower_val > 0 and curr_price < lower_val: bb_pos = "below_lower"
+            except: pass
             
             # ATR (14)
-            high_low = high - low
-            high_close = (high - close.shift()).abs()
-            low_close = (low - close.shift()).abs()
-            ranges = pd.concat([high_low, high_close, low_close], axis=1)
-            true_range = ranges.max(axis=1)
-            atr = true_range.rolling(window=14).mean().iloc[-1]
+            atr = 0
+            try:
+                high_low = high - low
+                high_close = (high - close.shift()).abs()
+                low_close = (low - close.shift()).abs()
+                ranges = pd.concat([high_low, high_close, low_close], axis=1)
+                true_range = ranges.max(axis=1)
+                atr = get_last(true_range.rolling(window=14).mean())
+            except: pass
 
             # --- 4. Volume Analysis ---
             # OBV
-            obv_change = pd.Series(0, index=df.index)
-            obv_change.loc[close > close.shift()] = vol
-            obv_change.loc[close < close.shift()] = -vol # Use negative for obv calculation logic
-            obv = obv_change.cumsum()
-            
             obv_slope = "flat"
-            if len(obv) > 5:
-                if obv.iloc[-1] > obv.iloc[-5]: obv_slope = "rising"
-                elif obv.iloc[-1] < obv.iloc[-5]: obv_slope = "falling"
+            try:
+                obv_change = pd.Series(0, index=df.index)
+                obv_change.loc[close > close.shift()] = vol
+                obv_change.loc[close < close.shift()] = -vol # Use negative for obv calculation logic
+                obv = obv_change.cumsum()
+                
+                if len(obv) > 5:
+                    if obv.iloc[-1] > obv.iloc[-5]: obv_slope = "rising"
+                    elif obv.iloc[-1] < obv.iloc[-5]: obv_slope = "falling"
+            except: pass
 
             # Volume MA
-            vol_ma5 = vol.rolling(window=5).mean().iloc[-1]
-            vol_ratio = vol.iloc[-1] / vol_ma5 if vol_ma5 > 0 else 0
+            vol_ratio = 0
+            try:
+                vol_ma5 = get_last(vol.rolling(window=5).mean())
+                vol_ratio = vol.iloc[-1] / vol_ma5 if vol_ma5 > 0 else 0
+            except: pass
 
             # --- 5. Support / Resistance (Pivot Points) ---
-            prev = df.iloc[-2] if len(df) > 1 else df.iloc[-1]
-            pp = (prev['high'] + prev['low'] + prev['close']) / 3
-            r1 = 2 * pp - prev['low']
-            s1 = 2 * pp - prev['high']
+            pp = r1 = s1 = 0
+            try:
+                prev = df.iloc[-2] if len(df) > 1 else df.iloc[-1]
+                pp = (prev['high'] + prev['low'] + prev['close']) / 3
+                r1 = 2 * pp - prev['low']
+                s1 = 2 * pp - prev['high']
+            except: pass
             
+            # Use max/min directly as they return scalars
             high_20d = high.tail(20).max()
             low_20d = low.tail(20).min()
+            
+            # Handle empty/nan/numpy types safely
+            def safe_float(val):
+                try:
+                    if pd.isna(val): return 0.0
+                    return float(val)
+                except: return 0.0
+
+            high_20d = safe_float(high_20d)
+            low_20d = safe_float(low_20d)
+            
+            # Fallback if 0 (though 0 might be valid for low, but unlikely for stock price)
+            if high_20d == 0: high_20d = safe_float(get_last(high))
+            if low_20d == 0: low_20d = safe_float(get_last(low))
 
             # --- 6. Recent Price Action ---
             recent_data = df.tail(15).copy()
@@ -214,10 +342,16 @@ class TechnicalAnalysisTool:
                     "volume": float(row['volume'])
                 })
 
+            # --- 7. Review Specific Indicators ---
+            td_seq = self.calculate_td_sequential(candles)
+            
+            curr_price = get_last(close)
+            prev_close = close.iloc[-2] if len(close) > 1 else curr_price
+
             context = {
                 "market_status": {
                     "current_price": round(curr_price, 2),
-                    "daily_change_pct": round((curr_price - close.iloc[-2]) / close.iloc[-2] * 100, 2) if len(close) > 1 else 0,
+                    "daily_change_pct": round((curr_price - prev_close) / prev_close * 100, 2) if prev_close > 0 else 0,
                     "volume_ratio": round(vol_ratio, 2)
                 },
                 "recent_price_action": price_action,
@@ -247,16 +381,17 @@ class TechnicalAnalysisTool:
                     "volatility": {
                         "atr_14": round(atr, 2),
                         "boll": {
-                            "upper": round(upper.iloc[-1], 2),
-                            "lower": round(lower.iloc[-1], 2),
-                            "width_pct": round(width_pct.iloc[-1], 4),
+                            "upper": round(upper_val, 2),
+                            "lower": round(lower_val, 2),
+                            "width_pct": round(width_pct_val, 4) if not pd.isna(width_pct_val) else 0,
                             "position": bb_pos
                         }
                     },
                     "volume_analysis": {
                         "obv_slope": obv_slope,
                         "current_vol_vs_ma5": round(vol_ratio, 2)
-                    }
+                    },
+                    "td_sequential": td_seq
                 },
                 "support_resistance": {
                     "pivot_points": {

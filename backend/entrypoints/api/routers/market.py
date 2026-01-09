@@ -146,3 +146,50 @@ async def query_market_data(payload: Dict[str, Any] = Body(...)):
             'data_source': 'real'
         }
     return clean_nans(response)
+
+@router.get("/sectors/flow")
+async def get_sectors_flow(
+    type: str = Query("hot", enum=["hot", "cold"]), 
+    limit: int = 10,
+    sector_type: str = Query("industry", enum=["industry", "concept"])
+):
+    """
+    Get sector fund flow ranking.
+    type: 'hot' (net inflow) or 'cold' (net outflow)
+    sector_type: 'industry' or 'concept'
+    """
+    import asyncio
+    if type == "hot":
+        data = await asyncio.to_thread(market_service.get_hot_sectors, limit, sector_type)
+    else:
+        data = await asyncio.to_thread(market_service.get_cold_sectors, limit, sector_type)
+        
+    return clean_nans({
+        "status": "success",
+        "type": type,
+        "sector_type": sector_type,
+        "data": data,
+        "timestamp": datetime.now().isoformat()
+    })
+
+@router.get("/sectors/{name}/stocks")
+async def get_sector_stocks(
+    name: str, 
+    limit: int = 5,
+    sort_by: str = Query("amount", enum=["amount", "percent"]),
+    sector_type: str = Query("industry", enum=["industry", "concept"])
+):
+    """
+    Get top stocks in a sector.
+    """
+    import asyncio
+    data = await asyncio.to_thread(market_service.get_sector_details, name, sort_by, limit, sector_type)
+    
+    if "error" in data:
+         raise HTTPException(status_code=404, detail=data["error"])
+
+    return clean_nans({
+        "status": "success",
+        "data": data,
+        "timestamp": datetime.now().isoformat()
+    })
