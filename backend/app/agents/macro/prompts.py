@@ -26,12 +26,12 @@ MACRO_ANALYSIS_INSTRUCTION = """
     "macro_health_score": 72,  // 0-100, 综合宏观健康度评分
     "macro_health_label": "偏乐观",  // "危险" | "偏悲观" | "中性" | "偏乐观" | "非常乐观"
     "key_metrics": [
-        {"name": "GDP", "value": "+6.5%", "trend": "UP"},  // trend: "UP" | "NEUTRAL" | "DOWN"
-        {"name": "CPI", "value": "2.1%", "trend": "NEUTRAL"},
-        {"name": "利率", "value": "4.5%", "trend": "DOWN"},
-        {"name": "PMI", "value": "51.2", "trend": "UP"},
-        {"name": "失业率", "value": "4.8%", "trend": "NEUTRAL"},
-        {"name": "M2增速", "value": "9.2%", "trend": "UP"}
+        {"name": "GDP (中国)", "value": "+6.5%", "trend": "UP"},  // trend: "UP" | "NEUTRAL" | "DOWN"
+        {"name": "CPI (中国)", "value": "2.1%", "trend": "NEUTRAL"},
+        {"name": "利率 (美国)", "value": "4.5%", "trend": "DOWN"},
+        {"name": "PMI (中国)", "value": "51.2", "trend": "UP"},
+        {"name": "失业率 (美国)", "value": "4.8%", "trend": "NEUTRAL"},
+        {"name": "M2增速 (中国)", "value": "9.2%", "trend": "UP"}
     ],
     "signal": "BULLISH",  // "BULLISH" | "BEARISH" | "NEUTRAL", 对风险资产(股票)的宏观态度
     "confidence": 0.75,   // 0.0 到 1.0

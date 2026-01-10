@@ -99,11 +99,15 @@ const MacroIndicatorCard: React.FC<MacroIndicatorCardProps> = ({
 
     // SVG 仪表盘
     const renderGauge = () => {
-        const angle = (macroHealthScore / 100) * 180 - 90; // -90 to 90 degrees
+        // 半圆仪表盘：0分在左边(180°)，100分在右边(0°)
+        // 角度范围：180° → 0° (从左到右)
+        const angle = 180 - (macroHealthScore / 100) * 180; // 180 to 0 degrees
         const radians = (angle * Math.PI) / 180;
-        const needleLength = 35;
-        const needleX = 50 + needleLength * Math.cos(radians);
-        const needleY = 50 + needleLength * Math.sin(radians);
+        const needleLength = 32;
+        const centerX = 50;
+        const centerY = 50;
+        const needleX = centerX + needleLength * Math.cos(radians);
+        const needleY = centerY - needleLength * Math.sin(radians); // Y轴向上为负
 
         return (
             <svg viewBox="0 0 100 60" className="w-32 h-20">
@@ -134,15 +138,15 @@ const MacroIndicatorCard: React.FC<MacroIndicatorCardProps> = ({
                 />
                 {/* 指针 */}
                 <line
-                    x1="50"
-                    y1="50"
+                    x1={centerX}
+                    y1={centerY}
                     x2={needleX}
                     y2={needleY}
                     stroke="white"
-                    strokeWidth="2"
+                    strokeWidth="2.5"
                     strokeLinecap="round"
                 />
-                <circle cx="50" cy="50" r="4" fill="white" />
+                <circle cx={centerX} cy={centerY} r="4" fill="white" />
             </svg>
         );
     };

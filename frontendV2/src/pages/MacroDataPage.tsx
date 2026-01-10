@@ -193,24 +193,32 @@ const MacroDataPage: React.FC = () => {
                 const jsonStr = jsonMatch ? jsonMatch[0] : cleanText;
 
                 const result = JSON.parse(jsonStr);
+                console.log("[MacroPage] Parsed AI result:", result);
 
                 setMacroData({
-                    macroHealthScore: result.macro_health_score,
-                    macroHealthLabel: result.macro_health_label,
-                    keyMetrics: result.key_metrics,
-                    signal: result.signal,
-                    confidence: result.confidence,
-                    marketCycle: result.market_cycle,
-                    marketImplication: result.market_implication,
-                    riskWarning: result.risk_warning,
-                    strategy: result.strategy,
-                    summary: result.summary,
-                    analysis: result.analysis,
-                    keyFactors: result.key_factors
+                    macroHealthScore: result.macro_health_score ?? 50,
+                    macroHealthLabel: result.macro_health_label || '中性',
+                    keyMetrics: result.key_metrics || [],
+                    signal: result.signal || null,
+                    confidence: result.confidence ?? 0,
+                    marketCycle: result.market_cycle || '',
+                    marketImplication: result.market_implication || result.summary || '分析已完成',
+                    riskWarning: result.risk_warning || '',
+                    strategy: result.strategy || '',
+                    summary: result.summary || '',
+                    analysis: result.analysis || '',
+                    keyFactors: result.key_factors || { positive: [], negative: [] }
                 });
             } catch (e) {
-                console.warn("Macro JSON parse failed, utilizing raw text", e);
-                // Keep the incrementally accumulated text as reasoning (handled below if result is used)
+                console.warn("Macro JSON parse failed:", e, "fullText:", fullText.slice(0, 500));
+                // Fallback: use raw text as analysis
+                setMacroData(prev => ({
+                    ...prev,
+                    macroHealthScore: 50,
+                    macroHealthLabel: '分析完成',
+                    marketImplication: '请查看详细分析',
+                    analysis: fullText
+                }));
             }
 
         } catch (e) {
@@ -323,7 +331,7 @@ const MacroDataPage: React.FC = () => {
                 />
 
                 {/* Top Section: Data Table & Fed Watch (Global Only) */}
-                <div className="h-1/3 flex gap-6">
+                <div className="min-h-[280px] flex gap-6 shrink-0">
                     {/* Data Table */}
                     <div className={`bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden ${activeTab === 'Global' ? 'w-2/3' : 'w-full'}`}>
                         <div className="overflow-y-auto flex-1">
@@ -419,7 +427,7 @@ const MacroDataPage: React.FC = () => {
                 </div>
 
                 {/* Bottom Section: Chart */}
-                <div className="flex-1 bg-slate-800 rounded-xl border border-slate-700 p-6 flex flex-col overflow-hidden">
+                <div className="min-h-[400px] bg-slate-800 rounded-xl border border-slate-700 p-6 flex flex-col shrink-0">
                     {selectedIndicator ? (
                         <>
                             <div className="mb-4 flex items-center gap-3">
