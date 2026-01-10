@@ -1,28 +1,43 @@
 import logging
 import json
-import asyncio
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from backend.app.agents.macro.agent import create_macro_agent
-from backend.app.agents.macro.callbacks import MacroCallbackHandler
+import os
+from typing import AsyncGenerator
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_openai import ChatOpenAI
+from backend.infrastructure.config.loader import config
 from backend.app.registry import Tools
+from backend.app.agents.macro.prompts import MACRO_ANALYSIS_INSTRUCTION
 
 logger = logging.getLogger(__name__)
 
 class MacroAgentService:
     def __init__(self):
         self.tools = Tools()
-        self.session_service = InMemorySessionService()
+        
+        # Initialize LLM (aligned with ReportAnalysisTool pattern)
+        api_key = config.get_api_key("siliconflow") or config.get_api_key("openai") or os.getenv("SILICONFLOW_API_KEY") or os.getenv("OPENAI_API_KEY")
+        
+        # Determine base URL and Model
+        self.api_base = "https://api.siliconflow.cn/v1" if config.get_api_key("siliconflow") or os.getenv("SILICONFLOW_API_KEY") else "https://api.openai.com/v1"
+        self.model = "deepseek-ai/DeepSeek-V3.1-Terminus" if "siliconflow" in self.api_base else "gpt-4o"
+        
+        self.llm = ChatOpenAI(
+            model=self.model,
+            temperature=0.1, # Low temperature for consistent JSON output
+            base_url=self.api_base,
+            api_key=api_key or "dummy",
+            streaming=True
+        )
 
-    async def analyze_stream(self, session_id: str):
+    async def analyze_stream(self, session_id: str) -> AsyncGenerator[str, None]:
         """
         Generates macro analysis and streams the output.
         """
-        callback_handler = MacroCallbackHandler()
-        agent = create_macro_agent(callback_handler=callback_handler)
+        logger.info(f"Starting macro analysis stream for session {session_id}")
         
         # 1. Fetch Data
         try:
+            logger.info("Fetching macro data...")
             # China Data
             cn_gdp = self.tools.get_macro_data("china gdp")
             cn_cpi = self.tools.get_macro_data("china cpi")
@@ -45,44 +60,35 @@ class MacroAgentService:
                 "Market": { "US10Y": us10y, "VIX": vix, "DXY": dxy }
             }
             context_json = json.dumps(macro_context, indent=2, default=str)
-        except Exception as e:
-             logger.error(f"Data fetch error: {e}")
-             context_json = "{}" # Proceed with empty or return error? Proceed for resilience.
-        
-        # Prepare User and Session
-        user_id = "macro_user"
-        # Ensure session exists
-        try:
-             await self.session_service.create_session(
-                app_name="macro_app",
-                user_id=user_id,
-                session_id=session_id
-            )
-        except Exception:
-            pass # Session might already exist
-
-        runner = Runner(agent=agent, app_name="macro_app", session_service=self.session_service)
-        
-        try:
-            from google.genai import types
-            input_content = types.Content(role="user", parts=[types.Part(text=f"Current Macro Data Context:\n{context_json}")])
-
-            events = runner.run_async(user_id=user_id, session_id=session_id, new_message=input_content)
+            logger.info("Macro data fetched successfully.")
             
-            async for event in events:
-                # logger.info(f"raw event: {event}")
-                try:
-                    if hasattr(event, 'content') and event.content and event.content.parts:
-                        for part in event.content.parts:
-                            if hasattr(part, 'text') and part.text:
-                                logger.info(f"Yielding chunk: {part.text[:50]}...")
-                                yield json.dumps({"type": "agent_response", "content": part.text}) + "\n"
-                except Exception as e:
-                    logger.error(f"Error processing event: {e}")
-                    pass
-                     
         except Exception as e:
-            logger.error(f"Runner error: {e}")
+            logger.error(f"Data fetch error: {e}")
+            context_json = "{}" # Proceed with empty or return error? Proceed for resilience.
+        
+        # 2. Construct Prompt
+        prompt = f"""
+{MACRO_ANALYSIS_INSTRUCTION}
+
+### 当前宏观数据 (Current Data Context)
+{context_json}
+"""
+        
+        # 3. Stream Response
+        try:
+            messages = [
+                SystemMessage(content="You are a professional macro-economic analyst."),
+                HumanMessage(content=prompt)
+            ]
+            
+            logger.info("Invoking LLM stream...")
+            async for chunk in self.llm.astream(messages):
+                if chunk.content:
+                    # Wrap in the format expected by frontend
+                    yield json.dumps({"type": "agent_response", "content": chunk.content}) + "\n"
+                    
+        except Exception as e:
+            logger.error(f"LLM stream error: {e}")
             yield json.dumps({"type": "error", "content": str(e)}) + "\n"
 
 macro_agent_service = MacroAgentService()

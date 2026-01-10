@@ -75,6 +75,62 @@ class MarketAPIService {
             return [];
         }
     }
+
+    // 获取市场智能前瞻 (流式)
+    async fetchMarketOutlook(onChunk: (content: string) => void): Promise<void> {
+        try {
+            const response = await fetch(`${this.baseURL}/agent/market/outlook`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({}) // Empty body for now
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to start analysis: ${response.statusText}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) return;
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
+                
+                // Process complete JSON objects
+                let boundary = buffer.indexOf('\n');
+                while (boundary !== -1) {
+                    const line = buffer.substring(0, boundary).trim();
+                    buffer = buffer.substring(boundary + 1);
+                    
+                    if (line) {
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.type === 'agent_response') {
+                                onChunk(data.content);
+                            } else if (data.type === 'error') {
+                                console.error('Stream error:', data.content);
+                                onChunk(`\n\n**Error:** ${data.content}`);
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse chunk:', line);
+                        }
+                    }
+                    boundary = buffer.indexOf('\n');
+                }
+            }
+        } catch (error) {
+            console.error('Market outlook analysis failed:', error);
+            onChunk('\n\n**Analysis failed due to network error.**');
+        }
+    }
 }
 
 export const marketService = new MarketAPIService();

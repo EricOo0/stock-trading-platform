@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, BarChart, Bar, Cell, LabelList, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
-import { ArrowUp, ArrowDown, Globe, BarChart2, DollarSign, Bot, Loader } from 'lucide-react';
+import { ArrowUp, ArrowDown, Globe, BarChart2, DollarSign, Bot, Loader, LayoutGrid, TrendingUp, RefreshCw } from 'lucide-react';
 import { macroAPI } from '../services/macroAPI';
 import type { MacroDataPoint } from '../services/macroAPI';
 import { ChartComponent } from '../components/ChartComponent';
 import MacroIndicatorCard from '../components/Macro/MacroIndicatorCard';
+import { SectorFlowCard } from '../components/Home/SectorFlowCard';
+import MarketAnalysisCard from '../components/MarketQuery/MarketAnalysisCard';
 
 interface IndicatorConfig {
     id: string; // ID sent to backend
@@ -12,11 +14,6 @@ interface IndicatorConfig {
     region: 'Global' | 'CN';
     category: string;
     unit: string;
-}
-
-interface IndicatorData extends IndicatorConfig {
-    history: MacroDataPoint[];
-    latest?: MacroDataPoint;
 }
 
 interface IndicatorData extends IndicatorConfig {
@@ -105,9 +102,12 @@ const fetchIndicator = async (config: IndicatorConfig): Promise<IndicatorData | 
 };
 
 const MacroDataPage: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'CN' | 'Global'>('CN');
+    const [activeTab, setActiveTab] = useState<'macro' | 'market'>('macro');
+    const [macroRegion, setMacroRegion] = useState<'CN' | 'Global'>('CN');
+    
     const [indicators, setIndicators] = useState<IndicatorData[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const [dataLoaded, setDataLoaded] = useState(false);
     const [selectedIndicator, setSelectedIndicator] = useState<IndicatorData | null>(null);
     const [fedProbData, setFedProbData] = useState<any>(null);
 
@@ -128,7 +128,6 @@ const MacroDataPage: React.FC = () => {
         keyFactors?: { positive: string[]; negative: string[] };
     }>({});
 
-    // const reasoningEndRef = React.useRef<HTMLDivElement>(null);  // Removed, unused
     const aiAbortControllerRef = React.useRef<AbortController | null>(null);
 
     const fetchAIAnalysis = async () => {
@@ -159,22 +158,16 @@ const MacroDataPage: React.FC = () => {
                 if (signal.aborted) break;
 
                 buffer += decoder.decode(value, { stream: true });
-                // console.log("Buffer update:", buffer.length);
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
                     if (!line.trim()) continue;
-                    // console.log("Processing line:", line);
                     try {
                         const event = JSON.parse(line);
-                        // console.log("Parsed event:", event);
                         if (event.type === 'agent_response') {
                             const newContent = event.content;
                             fullText += newContent;
-                            // Do not display raw JSON stream
-                            // Only display if we detect it's NOT JSON (unlikely with current prompt) 
-                            // or if we implement a stream parser later.
                         } else if (event.type === 'error') {
                             console.error("Agent returned error:", event.content);
                             setMacroData(prev => ({ ...prev, analysis: (prev.analysis || '') + `\n[Error: ${event.content}]` }));
@@ -183,17 +176,11 @@ const MacroDataPage: React.FC = () => {
                 }
             }
 
-            // Final Parsing to extract structured data if available
             try {
-                // Remove markdown code blocks if present
                 let cleanText = fullText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-                // Find JSON block
                 const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
                 const jsonStr = jsonMatch ? jsonMatch[0] : cleanText;
-
                 const result = JSON.parse(jsonStr);
-                console.log("[MacroPage] Parsed AI result:", result);
 
                 setMacroData({
                     macroHealthScore: result.macro_health_score ?? 50,
@@ -210,8 +197,7 @@ const MacroDataPage: React.FC = () => {
                     keyFactors: result.key_factors || { positive: [], negative: [] }
                 });
             } catch (e) {
-                console.warn("Macro JSON parse failed:", e, "fullText:", fullText.slice(0, 500));
-                // Fallback: use raw text as analysis
+                console.warn("Macro JSON parse failed:", e);
                 setMacroData(prev => ({
                     ...prev,
                     macroHealthScore: 50,
@@ -230,250 +216,299 @@ const MacroDataPage: React.FC = () => {
         }
     };
 
+    const loadData = async () => {
+        setLoading(true);
+        setDataLoaded(true);
+        const promises = INDICATORS_CONFIG.map(cfg => fetchIndicator(cfg));
+        const fedProbPromise = macroAPI.getFedImpliedProbability();
 
+        const [results, fedProb] = await Promise.all([
+            Promise.all(promises),
+            fedProbPromise
+        ]);
+
+        const validResults = results.filter((r): r is IndicatorData => r !== null);
+        setIndicators(validResults);
+
+        if (fedProb) {
+            setFedProbData(fedProb);
+        }
+
+        const defaultForTab = validResults.find(r => r.region === macroRegion);
+        if (defaultForTab) setSelectedIndicator(defaultForTab);
+
+        setLoading(false);
+    };
 
     useEffect(() => {
-        const loadData = async () => {
-            setLoading(true);
-            const promises = INDICATORS_CONFIG.map(cfg => fetchIndicator(cfg));
-
-            // Fetch Fed Probability parallel
-            const fedProbPromise = macroAPI.getFedImpliedProbability();
-
-            const [results, fedProb] = await Promise.all([
-                Promise.all(promises),
-                fedProbPromise
-            ]);
-
-            const validResults = results.filter((r): r is IndicatorData => r !== null);
-            setIndicators(validResults);
-
-            if (fedProb) {
-                setFedProbData(fedProb);
-            }
-
-            // Set default selected indicator based on active tab
-            const defaultForTab = validResults.find(r => r.region === activeTab);
-            if (defaultForTab) setSelectedIndicator(defaultForTab);
-
-            setLoading(false);
-
-            // AI Analysis is now manual - no auto-trigger
-            // fetchAIAnalysis();
-        };
-        loadData();
-
         return () => {
             if (aiAbortControllerRef.current) aiAbortControllerRef.current.abort();
         };
-    }, []); // Run once on mount
+    }, []);
 
-    // Filter indicators for current tab
-    const currentIndicators = indicators.filter(i => i.region === activeTab);
+    const currentIndicators = indicators.filter(i => i.region === macroRegion);
 
-    // Auto-select first indicator when switching tabs if current selection is not in new tab
     useEffect(() => {
-        if (selectedIndicator && selectedIndicator.region !== activeTab) {
-            const firstInTab = currentIndicators[0];
-            if (firstInTab) setSelectedIndicator(firstInTab);
-        } else if (!selectedIndicator && currentIndicators.length > 0) {
-            setSelectedIndicator(currentIndicators[0]);
+        if (activeTab === 'macro') {
+            if (selectedIndicator && selectedIndicator.region !== macroRegion) {
+                const firstInTab = currentIndicators[0];
+                if (firstInTab) setSelectedIndicator(firstInTab);
+            } else if (!selectedIndicator && currentIndicators.length > 0) {
+                setSelectedIndicator(currentIndicators[0]);
+            }
         }
-    }, [activeTab, indicators]);
+    }, [activeTab, macroRegion, indicators]);
 
 
     if (loading) {
-        return <div className="p-10 text-center text-slate-400">Loading Macro Data...</div>;
+        return (
+            <div className="h-full flex flex-col items-center justify-center bg-slate-900">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader className="w-8 h-8 text-blue-500 animate-spin" />
+                    <div className="text-slate-400 font-medium animate-pulse">Loading Macro Data...</div>
+                </div>
+            </div>
+        );
     }
 
     return (
         <div className="h-full flex flex-col bg-slate-900 text-white p-6 overflow-hidden">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <Globe className="text-blue-500" />
-                    Macroeconomic Data
-                </h1>
+                <div className="flex items-center gap-6">
+                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        <Globe className="text-blue-500" />
+                        Macro & Market
+                    </h1>
 
-                {/* Tabs */}
-                <div className="flex gap-2 bg-slate-800 p-1 rounded-lg">
-                    {(['CN', 'Global'] as const).map(tab => (
+                    {/* Main Tabs */}
+                    <div className="flex bg-slate-800 p-1 rounded-lg">
                         <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === tab
+                            onClick={() => setActiveTab('macro')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'macro'
                                 ? 'bg-blue-600 text-white shadow'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-700'
                                 }`}
                         >
-                            {tab === 'CN' ? 'China Domestic' : 'Global Market'}
+                            <Globe size={14} /> 宏观经济数据
                         </button>
-                    ))}
+                        <button
+                            onClick={() => setActiveTab('market')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'market'
+                                ? 'bg-blue-600 text-white shadow'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                                }`}
+                        >
+                            <TrendingUp size={14} /> 市场板块数据
+                        </button>
+                    </div>
                 </div>
+
+                {/* Sub Tabs for Macro only */}
+                {activeTab === 'macro' && (
+                    <div className="flex gap-2 bg-slate-800 p-1 rounded-lg">
+                        {(['CN', 'Global'] as const).map(tab => (
+                            <button
+                                key={tab}
+                                onClick={() => setMacroRegion(tab)}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${macroRegion === tab
+                                    ? 'bg-blue-600 text-white shadow'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                                    }`}
+                            >
+                                {tab === 'CN' ? 'China Domestic' : 'Global Market'}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
-            <div className="flex flex-col gap-6 h-[calc(100vh-140px)] overflow-y-auto">
-
-                {/* AI Analysis Section */}
-                <div className="flex items-start gap-4 shrink-0">
-                    {/* AI Trigger Button */}
+            {!dataLoaded ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-6 border border-slate-800 rounded-2xl bg-slate-900/50">
+                    <Globe size={64} className="text-blue-500 opacity-50" />
+                    <div className="text-center">
+                        <h2 className="text-2xl font-bold text-white mb-2">Macro & Market Data</h2>
+                        <p className="text-slate-400">Click below to load real-time macroeconomic indicators and market flows.</p>
+                    </div>
                     <button
-                        onClick={fetchAIAnalysis}
-                        disabled={analyzing}
-                        className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all shrink-0 ${analyzing
-                            ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500 shadow-lg hover:shadow-cyan-500/25'
-                            }`}
+                        onClick={loadData}
+                        disabled={loading}
+                        className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
                     >
-                        {analyzing ? (
-                            <Loader className="animate-spin" size={18} />
-                        ) : (
-                            <Bot size={18} />
-                        )}
-                        {analyzing ? '分析中...' : '开始 AI 分析'}
+                        {loading ? <Loader className="animate-spin" /> : <RefreshCw />}
+                        {loading ? 'Loading Data...' : 'Load Data'}
                     </button>
-
-                    {/* AI Analysis Card */}
-                    <div className="flex-1">
-                        <MacroIndicatorCard
-                            macroHealthScore={macroData.macroHealthScore}
-                            macroHealthLabel={macroData.macroHealthLabel}
-                            keyMetrics={macroData.keyMetrics}
-                            signal={macroData.signal}
-                            confidence={macroData.confidence}
-                            marketCycle={macroData.marketCycle}
-                            marketImplication={macroData.marketImplication}
-                            riskWarning={macroData.riskWarning}
-                            strategy={macroData.strategy}
-                            summary={macroData.summary}
-                            analysis={macroData.analysis}
-                            keyFactors={macroData.keyFactors}
-                            analyzing={analyzing}
-                        />
-                    </div>
                 </div>
-
-                {/* Top Section: Data Table & Fed Watch (Global Only) */}
-                <div className="min-h-[280px] flex gap-6 shrink-0">
-                    {/* Data Table */}
-                    <div className={`bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden ${activeTab === 'Global' ? 'w-2/3' : 'w-full'}`}>
-                        <div className="overflow-y-auto flex-1">
-                            <table className="w-full text-sm">
-                                <thead className="bg-slate-900/50 sticky top-0 backdrop-blur-sm z-10">
-                                    <tr>
-                                        <th className="p-3 text-left text-slate-400 font-medium">Indicator</th>
-                                        <th className="p-3 text-left text-slate-400 font-medium">Category</th>
-                                        <th className="p-3 text-right text-slate-400 font-medium">Latest Value</th>
-                                        <th className="p-3 text-right text-slate-400 font-medium">Date</th>
-                                        <th className="p-3 text-right text-slate-400 font-medium">Trend</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {currentIndicators.map((item) => (
-                                        <tr
-                                            key={item.id}
-                                            onClick={() => setSelectedIndicator(item)}
-                                            className={`
-                                            cursor-pointer border-b border-slate-700/50 hover:bg-slate-700/50 transition-colors
-                                            ${selectedIndicator?.id === item.id ? 'bg-blue-500/10 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'}
-                                        `}
-                                        >
-                                            <td className="p-3 font-medium text-slate-200">{item.name}</td>
-                                            <td className="p-3 text-slate-500">{item.category}</td>
-                                            <td className="p-3 text-right font-mono font-bold text-slate-200">
-                                                {item.latest?.value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                <span className="text-xs text-slate-500 ml-1">{item.unit}</span>
-                                            </td>
-                                            <td className="p-3 text-right text-slate-500 tabular-nums">
-                                                {item.latest?.date}
-                                            </td>
-                                            <td className="p-3 text-right">
-                                                {item.history.length > 1 && (
-                                                    (() => {
-                                                        const curr = item.latest?.value || 0;
-                                                        const prev = item.history[item.history.length - 2].value;
-                                                        const diff = curr - prev;
-                                                        const color = diff > 0 ? 'text-red-400' : diff < 0 ? 'text-green-400' : 'text-slate-400';
-                                                        return (
-                                                            <div className={`flex items-center justify-end gap-1 ${color}`}>
-                                                                {diff > 0 ? <ArrowUp size={14} /> : diff < 0 ? <ArrowDown size={14} /> : null}
-                                                                {Math.abs(diff).toFixed(2)}
-                                                            </div>
-                                                        );
-                                                    })()
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Fed Watch Card - Only for Global Tab */}
-                    {activeTab === 'Global' && fedProbData && (
-                        <div className="w-1/3 bg-slate-800 rounded-xl border border-slate-700 p-4 flex flex-col">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <DollarSign size={18} className="text-green-400" />
-                                    Fed Watch
-                                </h3>
-                                <div className="text-xs text-slate-400">
-                                    Implied: <span className="text-white font-mono">{fedProbData.implied_rate}%</span>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 min-h-0">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={fedProbData.data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} vertical={false} />
-                                        <XAxis dataKey="bin" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                                        <YAxis hide />
-                                        <Tooltip
-                                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
-                                            cursor={{ fill: '#334155', opacity: 0.2 }}
-                                        />
-                                        <Bar dataKey="prob" radius={[4, 4, 0, 0]}>
-                                            {fedProbData.data.map((entry: any, index: number) => (
-                                                <Cell key={`cell-${index}`} fill={entry.is_current ? '#3b82f6' : '#64748b'} />
-                                            ))}
-                                            <LabelList dataKey="prob" position="top" formatter={(val: any) => `${val}%`} fill="#e2e8f0" fontSize={12} />
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <div className="mt-2 text-center text-xs text-slate-500">
-                                Current Target: {fedProbData.current_target_rate}%
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Bottom Section: Chart */}
-                <div className="min-h-[400px] bg-slate-800 rounded-xl border border-slate-700 p-6 flex flex-col shrink-0">
-                    {selectedIndicator ? (
+            ) : (
+                <div className="flex flex-col gap-6 h-[calc(100vh-140px)] overflow-y-auto">
+                    {activeTab === 'macro' ? (
                         <>
-                            <div className="mb-4 flex items-center gap-3">
-                                <div className="p-2 bg-slate-700 rounded-lg">
-                                    <BarChart2 size={20} className="text-blue-400" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-white">{selectedIndicator.name} Trend</h2>
-                                    <p className="text-xs text-slate-400">Historical data analysis over the past year</p>
+                            {/* AI Analysis Section */}
+                            <div className="flex items-start gap-4 shrink-0">
+                                <button
+                                    onClick={fetchAIAnalysis}
+                                    disabled={analyzing}
+                                    className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all shrink-0 ${analyzing
+                                        ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500 shadow-lg hover:shadow-cyan-500/25'
+                                        }`}
+                                >
+                                    {analyzing ? <Loader className="animate-spin" size={18} /> : <Bot size={18} />}
+                                    {analyzing ? '分析中...' : '开始 AI 分析'}
+                                </button>
+
+                                <div className="flex-1">
+                                    <MacroIndicatorCard
+                                        macroHealthScore={macroData.macroHealthScore}
+                                        macroHealthLabel={macroData.macroHealthLabel}
+                                        keyMetrics={macroData.keyMetrics}
+                                        signal={macroData.signal}
+                                        confidence={macroData.confidence}
+                                        marketCycle={macroData.marketCycle}
+                                        marketImplication={macroData.marketImplication}
+                                        riskWarning={macroData.riskWarning}
+                                        strategy={macroData.strategy}
+                                        summary={macroData.summary}
+                                        analysis={macroData.analysis}
+                                        keyFactors={macroData.keyFactors}
+                                        analyzing={analyzing}
+                                    />
                                 </div>
                             </div>
 
-                            <div className="flex-1 min-h-0">
-                                <ChartComponent data={selectedIndicator.history} />
+                            {/* Top Section: Data Table & Fed Watch */}
+                            <div className="min-h-[280px] flex gap-6 shrink-0">
+                                <div className={`bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden ${macroRegion === 'Global' ? 'w-2/3' : 'w-full'}`}>
+                                    <div className="overflow-y-auto flex-1">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-slate-900/50 sticky top-0 backdrop-blur-sm z-10">
+                                                <tr>
+                                                    <th className="p-3 text-left text-slate-400 font-medium">Indicator</th>
+                                                    <th className="p-3 text-left text-slate-400 font-medium">Category</th>
+                                                    <th className="p-3 text-right text-slate-400 font-medium">Latest Value</th>
+                                                    <th className="p-3 text-right text-slate-400 font-medium">Date</th>
+                                                    <th className="p-3 text-right text-slate-400 font-medium">Trend</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {currentIndicators.map((item) => (
+                                                    <tr
+                                                        key={item.id}
+                                                        onClick={() => setSelectedIndicator(item)}
+                                                        className={`
+                                                    cursor-pointer border-b border-slate-700/50 hover:bg-slate-700/50 transition-colors
+                                                    ${selectedIndicator?.id === item.id ? 'bg-blue-500/10 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'}
+                                                `}
+                                                    >
+                                                        <td className="p-3 font-medium text-slate-200">{item.name}</td>
+                                                        <td className="p-3 text-slate-500">{item.category}</td>
+                                                        <td className="p-3 text-right font-mono font-bold text-slate-200">
+                                                            {item.latest?.value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            <span className="text-xs text-slate-500 ml-1">{item.unit}</span>
+                                                        </td>
+                                                        <td className="p-3 text-right text-slate-500 tabular-nums">
+                                                            {item.latest?.date}
+                                                        </td>
+                                                        <td className="p-3 text-right">
+                                                            {item.history.length > 1 && (
+                                                                (() => {
+                                                                    const curr = item.latest?.value || 0;
+                                                                    const prev = item.history[item.history.length - 2].value;
+                                                                    const diff = curr - prev;
+                                                                    const color = diff > 0 ? 'text-red-400' : diff < 0 ? 'text-green-400' : 'text-slate-400';
+                                                                    return (
+                                                                        <div className={`flex items-center justify-end gap-1 ${color}`}>
+                                                                            {diff > 0 ? <ArrowUp size={14} /> : diff < 0 ? <ArrowDown size={14} /> : null}
+                                                                            {Math.abs(diff).toFixed(2)}
+                                                                        </div>
+                                                                    );
+                                                                })()
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {macroRegion === 'Global' && fedProbData && (
+                                    <div className="w-1/3 bg-slate-800 rounded-xl border border-slate-700 p-4 flex flex-col">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                                <DollarSign size={18} className="text-green-400" />
+                                                Fed Watch
+                                            </h3>
+                                            <div className="text-xs text-slate-400">
+                                                Implied: <span className="text-white font-mono">{fedProbData.implied_rate}%</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 min-h-0">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={fedProbData.data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} vertical={false} />
+                                                    <XAxis dataKey="bin" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
+                                                    <YAxis hide />
+                                                    <Tooltip
+                                                        contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
+                                                        cursor={{ fill: '#334155', opacity: 0.2 }}
+                                                    />
+                                                    <Bar dataKey="prob" radius={[4, 4, 0, 0]}>
+                                                        {fedProbData.data.map((entry: any, index: number) => (
+                                                            <Cell key={`cell-${index}`} fill={entry.is_current ? '#3b82f6' : '#64748b'} />
+                                                        ))}
+                                                        <LabelList dataKey="prob" position="top" formatter={(val: any) => `${val}%`} fill="#e2e8f0" fontSize={12} />
+                                                    </Bar>
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                        <div className="mt-2 text-center text-xs text-slate-500">
+                                            Current Target: {fedProbData.current_target_rate}%
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Bottom Section: Chart */}
+                            <div className="min-h-[400px] bg-slate-800 rounded-xl border border-slate-700 p-6 flex flex-col shrink-0">
+                                {selectedIndicator ? (
+                                    <>
+                                        <div className="mb-4 flex items-center gap-3">
+                                            <div className="p-2 bg-slate-700 rounded-lg">
+                                                <BarChart2 size={20} className="text-blue-400" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-xl font-bold text-white">{selectedIndicator.name} Trend</h2>
+                                                <p className="text-xs text-slate-400">Historical data analysis over the past year</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 min-h-0">
+                                            <ChartComponent data={selectedIndicator.history} />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex-1 flex items-center justify-center text-slate-500">
+                                        Select an indicator to view trend
+                                    </div>
+                                )}
                             </div>
                         </>
                     ) : (
-                        <div className="flex-1 flex items-center justify-center text-slate-500">
-                            Select an indicator to view trend
+                        <div className="flex flex-col gap-6 h-full p-1 overflow-y-auto">
+                            {/* Top: AI Analysis Card (Full Width) */}
+                            <div className="shrink-0">
+                                <MarketAnalysisCard />
+                            </div>
+                            
+                            {/* Bottom: Sector Flow (Full Width) */}
+                            <div className="shrink-0 min-h-[400px]">
+                                <SectorFlowCard />
+                            </div>
                         </div>
                     )}
                 </div>
-
-            </div>
+            )}
         </div>
     );
 };
