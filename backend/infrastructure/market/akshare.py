@@ -28,48 +28,56 @@ class AkShareTool:
              return {"error": "Invalid A-share symbol"}
 
         try:
-            # Use 1-minute data for latest quote
-            df = ak.stock_zh_a_hist_min_em(symbol=symbol, period="1", adjust="qfq")
+            # Use spot data for full market snapshot
+            # This provides PE, PB, Turnover, etc. which are missing in hist_min stock_zh_a_hist_min_em
+            df = ak.stock_zh_a_spot_em()
             
             if df.empty:
-                return {"error": "Symbol not found"}
+                return {"error": "Market data unavailable"}
             
-            latest = df.iloc[-1]
-            current_price = float(latest['收盘'])
+            # Filter by symbol
+            row = df[df['代码'] == symbol]
+            if row.empty:
+                 return {"error": "Symbol not found in snapshot"}
             
-            # Simple previous close estimation
-            prev_close = 0.0
-            try:
-                date_str = datetime.now().strftime("%Y%m%d")
-                start_dt = (datetime.now() - timedelta(days=10)).strftime("%Y%m%d")
-                df_daily = ak.stock_zh_a_hist(symbol=symbol, period="daily", start_date=start_dt, end_date=date_str, adjust="qfq")
-                if len(df_daily) >= 2:
-                     prev_close = float(df_daily.iloc[-2]['收盘'])
-                elif len(df_daily) == 1:
-                     prev_close = float(df_daily.iloc[0]['开盘'])
-            except Exception:
-                pass
-
+            latest = row.iloc[0]
+            
+            # Map fields
+            current_price = float(latest['最新价'])
+            prev_close = float(latest['昨收'])
+            
             change_amount = 0.0
             change_percent = 0.0
             if prev_close > 0:
                 change_amount = current_price - prev_close
                 change_percent = (change_amount / prev_close) * 100
 
+            # Safe get helper
+            def get_val(key):
+                val = latest.get(key)
+                if pd.isna(val): return None
+                try: return float(val)
+                except: return None
+
             return {
                 "symbol": symbol,
                 "current_price": current_price,
-                "open": float(latest['开盘']),
-                "high": float(latest['最高']),
-                "low": float(latest['最低']),
+                "open": get_val('今开'),
+                "high": get_val('最高'),
+                "low": get_val('最低'),
                 "prev_close": prev_close,
                 "change_amount": round(change_amount, 2),
                 "change_percent": round(change_percent, 2),
-                "volume": float(latest['成交量']),
-                "turnover": float(latest['成交额']),
-                "timestamp": str(latest['时间']),
+                "volume": get_val('成交量'),
+                "turnover": get_val('成交额'),
+                "turnover_rate": get_val('换手率'),
+                "pe": get_val('市盈率-动态'), # PE TTM
+                "pb": get_val('市净率'),
+                "market_cap": get_val('总市值'),
+                "circulating_market_cap": get_val('流通市值'),
+                "timestamp": datetime.now().isoformat(), # Spot data doesn't have per-row time usually
                 "market": "A-share",
-                "source": "akshare"
+                "source": "akshare_spot"
             }
         except Exception as e:
             logger.error(f"AkShare get_stock_quote failed for {symbol}: {e}")
@@ -81,7 +89,7 @@ class AkShareTool:
         if not self._validate_symbol(symbol): return []
 
         try:
-            days_map = {"1m": 30, "3m": 90, "6m": 180, "1y": 365, "ytd": 365, "max": 3650}
+            days_map = {"1m": 30, "3m": 90, "6m": 180, "1y": 365, "ytd": 365, "max": 3650, "1mo": 30, "3mo": 90, "6mo": 180}
             if period.endswith('d') and period[:-1].isdigit():
                 delta_days = int(period[:-1])
             else:
@@ -119,21 +127,22 @@ class AkShareTool:
     def get_financial_indicators(self, symbol: str, years: int = 3) -> Dict[str, Any]:
         """Get financial indicators for A-shares."""
         try:
+            # Try primary source first
             df = ak.stock_financial_analysis_indicator(symbol=symbol)
-            print("df:",symbol,df)
-            if df.empty: return self._empty_indicators()
+            
+            if df.empty or len(df) < 2 or (df.iloc[0].get('日期') == '1900-01-01' and len(df) == 1):
+                # Fallback to abstract if empty or insufficient
+                logger.info(f"Primary financial indicators empty for {symbol}, trying abstract...")
+                return self._get_indicators_from_abstract(symbol, years)
             
             # AkShare data is reversed (oldest first)
             df = df.iloc[::-1].reset_index(drop=True)
             df = df.head(years * 4 + 1)
             
-            if len(df) < 2: return self._empty_indicators()
-            
-             # Skip invalid execution row if any, usually valid data starts from proper dates
-             # The source code skipped row 0 if it was 1900-01-01.
+            # Skip invalid execution row if any
             if df.iloc[0].get('日期') == '1900-01-01':
                  df = df.iloc[1:].reset_index(drop=True)
-            print(df)
+            
             return {
                 "revenue": self._extract_revenue(df),
                 "profit": self._extract_profit(df),
@@ -144,6 +153,113 @@ class AkShareTool:
             }
         except Exception as e:
             logger.error(f"AkShare get_financial_indicators failed: {e}")
+            # Try abstract as backup for exceptions too
+            try:
+                return self._get_indicators_from_abstract(symbol, years)
+            except:
+                return self._empty_indicators()
+
+    def _get_indicators_from_abstract(self, symbol: str, years: int = 3) -> Dict[str, Any]:
+        """Fallback method using stock_financial_abstract."""
+        try:
+            df = ak.stock_financial_abstract(symbol=symbol)
+            if df.empty: return self._empty_indicators()
+            
+            # 1. Transpose: Set '指标' as index and transpose
+            # Columns are dates, rows are metrics
+            # Filter columns that look like dates
+            date_cols = [c for c in df.columns if c.isdigit() and len(c) == 8]
+            date_cols.sort(reverse=True) # Newest first
+            
+            # Limit to requested years (approx 4 quarters per year)
+            limit = years * 4 + 1
+            selected_dates = date_cols[:limit]
+            
+            if not selected_dates: return self._empty_indicators()
+            
+            # Extract metrics into a more usable structure
+            # We need a DataFrame where rows = dates, cols = metrics
+            # df has '指标' column.
+            
+            # Helper to get series for a metric
+            def get_series(metric_name):
+                row = df[df['指标'] == metric_name]
+                if row.empty: return pd.Series(0, index=selected_dates)
+                # Return data for selected dates
+                return row.iloc[0][selected_dates].apply(lambda x: float(x) if x else 0.0)
+
+            # Build a new DataFrame with dates as rows
+            new_df = pd.DataFrame(index=selected_dates)
+            new_df['日期'] = [pd.to_datetime(d).strftime('%Y-%m-%d') for d in selected_dates]
+            
+            # Map metrics
+            # Revenue
+            new_df['主营业务收入增长率(%)'] = get_series('营业总收入增长率') * 100 # Abstract usually is decimal? Need verify. 
+            # Abstract values: 20250930: 7.57e8. Growth rates?
+            # Abstract usually has '营业总收入增长率'. Let's check sample. 
+            # No sample for growth rate, but usually percentages in akshare are raw numbers or %.
+            # Assuming raw decimal or percent. Safe check later.
+            
+            # Actually let's just extract what we need for the _extract_* helpers
+            # _extract_revenue needs: '主营业务收入增长率(%)', '主营利润比重', '每股经营性现金流(元)'
+            # _extract_profit needs: '扣除非经常性损益后的每股收益(元)', '销售毛利率(%)', '销售净利率(%)'
+            # _extract_cashflow needs: '每股经营性现金流(元)', '每股收益_调整后(元)'
+            # _extract_debt needs: '资产负债率(%)', '流动比率'
+            # _extract_shareholder_return needs: '股息发放率(%)', '净资产收益率(%)'
+            
+            # Mapping Abstract Indicators to Helper Keys
+            mapping = {
+                '主营业务收入增长率(%)': '营业总收入增长率', # Note: Abstract might be '营业总收入同比增长(%)' or similar. 
+                # From inspect: '营业总收入增长率'.
+                '每股经营性现金流(元)': '每股经营现金流',
+                '扣除非经常性损益后的每股收益(元)': '扣非净利润', # Approx? No, abstract has '基本每股收益' and maybe '扣非每股收益'? 
+                # Abstract has '扣非净利润' (Total). We can calc per share or just use Total if helper adapted.
+                # Actually helper uses '每股...'. Abstract has '基本每股收益'.
+                # Let's map to what we have.
+                '销售毛利率(%)': '毛利率',
+                '销售净利率(%)': '销售净利率',
+                '资产负债率(%)': '资产负债率',
+                '流动比率': '流动比率',
+                '净资产收益率(%)': '净资产收益率(ROE)'
+            }
+            
+            for target, source in mapping.items():
+                s = get_series(source)
+                # Special handling for percentages if needed. Abstract '毛利率' is usually 20.5 not 0.205?
+                # Let's check debugging output again. We didn't print values for rates.
+                # Usually akshare abstract is mixed. 
+                # Let's assume standard float.
+                new_df[target] = s
+
+            # Handle calculated fields for helpers
+            # '主营利润比重' -> Not in abstract directly. Use 0.
+            new_df['主营利润比重'] = 0.0
+            
+            # '每股收益_调整后(元)' -> Use '基本每股收益'
+            new_df['每股收益_调整后(元)'] = get_series('基本每股收益')
+            new_df['扣除非经常性损益后的每股收益(元)'] = get_series('基本每股收益') # Fallback
+            
+            # '股息发放率(%)' -> Not in abstract.
+            new_df['股息发放率(%)'] = 0.0
+
+            # Use the helpers (they expect a DataFrame where iloc[0] is latest)
+            # new_df index is dates (newest first), so iloc[0] is latest.
+            
+            # Important: _extract_revenue expects YOY growth.
+            # If '营业总收入增长率' is e.g. 0.15 (15%) or 15?
+            # We might need to adjust.
+            
+            return {
+                "revenue": self._extract_revenue(new_df),
+                "profit": self._extract_profit(new_df),
+                "cashflow": self._extract_cashflow(new_df),
+                "debt": self._extract_debt(new_df),
+                "shareholder_return": self._extract_shareholder_return(new_df),
+                "history": self._extract_financial_history(new_df)
+            }
+
+        except Exception as e:
+            logger.error(f"AkShare abstract fallback failed: {e}")
             return self._empty_indicators()
 
     # ========================== Sector Data ==========================

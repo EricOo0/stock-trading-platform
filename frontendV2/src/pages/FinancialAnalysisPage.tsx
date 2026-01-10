@@ -228,12 +228,18 @@ const FloatingAIAssistant: React.FC = () => {
     );
 };
 
-const FinancialAnalysisPage: React.FC = () => {
+const FinancialAnalysisPage: React.FC<{ sharedSymbol?: string; searchTrigger?: number; isActive?: boolean }> = ({ sharedSymbol }) => {
     const [financialSearchQuery, setFinancialSearchQuery] = useState('');
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [financialData, setFinancialData] = useState<FinancialReport | null>(null);
     const [financialLoading, setFinancialLoading] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (sharedSymbol) {
+            setFinancialSearchQuery(sharedSymbol);
+        }
+    }, [sharedSymbol]);
 
     // Indicators State
     const [financialIndicators, setFinancialIndicators] = useState<FinancialIndicators | null>(null);
@@ -407,27 +413,34 @@ const FinancialAnalysisPage: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col gap-6 p-6 max-w-[1920px] mx-auto w-full relative overflow-y-auto pb-20">
             {/* Header / Search Bar */}
-            <div className="flex-none z-10">
-                <div className="flex items-center justify-between mb-4">
+            <div className="flex-none z-10 flex items-center justify-between mb-6 bg-slate-900/40 p-4 rounded-2xl border border-slate-700/30 backdrop-blur-sm">
+                <div className="flex items-center gap-4">
+                    <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
+                        <span className="w-1.5 h-6 bg-indigo-500 rounded-full block"></span>
+                    </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-                            <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
-                                <span className="w-1.5 h-6 bg-indigo-500 rounded-full block"></span>
-                            </div>
+                        <h1 className="text-2xl font-bold text-white tracking-tight">
                             新财报分析
                         </h1>
+                        <p className="text-xs text-slate-400 mt-0.5">AI-Powered Financial Report Deep Dive</p>
                     </div>
                 </div>
 
-                <FinancialReportHeader
-                    financialSearchQuery={financialSearchQuery}
-                    setFinancialSearchQuery={setFinancialSearchQuery}
-                    handleFinancialSearch={handleFinancialSearch}
-                    financialLoading={financialLoading}
-                    isFullScreen={isFullScreen}
-                    setIsFullScreen={setIsFullScreen}
-                    error={error}
-                />
+                <div className="flex items-center gap-4">
+                    <div className="px-4 py-2 bg-slate-800/80 rounded-lg text-slate-400 text-sm border border-slate-700/50 flex items-center gap-2">
+                        <span>分析对象:</span>
+                        <span className="text-white font-mono font-bold tracking-wider">{financialSearchQuery || "--"}</span>
+                    </div>
+
+                    <button
+                        onClick={handleFinancialSearch}
+                        disabled={financialLoading || !financialSearchQuery}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95"
+                    >
+                        {financialLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Sparkles size={16} />}
+                        生成分析报告
+                    </button>
+                </div>
             </div>
 
             {/* Top Section: Financial Indicators */}

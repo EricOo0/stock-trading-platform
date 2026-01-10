@@ -1,73 +1,77 @@
-# React + TypeScript + Vite
+# AI Fund Manager - Frontend V2
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+现代化的 AI 基金经理前端界面，基于 **Next.js (React)** 和 **TailwindCSS** 构建。提供实时的市场数据可视化、AI 智能体流式对话以及深度的投研报告展示。
 
-Currently, two official plugins are available:
+## 🚀 技术栈 (Tech Stack)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Framework**: React 18 + Vite (SPA Mode)
+- **Language**: TypeScript
+- **Styling**: TailwindCSS
+- **State Management**: React Hooks
+- **Charting**: Lightweight Charts (TradingView) + Recharts
+- **Icons**: Lucide React
+- **PDF Rendering**: React-PDF
 
-## React Compiler
+## ✨ 核心功能 (Features)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **📊 市场仪表盘**: 实时行情、K 线图（支持 MA, MACD, RSI, KDJ, BOLL 等指标）、分时图。
+- **🤖 智能体对话**: 与 AI 顾问团（技术面、宏观面、消息面专家）进行流式对话。
+- **📝 深度研报**: 展示由后端生成的 PDF 研报解析、思维链 (CoT) 推理过程。
+- **🕸️ 宏观监控**: 实时展示美联储利率、CPI、GDP 等核心宏观指标。
 
-## Expanding the ESLint configuration
+## 🛠️ 安装与运行 (Setup)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 1. 安装依赖
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. 开发模式运行
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+确保后端服务已在 `http://127.0.0.1:8000` 启动。
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+应用将运行在 `http://localhost:3000`。
+
+### 3. 构建生产版本
+
+```bash
+npm run build
+npm run preview
+```
+
+## ⚙️ 配置 (Configuration)
+
+主要配置位于 `vite.config.ts`，默认配置了 API 代理：
+
+```typescript
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://127.0.0.1:8000', // 指向后端服务
+      changeOrigin: true,
+      secure: false,
+    }
+  }
+}
+```
+
+## 📁 目录结构 (Directory Structure)
+
+| Path | Description |
+| :--- | :--- |
+| `src/components/` | 可复用的 UI 组件 (Charts, Chat, Layout等) |
+| `src/pages/` | 页面级组件 (MarketQuery, TechnicalAnalysis等) |
+| `src/services/` | API 客户端服务，负责与后端通信 |
+| `src/hooks/` | 自定义 React Hooks (e.g., useResearchStream) |
+| `src/types/` | TypeScript 类型定义 |
+
+## 🎨 页面概览
+
+- **MarketQueryPage**: 核心行情查询，整合了 TradingView 图表和实时数据面板。
+- **TechnicalAnalysisPage**: 专注于技术指标的深度分析。
+- **MacroDataPage**: 宏观经济数据展示。
+- **NewsSentimentPage**: 舆情分析与新闻聚合。

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layout } from './components/Layout';
-import { MarketQueryPage, HomePage, StockSearchPage, InspiringPage } from './pages';
+import { MarketQueryPage, HomePage, StockSearchPage, InspiringPage, StockAnalysisPage } from './pages';
 import TechnicalAnalysisPage from './pages/TechnicalAnalysisPage';
 import MacroDataPage from './pages/MacroDataPage';
 import FinancialAnalysisPage from './pages/FinancialAnalysisPage';
@@ -20,6 +20,8 @@ function App() {
     switch (tab) {
       case 'home':
         return '首页';
+      case 'stock-analysis':
+        return '个股分析';
       case 'council':
         return 'AI 顾问团';
       case 'inspiring':
@@ -55,6 +57,8 @@ function App() {
     switch (activeTab) {
       case 'home':
         return <HomePage onNavigate={handleTabChange} />;
+      case 'stock-analysis':
+        return <StockAnalysisPage />;
       case 'council':
         return <CouncilRoom />;
       case 'inspiring':

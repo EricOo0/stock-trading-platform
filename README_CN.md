@@ -2,199 +2,135 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
 [English](README.md) | [中文](README_CN.md)
 
-
 > [!WARNING]
-> **Disclaimer**: 本项目代码完全由AI生成，暂时只跑了流程，不保证数据准确性和可靠性
-> **免责声明**: 本软件仅供**教育和研究使用**。不提供任何保证。使用本软件进行实盘交易涉及巨大风险，作者不对任何资金损失负责。
+> **Disclaimer**: 本项目是一次 **AI Vibe Coding** 实践，旨在探索 AI 能否独立完成一个大型项目的编写与维护。**所有代码均由 AI 生成**。
+>
+> **免责声明**: 本软件仅供**教育和研究使用**。部分数据可能存在问题或延迟。不提供任何保证。使用本软件进行实盘交易涉及巨大风险，作者不对任何资金损失负责。
 
 ---
 
-## 🇨🇳 项目介绍
-**AI Stock Trading Platform** 是一个基于多智能体协作（Multi-Agent）的全方位 AI 投研平台。它集成了消息面分析、基本均面筛选、技术面诊断以及财报深度解读等功能，致力于为投资者提供实时、深度的投资决策支持。
+## 💡 项目背景 (Background)
 
-### 核心亮点
-- **🤖 多智能体协同**: 消息、技术、基本面等专职 Agent 协同工作，产出综合分析报告。
-- **📚 深度研报分析**: 基于 RAG 技术实现研报 PDF 的自动解析与关键信息提取，支持原文溯源 (Source-Grounding)。
-- **💹 全市场覆盖**: 支持美股、港股、A 股实时行情与历史数据分析。
-- **🕸️ 宏观洞察**: 实时监控宏观经济数据（如美联储利率、通胀数据），把握大周期趋势。
+这个项目的核心目的是进行一次 **AI 全栈开发实践**。我们试图回答一个问题：**目前的 AI 技术能否在极少人为干预的情况下，自主完成一个包含前端、后端、数据处理和复杂逻辑的大型软件系统的编写与维护？**
+
+因此，本项目从架构设计、代码编写到文档撰写，绝大部分工作均由 AI 完成。
 
 ---
 
-## 🏗 系统架构
+## 🏗 系统架构 (System Architecture)
 
-本系统采用类似微服务的现代架构，以前端 Next.js 和后端 FastAPI 编排智能体。
+项目整体分为三个核心部分，后端集成了多种 Agent 范式（ReAct, Multi-Agent Debate, Master-Sub Agent）和框架（Google ADK, LangChain）：
 
-### 架构图
-
-![System Architecture](assets/architecture.png)
-
-<details>
-<summary>Mermaid 源码 (点击展开)</summary>
-
-```mermaid
-graph TD
-    User(["User / Investor"]) --> FE["Frontend (Next.js V2)"]
-    FE --> API["Backend API (FastAPI)"]
-    
-    subgraph "Backend Core (Python)"
-        API --> Coordinator["Chairman / Coordinator Agent"]
-        
-        Coordinator --> NewsAgent["News & Sentiment Agent"]
-        Coordinator --> TechAgent["Technical Analysis Agent"]
-        Coordinator --> MacroAgent["Macro Economics Agent"]
-        Coordinator --> ReportAgent["Financial Report Agent"]
-        
-        NewsAgent --> |"Tavily/SerpApi"| Web["Web Search"]
-        TechAgent --> |"AkShare/YFinance"| MarketData["Market Data"]
-        MacroAgent --> |"FRED/Search"| MacroData["Economic Data"]
-        ReportAgent --> |"LlamaCloud"| PDF["PDF Parsing & RAG"]
-        
-        Agents --> LLM["LLM Engine (DeepSeek / OpenAI)"]
-    end
-    
-    subgraph "Infrastructure"
-        DB[("Stock Database")]
-        Memory[("Redis / Vector DB")]
-        LLM --> |API Call| SiliconFlow["SiliconFlow API"]
-    end
-```
-</details>
-
-### 目录结构
-
-| 路径 | 描述 |
-| :--- | :--- |
-| **`frontendV2/`** | 现代 Web 界面 (Next.js, React, TailwindCSS)。处理实时流式传输和数据可视化。 |
-| **`backend/`** | 后端主代码库。 |
-| &nbsp;&nbsp;`app/agents/` | 核心智能体逻辑 (从 News 到 Macro 等各类 Agent)。 |
-| &nbsp;&nbsp;`infrastructure/` | 基础设施层 (市场数据适配器, 数据库, LLM 集成)。 |
-| &nbsp;&nbsp;`entrypoints/` | FastAPI 服务入口与路由定义。 |
-| **`skills/`** | 共享能力模块 (PDF 解析, 市场数据获取, 网络搜索等)。 |
-| **`memory_system/`** | 独立的智能体上下文管理与长期记忆系统 (Redis/Vector DB)。 |
+1.  **前端 (Frontend)**: 负责数据展示与用户交互，提供现代化的可视化界面。
+2.  **后端 (Backend)**: 负责数据拉取、处理以及核心的 Agent 调度与编排。
+3.  **记忆系统 (Memory System)**: 独立的认知存储层，由短期、中期、长期记忆组成，旨在让 AI 形成长期投资风格并具备自我反思能力。
 
 ---
 
 ## 🧩 功能模块 (Features)
 
-### 1. 消息面分析 (News Analysis)
-采用混合搜索模式实时捕捉市场动态。一方面通过 Search API 聚合主流媒体新闻，另一方面利用 LLM 操控无头浏览器 (**Browser-use/Playwright**) 深入社交论坛挖掘散户讨论热度与观点。
-*(注：目前社交媒体论坛反爬策略较严，效果持续优化中)*
+### 1. 首页 (Home)
+项目入口，提供直观的市场数据展示，包括 A 股大盘指数、板块资金流向等关键信息，帮助用户快速把握市场整体热度。
 
-![News Analysis 1](assets/消息面分析1.png)
-![News Analysis 2](assets/消息面分析2.png)
+![首页](assets/2026.1.10/首页-市场数据.png)
 
-### 2. 技术面分析 (Technical Analysis)
-综合道氏理论、波浪理论和威科夫操盘法，结合 RSI、MACD、布林带、KDJ 等量化指标，提供高置信度的趋势预测与买卖点分析。
+### 2. 个股分析 (Stock Analysis)
+针对单只股票的全方位深度扫描，包含以下子模块：
 
-![Technical Analysis 1](assets/技术面分析1.png)
-![Technical Analysis 2](assets/技术面分析2.png)
+*   **行情复盘**: 展示股票基本信息，AI 针对今日股价涨跌情况进行复盘分析，并给出操作建议。
+    ![行情复盘](assets/2026.1.10/个股分析-行情复盘.png)
 
-### 3. 宏观数据分析 (Macro Analysis)
-实时拉取并分析国内外核心宏观经济数据（如美联储利率决议、CPI/PPI 通胀数据、GDP 增长率等），研判大类资产周期与宏观趋势。
+*   **技术分析**: 结合 MACD、KDJ、BOLL 等技术指标以及道氏理论等经典交易理论，AI 对盘面进行深度解读，预测后市走势。
+    ![技术分析](assets/2026.1.10/个股分析-技术分析.png)
 
-![Macro Analysis 1](assets/宏观数据分析1.png)
-![Macro Analysis 2](assets/宏观数据分析2.png)
+*   **消息面分析**: 全网搜索主流媒体新闻，并深入 Reddit、雪球等社交媒体挖掘散户讨论，通过 AI 进行情感与舆情分析。
+    ![消息面分析](assets/2026.1.10/个股分析--消息面分析.png)
 
-### 4. 财报分析 (Financial Report Analysis)
-智能抓取美股/A股/港股财报 PDF，利用 RAG 技术精准定位并提取核心财务指标（营收、净利润、现金流等）。
-*(注：LLM 深度解读功能正在持续迭代以提升准确性)*
+*   **财报解读**: 自动拉取并解析财报数据，进行基本面诊断，评估公司财务健康状况。
+    ![财报解读](assets/2026.1.10/个股分析-财报解读.png)
 
-![Financial Report 1](assets/财报分析.png)
-![Financial Report 2](assets/财报分析2.png)
+*   **深度投研**: 综合上述所有工具的分析结果，对股票进行全面的综合评分与深度研判。
+    ![深度投研](assets/2026.1.10/个股分析-深度投研.png)
 
-### 5. 模拟盘 (AI Paper Trading)
-AI 代理自动进行模拟交易下注，实时记录并跟踪策略收益表现，用于验证投资策略的有效性与稳健性。
+*   **模拟回测**: (实验性功能) 基于 AI 策略的历史回测展示。
+    ![模拟回测](assets/2026.1.10/个股分析模拟回测.png)
 
-![Simulation](assets/模拟盘.png)
+### 3. 宏观数据 (Macro Data)
+实时拉取国内外核心宏观经济数据（如 CPI, PPI, GDP, 恐慌指数 VIX 等），AI 基于这些数据进行宏观经济形势分析，辅助判断大类资产配置方向。
 
-### 6. AI 顾问团 (AI Council)
-模拟“一人公司”的决策架构。由 CEO、CTO、首席分析师等多个 AI 角色组成的顾问团队，针对用户的投资疑问进行多视角、深层次的讨论与答疑。
+![宏观数据](assets/2026.1.10/宏观数据.png)
 
-![AI Council 1](assets/AI%20顾问团.png)
-![AI Council 2](assets/AI顾问团2.png)
-![AI Council 3](assets/AI顾问团3.png)
+### 4. AI 顾问团 (AI Council)
+参考“一人公司”理念，构建由多个 AI 角色（如 CEO、CTO、首席分析师等）组成的顾问团队。用户提出问题，多个 AI 各司其职进行圆桌讨论，最终给出综合结论。
+
+![AI 顾问团](assets/2026.1.10/AI顾问团.png)
+
+### 5. 记忆可视化 (Memory Visualization)
+这是项目的一个探索性亮点。我们期望 AI 不仅仅是无状态的问答机器，而是能够形成长期的投资风格。
+*   **反思与修正**: AI 能对历史决策进行复盘和反思，修正自己的投资逻辑。
+*   **三层记忆**: 实现了由短期记忆（Working Memory）、中期记忆（Episodic Memory）和长期记忆（Semantic Memory）组成的记忆系统。
+*(注：目前仅有少量 Agent 接入此系统)*
+
+![记忆可视化](assets/2026.1.10/记忆可视化.png)
+
+---
+
+## 🛠️ 技术探索 (Technical Exploration)
+
+本项目在后端 Agent 的开发中进行了广泛的技术探索：
+
+*   **Agent 范式多样性**:
+    *   **Single Agent ReAct**: 用于简单的工具调用任务。
+    *   **Multi-Agent Debate**: 用于复杂问题的多视角探讨（如顾问团）。
+    *   **Master-Sub Agent**: 用于任务拆解与分发（如深度投研）。
+*   **框架尝试**:
+    *   **Google ADK (Agent Development Kit)**: 用于构建标准化 Agent。
+    *   **LangChain**: 用于早期的原型验证和部分工具链。
+    *   **自研 EventBus**: 实现各模块间的解耦与通信。
 
 ---
 
 ## 🚀 快速开始
 
-### 前置要求
-- Python 3.10+
-- Node.js 18+
-- [Git](https://git-scm.com/)
+### 1. 启动 Backend & Agent 服务
 
-### 安装
+```bash
+# 安装依赖
+pip install -r requirements.txt
 
-1. **克隆仓库**
-   ```bash
-   git clone https://github.com/your-username/stock-trading-platform.git
-   cd stock-trading-platform
-   ```
+# 配置环境 (复制 .config.yaml.example 并填入 API Key)
+cp .config.yaml.example .config.yaml
 
-2. **后端设置**
-   ```bash
-   # 创建虚拟环境
-   python -m venv .venv
-   source .venv/bin/activate  # Windows: .venv\Scripts\activate
-   
-   # 安装依赖
-   pip install -r requirements.txt
-   ```
+# 启动核心 API 服务
+python -m backend.entrypoints.api.server
+```
 
-3. **前端设置**
-   ```bash
-   cd frontendV2
-   npm install
-   ```
+### 2. 启动 Memory System (可选)
 
-4. **配置**
-   复制示例配置并填写您的 API 密钥：
-   ```bash
-   cp .config.yaml.example .config.yaml
-   ```
-   
-   **必需的 API 密钥**:
-   - `tavily`: 用于 AI 搜索。 ([获取密钥](https://tavily.com))
-   - `llama_cloud`: 用于高质量 PDF 解析。 ([获取密钥](https://cloud.llamaindex.ai))
-   - `siliconflow` 或 `openai`: 主要 LLM 提供商。
-   - `fred_api_key`: 用于宏观经济数据。
+```bash
+cd memory_system
+pip install -r requirements.txt
+python -m api.server
+```
 
-5. **运行系统**
-   
-   启动后端：
-   ```bash
-   # 在根目录
-   python -m backend.entrypoints.api.server
-   ```
-   
-   启动前端：
-   ```bash
-   # 在 frontendV2 目录
-   npm run dev
-   ```
-   访问应用：`http://localhost:3000`。
+### 3. 启动 Frontend
+
+```bash
+cd frontendV2
+npm install
+npm run dev
+# 访问 http://localhost:3000
+```
 
 ---
 
-## 🤝 贡献代码
+## 🤝 贡献
 
-贡献使开源社区成为一个学习、激励和创造的绝佳场所。非常感谢您所做的任何贡献。
-
-1. Fork 本项目
-2. 创建您的 Feature 分支 (`git checkout -b feat/AmazingFeature`)
-3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feat/AmazingFeature`)
-5. 开启 Pull Request
+欢迎 Fork 本项目并提交 PR。由于代码主要由 AI 生成，可能会包含一些非典型的编码习惯，欢迎人类开发者进行优化！
 
 ## 📄 许可证
 
-基于 MIT 许可证分发。查看 `LICENSE` 了解更多信息。
-
-## 📅 下一步计划
-
-- [] 优化数据准确性和可靠性
-- [] 优化agent，提高效果
+MIT License

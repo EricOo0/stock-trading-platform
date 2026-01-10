@@ -308,8 +308,13 @@ class SinaFinanceTool:
         return data
 
     def _parse_period(self, period: str) -> int:
+        period = period.lower()
         if period.endswith('d'): return int(period[:-1])
         if period.endswith('y'): return int(period[:-1]) * 365
+        if period.endswith('mo'): return int(period[:-2]) * 30
+        if period.endswith('m') and not period.endswith('m') and not period.isdigit(): return 30 # Defensive
+        # Handle '1m', '3m' if they mean months
+        if period in ['1m', '3m', '6m']: return int(period[:-1]) * 30
         return 30
 
     def _parse_interval(self, interval: str) -> int:

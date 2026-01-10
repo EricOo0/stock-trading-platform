@@ -3,14 +3,14 @@ import { newsSentimentAPI } from '../services/newsSentimentAPI';
 import ConclusionCard from '../components/ConclusionCard';
 import PlanList from '../components/NewsSentiment/PlanList';
 import { FiSearch, FiCpu, FiFileText, FiLoader, FiLayers, FiZap, FiCheckCircle, FiArrowLeft } from 'react-icons/fi';
-import { 
-    EventType, 
+import {
+    EventType,
 } from '../types/newsSentiment';
-import type { 
-    NewsPlan, 
-    TaskUpdatePayload, 
-    ConclusionPayload, 
-    AgentEvent 
+import type {
+    NewsPlan,
+    TaskUpdatePayload,
+    ConclusionPayload,
+    AgentEvent
 } from '../types/newsSentiment';
 
 interface StreamItem {
@@ -23,9 +23,21 @@ interface StreamItem {
     tool_name?: string;
 }
 
-const NewsSentimentPage: React.FC = () => {
+interface NewsSentimentProps {
+    sharedSymbol?: string;
+    searchTrigger?: number;
+    isActive?: boolean;
+}
+
+const NewsSentimentPage: React.FC<NewsSentimentProps> = ({ sharedSymbol, searchTrigger, isActive }) => {
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (sharedSymbol) {
+            setQuery(`请对 ${sharedSymbol} 进行消息面分析`);
+        }
+    }, [sharedSymbol]);
 
     // State
     const [plan, setPlan] = useState<NewsPlan>({ tasks: [] });
@@ -80,17 +92,17 @@ const NewsSentimentPage: React.FC = () => {
                             case EventType.PLAN_UPDATE:
                                 setPlan(event.payload as NewsPlan);
                                 break;
-                            
+
                             case EventType.TASK_UPDATE:
                                 const payload = event.payload as TaskUpdatePayload;
                                 handleTaskUpdate(payload);
                                 break;
-                                
+
                             case EventType.CONCLUSION:
                                 setConclusion(event.payload as ConclusionPayload);
                                 addLog("Conclusion received.");
                                 break;
-                                
+
                             case EventType.ERROR:
                                 addLog(`[ERROR] ${event.payload}`);
                                 break;
@@ -113,14 +125,14 @@ const NewsSentimentPage: React.FC = () => {
     const handleTaskUpdate = (payload: TaskUpdatePayload) => {
         const timestamp = payload.timestamp || Date.now();
         const uniqueId = `item-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
-        
+
         // Find task title for context
         // Note: Using a ref or functional update inside setStreamItems might be better if plan is stale,
         // but here we just need a snapshot or lookup. 
         // We'll trust React state update batching or use a functional update with closure issues potentially.
         // For simplicity, we won't inject title here to avoid dependency complexity, 
         // or we'll fetch it from the latest plan state in a simplified way.
-        
+
         if (payload.type === 'thought') {
             setStreamItems(prev => {
                 const last = prev[prev.length - 1];
@@ -158,7 +170,7 @@ const NewsSentimentPage: React.FC = () => {
                 timestamp
             }]);
         } else if (payload.type === 'output') {
-             setStreamItems(prev => [...prev, {
+            setStreamItems(prev => [...prev, {
                 id: uniqueId,
                 type: 'output',
                 content: payload.content,
@@ -239,26 +251,26 @@ const NewsSentimentPage: React.FC = () => {
                 </div>
 
                 {/* Search Bar */}
-                <div className="flex-1 max-w-2xl mx-12">
-                    <div className="relative group">
-                        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-black transition-colors" />
-                        <input
-                            type="text"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Type a research objective (e.g., 'NVDA RTX 5090 supply chain analysis')..."
-                            className="w-full bg-gray-100 hover:bg-white border-none focus:bg-white focus:ring-1 focus:ring-gray-200 rounded-xl pl-12 pr-20 py-3 text-sm transition-all focus:shadow-lg shadow-sm"
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                            disabled={isLoading}
-                        />
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                            {isLoading ? <FiLoader className="animate-spin text-orange-500" /> :
-                                <button onClick={handleSearch} className="p-1.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm">
-                                    <FiSearch size={14} />
-                                </button>
-                            }
-                        </div>
+                <div className="flex-1 max-w-2xl mx-12 flex items-center gap-4">
+                    <div className="flex-1 bg-gray-100/50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 truncate flex items-center gap-2">
+                        <FiSearch className="text-gray-400" />
+                        {query || "请在顶部输入股票代码..."}
                     </div>
+
+                    {isLoading ? (
+                        <div className="px-6 py-2.5 bg-gray-100 text-orange-500 rounded-xl font-medium flex items-center gap-2">
+                            <FiLoader className="animate-spin" /> 分析中...
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handleSearch}
+                            disabled={!query || isLoading}
+                            className="bg-black hover:bg-gray-800 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-gray-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            <FiZap size={16} />
+                            开始智能分析
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -284,7 +296,7 @@ const NewsSentimentPage: React.FC = () => {
                     <div className="p-5 border-b border-gray-50 flex items-center justify-between bg-white/95 backdrop-blur z-10 min-h-[73px]">
                         {selectedTaskId ? (
                             <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-2 duration-300">
-                                <button 
+                                <button
                                     onClick={handleBackToOverview}
                                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors group"
                                     title="Back to Master Plan"
@@ -306,7 +318,7 @@ const NewsSentimentPage: React.FC = () => {
                     </div>
 
                     {/* Top Section: Thoughts & Tool Notices (Flex Grow) */}
-                    <div 
+                    <div
                         ref={streamContainerRef}
                         onScroll={handleScroll}
                         className="flex-1 overflow-y-auto p-6 custom-scrollbar-light space-y-6 min-h-0 border-b border-gray-100"
@@ -322,7 +334,7 @@ const NewsSentimentPage: React.FC = () => {
                             <>
                                 {displayedItems.map((item, idx) => (
                                     <div key={item.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-backwards" style={{ animationDelay: `${idx * 0.05} s` }}>
-                                        
+
                                         {/* Task Context Header if available */}
                                         {item.task_id && (
                                             <div className="flex items-center gap-2 mb-1 opacity-50">
@@ -366,7 +378,7 @@ const NewsSentimentPage: React.FC = () => {
                                         {item.type === 'output' && (
                                             <div className="bg-green-50 border border-green-100 p-4 rounded-xl text-sm text-gray-800">
                                                 <div className="flex items-center gap-2 mb-2 text-green-600 font-bold text-xs uppercase">
-                                                    <FiCheckCircle size={12}/> Task Output
+                                                    <FiCheckCircle size={12} /> Task Output
                                                 </div>
                                                 {item.content}
                                             </div>

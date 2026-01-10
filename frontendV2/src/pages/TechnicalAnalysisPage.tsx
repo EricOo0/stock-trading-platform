@@ -1,23 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, AlertCircle, Bot, ChevronDown, ChevronUp, Loader } from 'lucide-react';
-import StockChart, { type StockData } from '../components/TechnicalAnalysis/StockChart';
+import { Search, AlertCircle, Bot, Loader } from 'lucide-react';
+// import StockChart, { type StockData } from '../components/TechnicalAnalysis/StockChart';
+import TradingViewChart from '../components/TechnicalAnalysis/TradingViewChart';
+import { type StockData } from '../types/stock';
 import AnalysisPanel from '../components/TechnicalAnalysis/AnalysisPanel';
 import IndicatorSelector from '../components/TechnicalAnalysis/IndicatorSelector';
+import AITechnicalCard from '../components/TechnicalAnalysis/AITechnicalCard';
 
-const TechnicalAnalysisPage: React.FC = () => {
-    const [symbol, setSymbol] = useState('');
+
+interface TechnicalAnalysisResult {
+    signal: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+    confidence: number;
+    summary: string;
+    reasoning: string;
+    keyLevels?: { support: number[], resistance: number[] };
+    riskFactors: string[];
+}
+
+interface TechnicalAnalysisProps {
+    sharedSymbol?: string;
+    searchTrigger?: number;
+    isActive?: boolean;
+}
+
+const TechnicalAnalysisPage: React.FC<TechnicalAnalysisProps> = ({ sharedSymbol }) => {
+
+    const [symbol, setSymbol] = useState<string>('');
     const [loading, setLoading] = useState(false);
-    const [mode, setMode] = useState<'ANALYSIS' | 'REVIEW'>('ANALYSIS');
+    // const [mode, setMode] = useState<'ANALYSIS' | 'REVIEW'>('ANALYSIS'); // Removed Review mode
     const [error, setError] = useState<string | null>(null);
     const [data, setData] = useState<StockData[]>([]);
     const [period, setPeriod] = useState('1y');
 
+    useEffect(() => {
+        if (sharedSymbol) {
+            setSymbol(sharedSymbol);
+        }
+    }, [sharedSymbol]);
+
     // AI Analysis State
     const [analyzing, setAnalyzing] = useState(false);
-    const [aiSignal, setAiSignal] = useState<'BULLISH' | 'BEARISH' | 'NEUTRAL' | null>(null);
-    const [aiSummary, setAiSummary] = useState<string>('');
-    const [aiReasoning, setAiReasoning] = useState<string>('');
+
+    // Separate Data States for Modes
+    const [technicalData, setTechnicalData] = useState<TechnicalAnalysisResult | null>(null);
     const [aiContextExpanded, setAiContextExpanded] = useState(false);
+
+
+    // Legacy mapping for backwards compatibility in JSX (optional, or just update JSX)
+    // We will update JSX to use technicalData directly.
 
     // 指标状态
     const [mainIndicator, setMainIndicator] = useState<'MA' | 'BOLL' | 'NONE'>('MA');
@@ -28,7 +58,7 @@ const TechnicalAnalysisPage: React.FC = () => {
     const fetchAbortControllerRef = useRef<AbortController | null>(null);
     const aiAbortControllerRef = useRef<AbortController | null>(null);
 
-    const fetchData = async () => {
+    const fetchStockData = async () => {
         if (!symbol) return;
 
         // Cancel previous request
@@ -47,7 +77,7 @@ const TechnicalAnalysisPage: React.FC = () => {
             if (result.status === 'success') {
                 setData(result.data);
                 // Trigger AI Analysis after data load
-                fetchAIAnalysis();
+                // fetchAIAnalysis(); // Removed: Manual trigger only per user request
             } else {
                 setError(result.message || '获取数据失败');
             }
@@ -75,19 +105,21 @@ const TechnicalAnalysisPage: React.FC = () => {
         const signal = aiAbortControllerRef.current.signal;
 
         setAnalyzing(true);
-        setAiSignal(null);
-        setAiSummary('');
-        setAiReasoning('');
+
+        // Clear ONLY the current mode's data to indicate fresh start, or keep previous while loading?
+        // Usually clearing is better to show "Thinking..." state correctly.
+        // Clear ONLY the current mode's data to indicate fresh start, or keep previous while loading?
+        // Usually clearing is better to show "Thinking..." state correctly.
+        setTechnicalData(null);
 
         try {
-            const endpoint = mode === 'REVIEW' ? '/api/agent/review/analyze' : '/api/agent/technical/analyze';
+            const endpoint = '/api/agent/technical/analyze';
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     symbol: symbol,
-                    session_id: `${mode.toLowerCase()}-${Date.now()}`,
-                    user_id: "user" // Add user_id for Review Agent
+                    session_id: `analysis-${Date.now()}`
                 }),
                 signal
             });
@@ -120,7 +152,16 @@ const TechnicalAnalysisPage: React.FC = () => {
 
                         if (event.type === 'thought') {
                             hasReceivedThoughts = true;
-                            setAiReasoning(prev => prev + event.content);
+                            const content = event.content;
+                            setTechnicalData(prev => ({
+                                signal: prev?.signal || null,
+                                confidence: prev?.confidence || 0,
+                                summary: prev?.summary || '',
+                                reasoning: (prev?.reasoning || '') + content,
+                                keyLevels: prev?.keyLevels,
+                                riskFactors: prev?.riskFactors || []
+                            }));
+
                             if (reasoningEndRef.current) {
                                 reasoningEndRef.current.scrollIntoView({ behavior: 'smooth' });
                             }
@@ -128,9 +169,17 @@ const TechnicalAnalysisPage: React.FC = () => {
                         else if (event.type === 'agent_response') {
                             // Accumulate the final answer text
                             fullResponseText += event.content;
-                            // Optionally display it as it arrives if we haven't switched to summary yet
+                            // Also stream to UI for visibility
                             if (!hasReceivedThoughts) {
-                                setAiReasoning(prev => prev + event.content);
+                                const content = event.content;
+                                setTechnicalData(prev => ({
+                                    signal: prev?.signal || null,
+                                    confidence: prev?.confidence || 0,
+                                    summary: prev?.summary || '',
+                                    reasoning: (prev?.reasoning || '') + content,
+                                    keyLevels: prev?.keyLevels,
+                                    riskFactors: prev?.riskFactors || []
+                                }));
                             }
                         }
                     } catch (e) {
@@ -150,20 +199,31 @@ const TechnicalAnalysisPage: React.FC = () => {
                         const jsonStr = fullResponseText.substring(firstOpen, lastClose + 1);
                         const result = JSON.parse(jsonStr);
 
-                        setAiSignal(result.signal);
-                        setAiSummary(result.summary);
+                        setTechnicalData({
+                            signal: result.signal,
+                            confidence: result.confidence || 0,
+                            summary: result.summary,
+                            reasoning: (!hasReceivedThoughts && result.analysis) ? result.analysis : (technicalData?.reasoning || ''),
+                            keyLevels: result.key_levels,
+                            riskFactors: result.risk_factors || []
+                        });
+
                         // If we didn't receive thought stream, ensure the reasoning is set to the structured analysis
-                        if (!hasReceivedThoughts) {
-                            setAiReasoning(result.analysis);
+                        if (!hasReceivedThoughts && result.analysis) {
+                            // Already handled in setTechnicalData above
                         }
+
                     } else {
-                        // If no JSON found, just show the text
-                        setAiSummary("Analysis Completed (Unstructured)");
-                        if (!hasReceivedThoughts) setAiReasoning(fullResponseText);
+                        // No JSON found
+                        setTechnicalData(prev => ({
+                            ...(prev as TechnicalAnalysisResult),
+                            summary: "Analysis Completed (Unstructured)",
+                            reasoning: fullResponseText
+                        }));
                     }
                 } catch (e) {
                     console.warn("Failed to parse final accumulated JSON", e);
-                    setAiSummary("Analysis Parsing Failed");
+                    setTechnicalData(prev => ({ ...(prev as TechnicalAnalysisResult), summary: "Analysis Parsing Failed" }));
                 }
             }
         } catch (e) {
@@ -180,73 +240,21 @@ const TechnicalAnalysisPage: React.FC = () => {
     };
 
     useEffect(() => {
-        fetchData();
+        if (symbol) {
+            fetchStockData();
+        }
         return () => {
             if (fetchAbortControllerRef.current) fetchAbortControllerRef.current.abort();
             if (aiAbortControllerRef.current) aiAbortControllerRef.current.abort();
         };
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [symbol, period]);
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        fetchData();
-    };
+
 
     // Render Logic for AI Card
-    const renderAICard = () => {
-        if (!aiSignal && !analyzing && !aiReasoning) return null; // Nothing yet
-
-        const getSignalColor = () => {
-            if (aiSignal === 'BULLISH') return 'text-red-400 border-red-500/30 bg-red-500/10';
-            if (aiSignal === 'BEARISH') return 'text-green-400 border-green-500/30 bg-green-500/10';
-            return 'text-slate-300 border-slate-600/30 bg-slate-700/30';
-        };
-
-        return (
-            <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden mb-6 shadow-lg transition-all">
-                {/* Header / Summary */}
-                <div
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-700/50 transition-colors"
-                    onClick={() => setAiContextExpanded(!aiContextExpanded)}
-                >
-                    <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-lg ${analyzing ? 'animate-pulse bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
-                            {analyzing ? <Loader className="animate-spin" size={24} /> : <Bot size={24} />}
-                        </div>
-
-                        <div>
-                            <div className="flex items-center gap-3 mb-1">
-                                <h3 className="font-bold text-white text-lg">AI Technical Insight</h3>
-                                {aiSignal && (
-                                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getSignalColor()}`}>
-                                        {aiSignal}
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-slate-400 text-sm">
-                                {analyzing && !aiSummary ? "Analyzing market structure & indicators..." : (aiSummary || "Analysis ready.")}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="text-slate-500">
-                        {aiContextExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                    </div>
-                </div>
-
-                {/* Expanded Content: Reasoning */}
-                {(aiContextExpanded || analyzing) && (
-                    <div className="border-t border-slate-700 bg-slate-900/50 p-4">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Detailed Reasoning</h4>
-                        <div className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed font-mono text-xs whitespace-pre-wrap">
-                            {aiReasoning}
-                            <div ref={reasoningEndRef} />
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    };
+    // Replaced by AITechnicalCard component
+    // const renderAICard = () => ... (removed)
 
     return (
         <div className="h-full flex flex-col bg-slate-900 text-white overflow-hidden">
@@ -258,58 +266,44 @@ const TechnicalAnalysisPage: React.FC = () => {
 
                 <div className="flex flex-col gap-4 items-end">
                     <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700 w-fit">
-                        <button
-                            onClick={() => setMode('ANALYSIS')}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                                mode === 'ANALYSIS' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                            }`}
-                        >
+                        <div className="px-3 py-1.5 rounded-md text-sm font-medium bg-indigo-600 text-white shadow-lg">
                             实时分析
-                        </button>
-                        <button
-                            onClick={() => setMode('REVIEW')}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                                mode === 'REVIEW' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                            }`}
-                        >
-                            每日复盘
-                        </button>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <form onSubmit={handleSearch} className="flex gap-2">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={symbol}
-                                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                                placeholder="Symbol (e.g. AAPL)"
-                                className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 pl-10 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64 transition-all"
-                            />
-                            <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={loading || analyzing}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? 'Fetching...' : 'Analyze'}
-                        </button>
-                    </form>
+                        <div className="flex items-center gap-4">
+                            {symbol ? (
+                                <div className="px-4 py-2 bg-slate-800 rounded-lg text-slate-300 text-sm border border-slate-700 font-mono font-bold tracking-wider">
+                                    {symbol}
+                                </div>
+                            ) : (
+                                <div className="text-slate-500 text-sm italic">请在顶部输入代码</div>
+                            )}
 
-                    <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
-                        {['6mo', '1y', '2y', '5y'].map((p) => (
                             <button
-                                key={p}
-                                onClick={() => { setPeriod(p); setTimeout(fetchData, 0); }}
-                                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${period === p ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'
-                                    }`}
+                                onClick={() => fetchAIAnalysis()}
+                                disabled={loading || analyzing || !symbol}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
-                                {p}
+                                {loading ? <Loader className="animate-spin" size={16} /> : <Bot size={18} />}
+                                {loading ? '获取数据中...' : '开始 AI 分析'}
                             </button>
-                        ))}
+                        </div>
+
+                        <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
+                            {['6mo', '1y', '2y', '5y'].map((p) => (
+                                <button
+                                    key={p}
+                                    onClick={() => { setPeriod(p); setTimeout(fetchStockData, 0); }}
+                                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${period === p ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'
+                                        }`}
+                                >
+                                    {p}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
                 </div>
             </header>
 
@@ -330,20 +324,28 @@ const TechnicalAnalysisPage: React.FC = () => {
                 ) : !symbol ? (
                     <div className="h-full flex flex-col items-center justify-center text-slate-500">
                         <Search size={48} className="mb-4 opacity-50" />
-                        <h2 className="text-xl font-medium mb-2">Enter a stock symbol to start {mode === 'REVIEW' ? 'Review' : 'Analysis'}</h2>
+                        <h2 className="text-xl font-medium mb-2">Enter a stock symbol to start Analysis</h2>
                         <p>Search for any US/HK/CN stock code (e.g. AAPL, 00700, 600519)</p>
                     </div>
                 ) : (
                     <>
                         {/* AI Analysis Panel */}
-                        {renderAICard()}
+                        <AITechnicalCard
+                            signal={technicalData?.signal || null}
+                            confidence={technicalData?.confidence || 0}
+                            summary={technicalData?.summary || ''}
+                            reasoning={technicalData?.reasoning || ''}
+                            keyLevels={technicalData?.keyLevels}
+                            riskFactors={technicalData?.riskFactors}
+                            analyzing={analyzing}
+                        />
 
                         {/* Legacy Panels (Modified to be simpler perhaps, or kept as is) */}
                         <AnalysisPanel data={data} />
 
                         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                             <div className="lg:col-span-3 space-y-4">
-                                <StockChart
+                                <TradingViewChart
                                     data={data}
                                     mainIndicator={mainIndicator}
                                     subIndicator={subIndicator}

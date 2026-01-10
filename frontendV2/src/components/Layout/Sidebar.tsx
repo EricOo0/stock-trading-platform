@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BarChart2, TrendingUp, Search, Eye, ChevronLeft, ChevronRight, Globe, Gamepad2, FileText, Brain, Sparkles } from 'lucide-react';
+import { Home, TrendingUp, ChevronLeft, ChevronRight, Globe, Gamepad2, Brain, Layers } from 'lucide-react';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -29,22 +29,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       color: "text-violet-500",
     },
     {
-      id: "inspiring",
-      label: "深度投研",
-      icon: <Sparkles size={20} />,
-      color: "text-yellow-400",
-    },
-    {
-      id: "news-sentiment",
-      label: "消息面分析",
-      icon: <Search size={20} />,
-      color: "text-purple-400",
-    },
-    {
-      id: "technical-analysis",
-      label: "技术分析",
-      icon: <BarChart2 size={20} />,
-      color: "text-emerald-500",
+      id: "stock-analysis",
+      label: "个股分析",
+      icon: <Layers size={20} />,
+      color: "text-blue-400",
     },
     {
       id: "macro-data",
@@ -53,40 +41,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       color: "text-cyan-500",
     },
     {
-      id: "financial-analysis",
-      label: "财报分析",
-      icon: <FileText size={20} />,
-      color: "text-indigo-400",
-    },
-    {
-      id: "stock-simulation",
-      label: "模拟回测",
-      icon: <TrendingUp size={20} />,
-      color: "text-orange-500",
-    },
-    {
       id: "council",
       label: "AI 顾问团",
       icon: <Gamepad2 size={20} />,
       color: "text-pink-500",
-    },
-    {
-      id: "market-query",
-      label: "行情查询",
-      icon: <TrendingUp size={20} />,
-      color: "text-blue-500",
-    },
-    {
-      id: "stock-search",
-      label: "股票搜索",
-      icon: <Search size={20} />,
-      color: "text-amber-500",
-    },
-    {
-      id: "watchlist",
-      label: "自选股票",
-      icon: <Eye size={20} />,
-      color: "text-red-500",
     },
     {
       id: "memory-viz",

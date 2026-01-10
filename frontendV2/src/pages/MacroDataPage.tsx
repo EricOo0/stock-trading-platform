@@ -4,6 +4,7 @@ import { ArrowUp, ArrowDown, Globe, BarChart2, DollarSign } from 'lucide-react';
 import { macroAPI } from '../services/macroAPI';
 import type { MacroDataPoint } from '../services/macroAPI';
 import { ChartComponent } from '../components/ChartComponent';
+import MacroIndicatorCard from '../components/Macro/MacroIndicatorCard';
 
 interface IndicatorConfig {
     id: string; // ID sent to backend
@@ -112,12 +113,22 @@ const MacroDataPage: React.FC = () => {
 
     // AI Analysis State
     const [analyzing, setAnalyzing] = useState(false);
-    const [aiSignal, setAiSignal] = useState<'BULLISH' | 'BEARISH' | 'NEUTRAL' | null>(null);
-    const [aiSummary, setAiSummary] = useState<string>('');
-    const [aiReasoning, setAiReasoning] = useState<string>('');
-    const [aiContextExpanded, setAiContextExpanded] = useState(false);
+    const [macroData, setMacroData] = useState<{
+        macroHealthScore?: number;
+        macroHealthLabel?: string;
+        keyMetrics?: Array<{ name: string; value: string; trend: 'UP' | 'NEUTRAL' | 'DOWN' }>;
+        signal?: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+        confidence?: number;
+        marketCycle?: string;
+        marketImplication?: string;
+        riskWarning?: string;
+        strategy?: string;
+        summary?: string;
+        analysis?: string;
+        keyFactors?: { positive: string[]; negative: string[] };
+    }>({});
 
-    const reasoningEndRef = React.useRef<HTMLDivElement>(null);
+    // const reasoningEndRef = React.useRef<HTMLDivElement>(null);  // Removed, unused
     const aiAbortControllerRef = React.useRef<AbortController | null>(null);
 
     const fetchAIAnalysis = async () => {
@@ -126,9 +137,7 @@ const MacroDataPage: React.FC = () => {
         const signal = aiAbortControllerRef.current.signal;
 
         setAnalyzing(true);
-        setAiSignal(null);
-        setAiSummary('');
-        setAiReasoning('');
+        setMacroData({});
 
         try {
             const response = await fetch('/api/agent/macro/analyze', {
@@ -168,7 +177,7 @@ const MacroDataPage: React.FC = () => {
                             // or if we implement a stream parser later.
                         } else if (event.type === 'error') {
                             console.error("Agent returned error:", event.content);
-                            setAiReasoning(prev => prev + `\n[Error: ${event.content}]`);
+                            setMacroData(prev => ({ ...prev, analysis: (prev.analysis || '') + `\n[Error: ${event.content}]` }));
                         }
                     } catch (e) { }
                 }
@@ -185,69 +194,35 @@ const MacroDataPage: React.FC = () => {
 
                 const result = JSON.parse(jsonStr);
 
-                if (result.signal) setAiSignal(result.signal);
-                if (result.summary) setAiSummary(result.summary);
-                if (result.analysis) setAiReasoning(result.analysis);
+                setMacroData({
+                    macroHealthScore: result.macro_health_score,
+                    macroHealthLabel: result.macro_health_label,
+                    keyMetrics: result.key_metrics,
+                    signal: result.signal,
+                    confidence: result.confidence,
+                    marketCycle: result.market_cycle,
+                    marketImplication: result.market_implication,
+                    riskWarning: result.risk_warning,
+                    strategy: result.strategy,
+                    summary: result.summary,
+                    analysis: result.analysis,
+                    keyFactors: result.key_factors
+                });
             } catch (e) {
                 console.warn("Macro JSON parse failed, utilizing raw text", e);
-                // Keep the incrementally accumulated text as reasoning
+                // Keep the incrementally accumulated text as reasoning (handled below if result is used)
             }
 
         } catch (e) {
             if (e instanceof Error && e.name === 'AbortError') return;
             console.error(e);
-            setAiReasoning(prev => prev + "\n[Analysis interrupted or failed]");
+            setMacroData(prev => ({ ...prev, analysis: prev.analysis + "\n[Analysis interrupted or failed]" }));
         } finally {
             if (!signal.aborted) setAnalyzing(false);
         }
     };
 
-    const renderAICard = () => {
-        if (!aiSignal && !analyzing && !aiReasoning) return null;
 
-        const getSignalColor = () => {
-            if (aiSignal === 'BULLISH') return 'text-red-400 border-red-500/30 bg-red-500/10';
-            if (aiSignal === 'BEARISH') return 'text-green-400 border-green-500/30 bg-green-500/10';
-            return 'text-slate-300 border-slate-600/30 bg-slate-700/30';
-        };
-
-        return (
-            <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden mb-6 shadow-lg transition-all">
-                <div
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-700/50 transition-colors"
-                    onClick={() => setAiContextExpanded(!aiContextExpanded)}
-                >
-                    <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-lg ${analyzing ? 'animate-pulse bg-cyan-500/20 text-cyan-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
-                            {analyzing ? <Globe className="animate-spin" size={24} /> : <Globe size={24} />}
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-3 mb-1">
-                                <h3 className="font-bold text-white text-lg">AI Macro Strategist</h3>
-                                {aiSignal && (
-                                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getSignalColor()}`}>
-                                        {aiSignal}
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-slate-400 text-sm">
-                                {analyzing && !aiSummary ? "Analyzing global economic indicators..." : (aiSummary || "Macro analysis ready.")}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {(aiContextExpanded || analyzing || aiReasoning) && (
-                    <div className="border-t border-slate-700 bg-slate-900/50 p-4">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Strategy Logic</h4>
-                        <div className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed font-mono text-xs whitespace-pre-wrap">
-                            {aiReasoning || (analyzing ? "Reading macro data points..." : "")}
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     useEffect(() => {
         const loadData = async () => {
@@ -328,10 +303,24 @@ const MacroDataPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex flex-col gap-6 h-[calc(100vh-140px)]">
+            <div className="flex flex-col gap-6 h-[calc(100vh-140px)] overflow-y-auto">
 
                 {/* AI Analysis Card */}
-                {renderAICard()}
+                <MacroIndicatorCard
+                    macroHealthScore={macroData.macroHealthScore}
+                    macroHealthLabel={macroData.macroHealthLabel}
+                    keyMetrics={macroData.keyMetrics}
+                    signal={macroData.signal}
+                    confidence={macroData.confidence}
+                    marketCycle={macroData.marketCycle}
+                    marketImplication={macroData.marketImplication}
+                    riskWarning={macroData.riskWarning}
+                    strategy={macroData.strategy}
+                    summary={macroData.summary}
+                    analysis={macroData.analysis}
+                    keyFactors={macroData.keyFactors}
+                    analyzing={analyzing}
+                />
 
                 {/* Top Section: Data Table & Fed Watch (Global Only) */}
                 <div className="h-1/3 flex gap-6">

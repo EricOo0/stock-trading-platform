@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Union
 from backend.infrastructure.config.loader import config
 
@@ -86,12 +87,15 @@ class Tools:
 
         # Strategy: A-share (Sina->AkShare->Yahoo), US/HK (Yahoo->Sina)
         if market == "A-share":
-            res = self.sina.get_stock_quote(symbol, market="A-share")
-            if not self._is_error(res):
-                return res
+            # Prefer AkShare for better metadata (PE, PB, etc) if using spot data
             res = self.akshare.get_stock_quote(symbol)
             if not self._is_error(res):
                 return res
+            # Fallback to Sina
+            res = self.sina.get_stock_quote(symbol, market="A-share")
+            if not self._is_error(res):
+                return res
+            # Fallback to Yahoo
             res = self.yahoo.get_stock_quote(symbol, market="A-share")
             if not self._is_error(res):
                 return res
@@ -539,8 +543,61 @@ class Tools:
         self, symbol: str, period: str = "1y"
     ) -> List[Dict[str, Any]]:
         """Get historical data with calculated indicators (for charts)."""
-        history = self.get_historical_data(symbol, period=period)
-        return self.technical.calculate_indicators_history(history)
+        # Mapping for minimum data requirement for technical indicators
+        # Indicators like MA60, MACD need sufficient history (at least 30-60 points)
+        min_fetch_period = "6mo"
+        short_periods = ["1d", "5d", "1mo", "1m", "30d", "3mo", "3m", "60d", "90d"]
+
+        fetch_period = period
+        if period in short_periods:
+            fetch_period = min_fetch_period
+
+        history = self.get_historical_data(symbol, period=fetch_period)
+        
+        # Calculate indicators on the full history
+        full_data = self.technical.calculate_indicators_history(history)
+        
+        # If we fetched more data than requested, slice it back to requested period
+        if fetch_period != period:
+             days_map = {
+                 "1d": 1, "5d": 5, 
+                 "1mo": 32, "1m": 32, "30d": 32, # 32 days to cover a full month with weekends
+                 "3mo": 95, "3m": 95, "60d": 65, "90d": 95
+             }
+             
+             target_days = days_map.get(period, 32)
+             
+             try:
+                 # Filter data by date
+                 cutoff_date = (datetime.now() - timedelta(days=target_days)).date()
+                 
+                 filtered_data = []
+                 for d in full_data:
+                     # Check timestamp format. Usually YYYY-MM-DD
+                     ts = d.get('timestamp', '')
+                     if not ts: continue
+                     
+                     try:
+                         # Handle YYYY-MM-DD format
+                         d_date = datetime.strptime(ts, "%Y-%m-%d").date()
+                         if d_date >= cutoff_date:
+                             filtered_data.append(d)
+                     except ValueError:
+                         # Handle potential datetime string like YYYY-MM-DDTHH:MM:SS
+                         try:
+                             d_date = datetime.strptime(ts.split('T')[0], "%Y-%m-%d").date()
+                             if d_date >= cutoff_date:
+                                 filtered_data.append(d)
+                         except:
+                             pass
+                             
+                 return filtered_data
+                 
+             except Exception as e:
+                 logger.warning(f"Failed to filter technical history: {e}")
+                 return full_data
+
+        return full_data
 
     def get_macro_history(self, query: str, period: str = "1y") -> Dict[str, Any]:
         """Get historical macro data."""

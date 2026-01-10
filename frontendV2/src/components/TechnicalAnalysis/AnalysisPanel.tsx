@@ -1,5 +1,5 @@
 import React from 'react';
-import type { StockData } from './StockChart';
+import type { StockData } from '../../types/stock';
 
 interface AnalysisPanelProps {
     data: StockData[];
