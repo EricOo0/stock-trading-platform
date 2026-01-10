@@ -61,14 +61,28 @@ export const macroAPI = {
     },
 
     getFedImpliedProbability: async (): Promise<any> => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/macro-data/fed-implied-probability`);
-            const result = await response.json();
-            return result.status === 'success' ? result : null;
-        } catch (error) {
-            console.error("Error fetching Fed probability:", error);
-            return null;
+        const maxRetries = 3;
+        const retryDelay = 1000; // 1 second
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/macro-data/fed-implied-probability`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    return result;
+                } else {
+                    console.warn(`[MacroAPI] Fed probability attempt ${attempt} failed:`, result);
+                }
+            } catch (error) {
+                console.error(`[MacroAPI] Fed probability attempt ${attempt} error:`, error);
+                if (attempt < maxRetries) {
+                    console.log(`[MacroAPI] Retrying in ${retryDelay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                }
+            }
         }
+        console.error('[MacroAPI] Fed probability failed after all retries');
+        return null;
     },
 
     clearCache: () => {

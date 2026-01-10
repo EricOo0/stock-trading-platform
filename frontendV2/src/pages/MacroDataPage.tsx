@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, BarChart, Bar, Cell, LabelList, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
-import { ArrowUp, ArrowDown, Globe, BarChart2, DollarSign } from 'lucide-react';
+import { ArrowUp, ArrowDown, Globe, BarChart2, DollarSign, Bot, Loader } from 'lucide-react';
 import { macroAPI } from '../services/macroAPI';
 import type { MacroDataPoint } from '../services/macroAPI';
 import { ChartComponent } from '../components/ChartComponent';
@@ -258,8 +258,8 @@ const MacroDataPage: React.FC = () => {
 
             setLoading(false);
 
-            // Trigger AI Analysis
-            fetchAIAnalysis();
+            // AI Analysis is now manual - no auto-trigger
+            // fetchAIAnalysis();
         };
         loadData();
 
@@ -313,22 +313,44 @@ const MacroDataPage: React.FC = () => {
 
             <div className="flex flex-col gap-6 h-[calc(100vh-140px)] overflow-y-auto">
 
-                {/* AI Analysis Card */}
-                <MacroIndicatorCard
-                    macroHealthScore={macroData.macroHealthScore}
-                    macroHealthLabel={macroData.macroHealthLabel}
-                    keyMetrics={macroData.keyMetrics}
-                    signal={macroData.signal}
-                    confidence={macroData.confidence}
-                    marketCycle={macroData.marketCycle}
-                    marketImplication={macroData.marketImplication}
-                    riskWarning={macroData.riskWarning}
-                    strategy={macroData.strategy}
-                    summary={macroData.summary}
-                    analysis={macroData.analysis}
-                    keyFactors={macroData.keyFactors}
-                    analyzing={analyzing}
-                />
+                {/* AI Analysis Section */}
+                <div className="flex items-start gap-4 shrink-0">
+                    {/* AI Trigger Button */}
+                    <button
+                        onClick={fetchAIAnalysis}
+                        disabled={analyzing}
+                        className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all shrink-0 ${analyzing
+                            ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500 shadow-lg hover:shadow-cyan-500/25'
+                            }`}
+                    >
+                        {analyzing ? (
+                            <Loader className="animate-spin" size={18} />
+                        ) : (
+                            <Bot size={18} />
+                        )}
+                        {analyzing ? '分析中...' : '开始 AI 分析'}
+                    </button>
+
+                    {/* AI Analysis Card */}
+                    <div className="flex-1">
+                        <MacroIndicatorCard
+                            macroHealthScore={macroData.macroHealthScore}
+                            macroHealthLabel={macroData.macroHealthLabel}
+                            keyMetrics={macroData.keyMetrics}
+                            signal={macroData.signal}
+                            confidence={macroData.confidence}
+                            marketCycle={macroData.marketCycle}
+                            marketImplication={macroData.marketImplication}
+                            riskWarning={macroData.riskWarning}
+                            strategy={macroData.strategy}
+                            summary={macroData.summary}
+                            analysis={macroData.analysis}
+                            keyFactors={macroData.keyFactors}
+                            analyzing={analyzing}
+                        />
+                    </div>
+                </div>
 
                 {/* Top Section: Data Table & Fed Watch (Global Only) */}
                 <div className="min-h-[280px] flex gap-6 shrink-0">
