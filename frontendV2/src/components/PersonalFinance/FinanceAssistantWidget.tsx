@@ -1,9 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, User, Sparkles, Loader2, Maximize2, Minimize2 } from 'lucide-react';
+import { Bot, X, Send, User, Sparkles, Loader2, Maximize2, Minimize2, ChevronDown, ChevronRight, CheckCircle2, Clock, PlayCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import RecommendationCard, { type RecommendationCardProps } from './RecommendationCard';
 import type { AssetItem } from '../../types/personalFinance';
+
+interface ExecutionStep {
+  id: string;
+  title: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+  result?: string;
+  type?: 'task_result';
+}
 
 interface Message {
   id: string;
@@ -11,12 +19,86 @@ interface Message {
   text: string;
   timestamp: Date;
   cards?: RecommendationCardProps[];
+  steps?: ExecutionStep[];
 }
 
 interface FinanceAssistantWidgetProps {
   assets: AssetItem[];
   cash: number;
 }
+
+// Helper to safely render content that might be an object
+const safeRender = (content: any): string => {
+  if (typeof content === 'string') return content;
+  if (typeof content === 'object' && content !== null) {
+    try {
+      return JSON.stringify(content, null, 2);
+    } catch (e) {
+      return '[Object]';
+    }
+  }
+  return String(content || '');
+};
+
+const ExecutionSteps: React.FC<{ steps: ExecutionStep[] }> = ({ steps }) => {
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+
+  if (!steps || steps.length === 0) return null;
+
+  return (
+    <div className="mt-3 bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="px-3 py-2 bg-slate-800/80 border-b border-slate-700/50 flex items-center gap-2">
+        <Sparkles size={14} className="text-blue-400" />
+        <span className="text-xs font-medium text-slate-300">思考与执行过程</span>
+      </div>
+      <div className="p-2 space-y-1">
+        {steps.map((step) => {
+          const isCompleted = step.status === 'COMPLETED';
+          const isInProgress = step.status === 'IN_PROGRESS';
+          const hasResult = !!step.result;
+          const isExpanded = expandedStepId === step.id;
+
+          return (
+            <div key={step.id} className="group">
+              <div 
+                className={`
+                  flex items-center gap-2 p-2 rounded-lg text-xs transition-colors
+                  ${hasResult ? 'hover:bg-slate-700/50 cursor-pointer' : ''}
+                `}
+                onClick={() => hasResult && setExpandedStepId(isExpanded ? null : step.id)}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                ) : isInProgress ? (
+                  <Loader2 size={14} className="text-blue-400 animate-spin shrink-0" />
+                ) : (
+                  <Clock size={14} className="text-slate-500 shrink-0" />
+                )}
+                
+                <span className={`flex-1 ${isCompleted ? 'text-slate-300' : 'text-slate-400'}`}>
+                  {safeRender(step.title)}
+                </span>
+
+                {hasResult && (
+                  <div className="text-slate-500">
+                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  </div>
+                )}
+              </div>
+
+              {/* Step Result Detail */}
+              {isExpanded && step.result && (
+                <div className="ml-6 mr-2 mb-2 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50 text-xs text-slate-300 font-mono whitespace-pre-wrap max-h-60 overflow-y-auto">
+                  {safeRender(step.result)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const FinanceAssistantWidget: React.FC<FinanceAssistantWidgetProps> = ({ assets, cash }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -64,13 +146,14 @@ const FinanceAssistantWidget: React.FC<FinanceAssistantWidgetProps> = ({ assets,
         },
         body: JSON.stringify({
           assets: assets.map(a => ({
-            symbol: a.code,
+            symbol: a.code || a.name, // Fallback to name if code is empty to help AI identify asset
             name: a.name,
             type: a.type,
             quantity: a.quantity,
             cost_basis: a.avgCost,
             current_price: a.currentPrice,
-            total_value: a.totalValue
+            // Fallback: if totalValue is 0 (missing price) but we have cost, use cost to avoid AI thinking we have 0 assets
+            total_value: (a.totalValue === 0 && a.totalCost > 0) ? a.totalCost : a.totalValue
           })),
           cash_balance: cash,
           query: text
@@ -84,13 +167,15 @@ const FinanceAssistantWidget: React.FC<FinanceAssistantWidgetProps> = ({ assets,
       let botMsgId = (Date.now() + 1).toString();
       let botText = '';
       let cards: RecommendationCardProps[] = [];
+      let steps: ExecutionStep[] = [];
 
       // Initial Bot Message Placeholder
       setMessages(prev => [...prev, {
         id: botMsgId,
         sender: 'bot',
         text: '',
-        timestamp: new Date()
+        timestamp: new Date(),
+        steps: []
       }]);
 
       while (true) {
@@ -111,12 +196,32 @@ const FinanceAssistantWidget: React.FC<FinanceAssistantWidgetProps> = ({ assets,
               cards.push(data.data);
             } else if (data.type === 'error') {
               botText += `\n\n[系统错误: ${data.content}]`;
+            } else if (data.type === 'step') {
+              // Update existing step or add new one
+              const existingIndex = steps.findIndex(s => s.title === data.title);
+              if (existingIndex !== -1) {
+                steps[existingIndex] = { ...steps[existingIndex], status: data.status, result: data.content };
+              } else {
+                steps.push({
+                  id: Date.now().toString() + Math.random(),
+                  title: data.title,
+                  status: data.status,
+                  result: data.content
+                });
+              }
+            } else if (data.type === 'status') {
+              // Generic status updates as steps
+              steps.push({
+                id: Date.now().toString() + Math.random(),
+                title: data.content,
+                status: 'COMPLETED'
+              });
             }
 
             // Update Message
             setMessages(prev => prev.map(msg => 
               msg.id === botMsgId 
-                ? { ...msg, text: botText, cards: [...cards] } 
+                ? { ...msg, text: botText, cards: [...cards], steps: [...steps] } 
                 : msg
             ));
           } catch (e) {
@@ -244,13 +349,18 @@ const FinanceAssistantWidget: React.FC<FinanceAssistantWidgetProps> = ({ assets,
                               td: ({children}) => <td className="px-3 py-2 text-sm text-slate-300 whitespace-nowrap">{children}</td>,
                             }}
                           >
-                            {msg.text}
+                            {typeof msg.text === 'string' ? msg.text : ''}
                           </ReactMarkdown>
                         </div>
-                      ) : msg.text}
+                      ) : (typeof msg.text === 'string' ? msg.text : '')}
                     </div>
                   )}
                   
+                  {/* Execution Steps */}
+                  {msg.steps && msg.steps.length > 0 && (
+                    <ExecutionSteps steps={msg.steps} />
+                  )}
+
                   {/* Render Cards if any */}
                   {msg.cards && msg.cards.length > 0 && (
                     <div className={`grid gap-3 w-full ${isExpanded ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>

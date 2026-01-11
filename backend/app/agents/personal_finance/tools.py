@@ -8,10 +8,11 @@ from backend.app.agents.personal_finance.sub_agents import (
     MarketAnalyst,
     NewsAnalyst,
     TechnicalAnalyst,
-    DailyReviewAnalyst
+    DailyReviewAnalyst,
 )
 
 logger = logging.getLogger(__name__)
+
 
 async def run_macro_analysis(session_id: str = "default") -> str:
     """
@@ -26,6 +27,7 @@ async def run_macro_analysis(session_id: str = "default") -> str:
         logger.error(f"Failed to run macro analysis: {e}")
         return f"Error running macro analysis: {str(e)}"
 
+
 async def run_market_analysis() -> str:
     """
     Runs the Market Analyst (independent sub-agent) and returns the analysis.
@@ -38,6 +40,7 @@ async def run_market_analysis() -> str:
     except Exception as e:
         logger.error(f"Failed to run market analysis: {e}")
         return f"Error running market analysis: {str(e)}"
+
 
 async def run_technical_analysis(symbol: str, session_id: str = "default") -> str:
     """
@@ -52,6 +55,7 @@ async def run_technical_analysis(symbol: str, session_id: str = "default") -> st
         logger.error(f"Failed to run technical analysis for {symbol}: {e}")
         return f"Error running technical analysis for {symbol}: {str(e)}"
 
+
 async def run_news_analysis(query: str, session_id: str = "default") -> str:
     """
     Runs the News Analyst (independent sub-agent) for a specific query.
@@ -65,6 +69,7 @@ async def run_news_analysis(query: str, session_id: str = "default") -> str:
         logger.error(f"Failed to run news analysis: {e}")
         return f"Error running news analysis: {str(e)}"
 
+
 async def run_daily_review_analysis(symbol: str, session_id: str = "default") -> str:
     """
     Runs the Daily Review Analyst (independent sub-agent) for a specific symbol.
@@ -77,4 +82,3 @@ async def run_daily_review_analysis(symbol: str, session_id: str = "default") ->
     except Exception as e:
         logger.error(f"Failed to run daily review analysis for {symbol}: {e}")
         return f"Error running daily review analysis for {symbol}: {str(e)}"
-

@@ -15,6 +15,8 @@ from .schemas import (
     ClusterRequest,
     FinalizeSessionRequest,
     FinalizeSessionResponse,
+    ClearMemoryRequest,
+    ClearMemoryResponse,
 )
 from core.manager import MemoryManager
 from utils.logger import logger
@@ -77,6 +79,8 @@ async def get_context(request: GetContextRequest):
             agent_id=request.agent_id,
             query=request.query,
             session_id=request.session_id,
+            limit=request.limit,
+            max_tokens=request.max_tokens,
         )
 
         # 构造响应
@@ -148,6 +152,25 @@ async def get_stats(user_id: str, agent_id: str):
         logger.error(f"Error getting stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/memory/clear", response_model=ClearMemoryResponse)
+async def clear_memory(request: ClearMemoryRequest):
+    """清空指定用户和Agent的所有记忆"""
+    try:
+        logger.info(f"🧹 Clearing memory for user: {request.user_id}, agent: {request.agent_id}")
+        result = await asyncio.to_thread(
+            manager.clear_memory,
+            user_id=request.user_id,
+            agent_id=request.agent_id
+        )
+        if result.get("status") == "error":
+            raise HTTPException(status_code=500, detail=result.get("message"))
+        return ClearMemoryResponse(status="success", message="Memory cleared successfully")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error clearing memory: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Internal/Debug endpoints (Optional, can be removed or moved to admin router)
 # @router.post("/memory/event/extract")

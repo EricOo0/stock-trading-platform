@@ -64,17 +64,18 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
 # News & Search Tools
 # ============================================================================
 
-def search_market_news(query: str) -> List[Dict[str, Any]]:
+def search_market_news(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     """
     Search for latest market news related to a query.
     
     Args:
         query: Search query (e.g., "Apple stock news", "Fed interest rate").
+        limit: Number of results to return (default: 5).
     
     Returns:
         List of news items with title and link.
     """
-    return get_registry().search_market_news(query)
+    return get_registry().search_market_news(query, limit=limit)
 
 
 # ============================================================================

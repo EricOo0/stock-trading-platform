@@ -190,5 +190,23 @@ class SemanticMemory:
                         "timestamp": metadata.get("timestamp"),
                     }
                 )
-
         return experiences
+
+    def clear(self) -> None:
+        """清空长期记忆"""
+        try:
+            self.user_persona = {
+                "risk_preference": "Balanced",
+                "investment_style": [],
+                "interested_sectors": [],
+                "analysis_habits": [],
+                "observed_traits": [],
+                "last_updated": None
+            }
+            self.core_principles = []
+            self.experience_store.clear()
+            self._save_to_disk()
+            logger.info(f"Cleared SemanticMemory for {self.user_id}:{self.agent_id}")
+        except Exception as e:
+            logger.error(f"Failed to clear SemanticMemory: {e}")
+            raise

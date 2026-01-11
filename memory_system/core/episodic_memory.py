@@ -205,3 +205,13 @@ class EpisodicMemory:
                 })
         
         return conflicts
+
+    def clear(self) -> None:
+        """清空所有中期记忆"""
+        try:
+            self.vector_store.clear()
+            self.graph_store.clear()
+            logger.info(f"Cleared EpisodicMemory for {self.user_id}:{self.agent_id}")
+        except Exception as e:
+            logger.error(f"Failed to clear EpisodicMemory: {e}")
+            raise

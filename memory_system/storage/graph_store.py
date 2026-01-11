@@ -126,3 +126,14 @@ class GraphStore:
                 "nodes": self.graph.number_of_nodes(),
                 "edges": self.graph.number_of_edges()
             }
+
+    def clear(self) -> None:
+        """清空图数据"""
+        try:
+            with self.lock:
+                self.graph.clear()
+                self._save()
+            logger.info(f"Cleared graph store: {self.file_path}")
+        except Exception as e:
+            logger.error(f"Failed to clear graph: {e}")
+            raise
