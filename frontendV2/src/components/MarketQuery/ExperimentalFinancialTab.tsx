@@ -4,14 +4,19 @@ import FinancialReportHeader from './components/FinancialReportHeader';
 import FinancialAnalysisPanel from './components/FinancialAnalysisPanel';
 import FinancialPDFViewer from './components/FinancialPDFViewer';
 import type { FinancialReport, AnchorMap, Citation } from './components/types';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, Maximize2, Minimize2 } from 'lucide-react';
 
 import { FinancialIndicatorsDisplay } from '../Financial';
 import { getFinancialIndicators } from '../../services/financialService';
 import type { FinancialIndicators } from '../../types/financial';
 
+interface AIChatPanelProps {
+    isExpanded?: boolean;
+    onToggleExpand?: () => void;
+}
+
 // Simple AI Chat Panel Component
-const AIChatPanel: React.FC = () => {
+const AIChatPanel: React.FC<AIChatPanelProps> = ({ isExpanded, onToggleExpand }) => {
     const [messages, setMessages] = useState<{ role: 'user' | 'ai'; content: string }[]>([
         { role: 'ai', content: '你好！我是你的AI财报助手。关于这家公司的财报，你有什么想问的吗？' }
     ]);
@@ -28,12 +33,21 @@ const AIChatPanel: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-            <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+        <div className={`flex flex-col h-full bg-slate-800 rounded-xl border border-slate-700 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-2xl' : ''}`}>
+            <div className="p-4 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
                 <h3 className="text-white font-medium flex items-center gap-2">
                     <Bot size={18} className="text-blue-400" />
                     AI 助手
                 </h3>
+                {onToggleExpand && (
+                    <button
+                        onClick={onToggleExpand}
+                        className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-slate-700 rounded"
+                        title={isExpanded ? "Minimize" : "Expand"}
+                    >
+                        {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                    </button>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -74,6 +88,7 @@ const AIChatPanel: React.FC = () => {
 };
 
 const ExperimentalFinancialTab: React.FC = () => {
+    const [chatExpanded, setChatExpanded] = useState(false);
     const [financialSearchQuery, setFinancialSearchQuery] = useState('');
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [financialData, setFinancialData] = useState<FinancialReport | null>(null);
@@ -258,12 +273,18 @@ const ExperimentalFinancialTab: React.FC = () => {
             />
 
             {/* 3-Column Layout */}
-            <div className="flex-1 grid grid-cols-12 gap-4 min-h-0">
+            <div className="flex-1 grid grid-cols-12 gap-4 min-h-0 relative">
 
                 {/* Left Column: AI Chat (20%) */}
-                <div className="col-span-3 min-h-0">
-                    <AIChatPanel />
+                <div className={`
+                    ${chatExpanded ? 'absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-sm p-4' : 'col-span-3 min-h-0'} 
+                    transition-all duration-300 ease-in-out
+                `}>
+                    <AIChatPanel isExpanded={chatExpanded} onToggleExpand={() => setChatExpanded(!chatExpanded)} />
                 </div>
+
+                {/* Placeholder for Layout Stability */}
+                {chatExpanded && <div className="col-span-3 min-h-0" />}
 
                 {/* Middle Column: Financial Analysis (50%) */}
                 <div className="col-span-6 flex flex-col gap-4 min-h-0 overflow-y-auto bg-slate-800/50 rounded-xl p-4 border border-slate-700">

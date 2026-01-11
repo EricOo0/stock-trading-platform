@@ -750,6 +750,14 @@ class Tools:
             query, limit=limit, finbert_tool=self.finbert, search_tool=self.tavily
         )
 
+    def get_stock_fund_flow(self, symbol: str) -> List[Dict[str, Any]]:
+        """Get individual stock fund flow history."""
+        # Only supported for A-shares via AkShare currently
+        market = self._detect_market(symbol)
+        if market == "A-share":
+            return self.akshare.get_stock_fund_flow(symbol)
+        return []
+
     # --- Helpers ---
 
     def _detect_market(self, symbol: str) -> str:
