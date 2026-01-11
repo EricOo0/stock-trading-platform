@@ -134,7 +134,10 @@ const AssetTable: React.FC<AssetTableProps> = ({ assets, onEdit, onUpdateAsset, 
                     />
                   </td>
                   <td className="p-4 text-right font-medium text-white">¥{asset.totalValue.toLocaleString()}</td>
-                  <td className="p-4 text-right text-slate-400">¥{asset.totalCost.toLocaleString()}</td>
+                  <td className="p-4 text-right text-slate-400">
+                    <div>¥{asset.totalCost.toLocaleString()}</div>
+                    <div className="text-xs text-slate-500 font-mono">(@ ¥{asset.avgCost.toLocaleString()})</div>
+                  </td>
                   <td className={`p-4 text-right font-medium ${asset.pnl >= 0 ? 'text-red-400' : 'text-green-400'}`}>
                     {asset.pnl >= 0 ? '+' : ''}{asset.pnl.toLocaleString()}
                   </td>

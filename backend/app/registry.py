@@ -707,6 +707,7 @@ class Tools:
         provider: str = "auto",
         topic: str = "news",
         include_domains: Optional[List[str]] = None,
+        limit: int = 5,
     ) -> List[Dict[str, Any]]:
         """Search for market news."""
         if provider == "auto":
@@ -719,7 +720,7 @@ class Tools:
 
         if provider == "tavily" and self.tavily:
             return self.tavily.search(
-                query, topic=topic, include_domains=include_domains
+                query, topic=topic, include_domains=include_domains, max_results=limit
             )
         if provider == "serp" and self.serp:
             return self.serp.search(query, topic="news")

@@ -89,9 +89,13 @@ const MemoryVisualizationPage: React.FC = () => {
         return {
             ...memoryData,
             working_memory: (memoryData.working_memory || [])
-                .filter((item) =>
-                    !query || item.content.toLowerCase().includes(query)
-                )
+                .filter((item) => {
+                    if (!query) return true;
+                    const content = typeof item.content === 'string' 
+                        ? item.content 
+                        : JSON.stringify(item.content);
+                    return content.toLowerCase().includes(query);
+                })
                 .sort(sortByTimeDesc),
             episodic_memory: (memoryData.episodic_memory || [])
                 .filter((item) => {

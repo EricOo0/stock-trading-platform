@@ -68,16 +68,20 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ type, data }) => {
     const getContent = () => {
         if (type === 'working') {
             const item = data as WorkingMemoryItem;
-            return item.content;
+            return typeof item.content === 'string' ? item.content : JSON.stringify(item.content, null, 2);
         } else if (type === 'episodic') {
             const item = data as EpisodicMemoryItem;
             if (typeof item.content === 'string') {
                 return item.content;
             }
-            return item.content.summary || item.content.key_findings || JSON.stringify(item.content);
+            return item.content.summary || item.content.key_findings || JSON.stringify(item.content, null, 2);
         } else {
             const item = data as SemanticMemoryItem;
-            return item.content;
+            if (typeof item.content === 'string') {
+                return item.content;
+            }
+            // Handle object content for semantic memory
+            return JSON.stringify(item.content, null, 2);
         }
     };
 

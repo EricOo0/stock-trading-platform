@@ -197,7 +197,7 @@ class MemoryManager:
             "tokens": wm.total_tokens()
         }
 
-    def get_context(self, user_id: str, agent_id: str, query: str, session_id: str = None) -> Dict:
+    def get_context(self, user_id: str, agent_id: str, query: str, session_id: str = None, limit: int = 20, max_tokens: int = 5000) -> Dict:
         """获取三层记忆复合上下文，包含 Token 预算控制"""
         wm = self._get_working_memory(user_id, agent_id)
         em = self._get_episodic_memory(user_id, agent_id)
@@ -206,12 +206,23 @@ class MemoryManager:
         budget = settings.TOKEN_BUDGET
         
         # 1. STM - 近期对话 (Working Memory)
-        working_items = wm.get_details()
-        # WM 已经在 add 时保证了总额，这里直接获取
-        working_tokens = wm.total_tokens()
+        # 应用 max_tokens 限制 (从最新消息开始保留)
+        full_items = wm.get_details()
+        working_items = []
+        working_tokens = 0
+        
+        # 从后往前遍历，直到 token 超限
+        for item in reversed(full_items):
+            content_str = f"{item.get('role', '')}: {str(item.get('content', ''))}"
+            t_count = tokenizer.count_tokens(content_str)
+            if working_tokens + t_count > max_tokens:
+                break
+            working_items.insert(0, item)
+            working_tokens += t_count
         
         # 2. MTM - 相关见解 (Episodic Memory)
-        episodic_results = em.retrieve(query, top_k=10) # 先多取一点用于预算控制
+        # 使用 limit 参数限制条数
+        episodic_results = em.retrieve(query, top_k=limit) 
         episodic_items = []
         episodic_tokens = 0
         for m in episodic_results:
@@ -314,11 +325,11 @@ class MemoryManager:
                 users.add(u)
                 agents.add(a)
                 
-        # 3. 确保默认值存在
-        if not users: users.add("test_user_001")
-        if not agents: 
-            agents.add("research_agent")
-            agents.add("chairman")
+        # 3. 确保默认值存在 (已移除，以便准确反映系统状态)
+        # if not users: users.add("test_user_001")
+        # if not agents: 
+        #     agents.add("research_agent")
+        #     agents.add("chairman")
                 
         return {
             "users": sorted(list(users)),
@@ -406,3 +417,24 @@ class MemoryManager:
             sm = self._get_semantic_memory(user_id, agent_id)
             for p in principles:
                 sm.add_core_principle(p)
+
+    def clear_memory(self, user_id: str, agent_id: str) -> Dict[str, Any]:
+        """清空指定用户和Agent的所有记忆"""
+        try:
+            # 1. 清空短期记忆
+            wm = self._get_working_memory(user_id, agent_id)
+            wm.clear(keep_last_n=0)
+            
+            # 2. 清空中期记忆
+            em = self._get_episodic_memory(user_id, agent_id)
+            em.clear()
+            
+            # 3. 清空长期记忆
+            sm = self._get_semantic_memory(user_id, agent_id)
+            sm.clear()
+            
+            logger.info(f"Memory cleared for {user_id}:{agent_id}")
+            return {"status": "success", "message": "All memory cleared"}
+        except Exception as e:
+            logger.error(f"Failed to clear memory: {e}")
+            return {"status": "error", "message": str(e)}

@@ -6,16 +6,27 @@ import logging
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
 
-from backend.app.agents.personal_finance.models import AssetItem, PriceUpdateMap, PriceUpdate, PortfolioSnapshot
-from backend.app.services.personal_finance_service import update_prices, get_portfolio, save_portfolio
+from backend.app.agents.personal_finance.models import (
+    AssetItem,
+    PriceUpdateMap,
+    PriceUpdate,
+    PortfolioSnapshot,
+)
+from backend.app.services.personal_finance_service import (
+    update_prices,
+    get_portfolio,
+    save_portfolio,
+)
 from backend.app.agents.personal_finance.agent import create_personal_finance_graph
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/personal-finance", tags=["Personal Finance"])
 
+
 class UpdatePricesRequest(BaseModel):
     assets: List[AssetItem]
+
 
 @router.get("/portfolio", response_model=PortfolioSnapshot)
 async def get_user_portfolio(user_id: str = "default_user"):
@@ -28,8 +39,11 @@ async def get_user_portfolio(user_id: str = "default_user"):
         logger.error(f"Error getting portfolio: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/portfolio", response_model=PortfolioSnapshot)
-async def save_user_portfolio(snapshot: PortfolioSnapshot, user_id: str = "default_user"):
+async def save_user_portfolio(
+    snapshot: PortfolioSnapshot, user_id: str = "default_user"
+):
     """
     Save user portfolio.
     """
@@ -38,6 +52,7 @@ async def save_user_portfolio(snapshot: PortfolioSnapshot, user_id: str = "defau
     except Exception as e:
         logger.error(f"Error saving portfolio: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/update-prices", response_model=PriceUpdateMap)
 async def update_asset_prices(request: UpdatePricesRequest):
@@ -55,49 +70,88 @@ async def update_asset_prices(request: UpdatePricesRequest):
         logger.error(f"Error updating prices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 async def stream_analysis(portfolio: PortfolioSnapshot) -> AsyncGenerator[str, None]:
     """
     Streams analysis updates and final report.
     """
     graph = create_personal_finance_graph()
-    
+
     # Initial State
+    user_query = portfolio.query or "请分析我的投资组合并给出建议。"
     initial_state = {
-        "messages": [HumanMessage(content="Please analyze my portfolio and give me advice.")],
+        "messages": [HumanMessage(content=user_query)],
         "portfolio": portfolio.dict(),
-        "user_id": "default_user", # TODO: Get from auth
-        "session_id": "default_session"
+        "user_id": "default_user",  # TODO: Get from auth
+        "session_id": "default_session",
     }
-    
-    yield json.dumps({"type": "status", "content": "Analyzing portfolio context..."}) + "\n"
-    
+
+    yield json.dumps(
+        {"type": "status", "content": "Analyzing portfolio context..."}
+    ) + "\n"
+
     try:
         async for event in graph.astream(initial_state):
             # event is a dict of {node_name: state_update}
             for node, update in event.items():
+                if node == "pre_process":
+                    replay_enabled = update.get("replay_enabled")
+                    lessons_count = update.get("lessons_count")
+                    yield json.dumps(
+                        {
+                            "type": "status",
+                            "content": f"PreProcess 完成：replay={replay_enabled}, lessons={lessons_count}",
+                        }
+                    ) + "\n"
                 if node == "planner":
                     agents = update.get("selected_agents", [])
-                    yield json.dumps({"type": "status", "content": f"Planned analysis with agents: {', '.join(agents)}"}) + "\n"
+                    yield json.dumps(
+                        {
+                            "type": "status",
+                            "content": f"计划生成完成：{', '.join(agents)}",
+                        }
+                    ) + "\n"
                 elif node == "executor":
-                    yield json.dumps({"type": "status", "content": "Sub-agent analysis completed."}) + "\n"
+                    if isinstance(update, dict) and update.get("status"):
+                        yield json.dumps(
+                            {"type": "status", "content": update.get("status")}
+                        ) + "\n"
+                    elif isinstance(update, dict) and update.get("task_update"):
+                        tu = update.get("task_update")
+                        if isinstance(tu, dict):
+                            # Send detailed task result as a step
+                            yield json.dumps(
+                                {
+                                    "type": "step",
+                                    "step_type": "task_result",
+                                    "title": tu.get('title'),
+                                    "status": tu.get('status'),
+                                    "content": tu.get('result', '')  # Forward the result content
+                                }
+                            ) + "\n"
+                    else:
+                        yield json.dumps(
+                            {"type": "status", "content": "子任务执行完成。"}
+                        ) + "\n"
                 elif node == "synthesizer":
-                    # Stream final report tokens? 
-                    # LangGraph astream returns state updates, not tokens. 
+                    # Stream final report tokens?
+                    # LangGraph astream returns state updates, not tokens.
                     # To stream tokens, we'd need to hook into the LLM callback within the node or use astream_events.
                     # For now, we send the full report at the end.
-                    
+
                     report = update.get("final_report", "")
                     yield json.dumps({"type": "report_chunk", "content": report}) + "\n"
-                    
+
                     cards = update.get("recommendation_cards", [])
                     for card in cards:
                         yield json.dumps({"type": "card", "data": card.dict()}) + "\n"
-                        
+
     except Exception as e:
         logger.error(f"Analysis failed: {e}", exc_info=True)
         yield json.dumps({"type": "error", "content": str(e)}) + "\n"
-        
+
     yield json.dumps({"type": "done", "content": "Analysis complete"}) + "\n"
+
 
 @router.post("/analyze")
 async def analyze_portfolio(request: PortfolioSnapshot):
@@ -105,6 +159,5 @@ async def analyze_portfolio(request: PortfolioSnapshot):
     Analyze portfolio using AI agents (Streaming).
     """
     return StreamingResponse(
-        stream_analysis(request),
-        media_type="application/x-ndjson"
+        stream_analysis(request), media_type="application/x-ndjson"
     )

@@ -44,7 +44,7 @@ class MemoryClient:
             return False
 
     def get_context(
-        self, query: str, session_id: Optional[str] = None
+        self, query: str, session_id: Optional[str] = None, limit: int = 20, max_tokens: int = 5000
     ) -> Dict[str, Any]:
         """
         Retrieve cognitive context for a query.
@@ -55,6 +55,8 @@ class MemoryClient:
                 "agent_id": self.agent_id,
                 "query": query,
                 "session_id": session_id,
+                "limit": limit,
+                "max_tokens": max_tokens,
             }
 
             response = requests.post(

@@ -118,6 +118,8 @@ class GetContextRequest(BaseModel):
     query: str = Field(..., description="当前查询")
     session_id: Optional[str] = Field(None, description="会话ID")
     task_type: Optional[str] = Field(None, description="任务类型，用于上下文感知检索")
+    limit: int = Field(default=20, description="Episodic memory 条数限制")
+    max_tokens: int = Field(default=5000, description="Working memory Token 限制")
 
     class Config:
         json_schema_extra = {
@@ -262,6 +264,16 @@ class GetStatsResponse(BaseModel):
     stats: MemoryStats
     message: Optional[str] = None
 
+
+class ClearMemoryRequest(BaseModel):
+    """清空记忆请求"""
+    user_id: str = Field(..., description="User ID")
+    agent_id: str = Field(..., description="Agent ID")
+
+class ClearMemoryResponse(BaseModel):
+    """清空记忆响应"""
+    status: Literal["success", "error"]
+    message: Optional[str] = None
 
 # ==================== Error Response ====================
 

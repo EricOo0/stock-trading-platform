@@ -114,3 +114,14 @@ class VectorStore:
     def count(self) -> int:
         """获取文档总数"""
         return self.collection.count()
+
+    def clear(self) -> None:
+        """清空集合中的所有数据"""
+        try:
+            name = self.collection.name
+            self.client.delete_collection(name)
+            self.collection = self.client.create_collection(name=name)
+            logger.info(f"Cleared vector store collection: {name}")
+        except Exception as e:
+            logger.error(f"Failed to clear vector store: {e}")
+            raise
