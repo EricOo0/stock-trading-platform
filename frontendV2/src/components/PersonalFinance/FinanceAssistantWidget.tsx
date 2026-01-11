@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, User, Sparkles, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import RecommendationCard, { type RecommendationCardProps } from './RecommendationCard';
 import type { AssetItem } from '../../types/personalFinance';
 
@@ -224,11 +225,23 @@ const FinanceAssistantWidget: React.FC<FinanceAssistantWidgetProps> = ({ assets,
                       {msg.sender === 'bot' ? (
                         <div className="prose prose-invert prose-sm max-w-none">
                           <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
                             components={{
                               p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
-                              ul: ({children}) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+                              ul: ({children}) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                              ol: ({children}) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
                               li: ({children}) => <li className="mb-1">{children}</li>,
-                              strong: ({children}) => <span className="font-bold text-blue-300">{children}</span>
+                              strong: ({children}) => <span className="font-bold text-blue-300">{children}</span>,
+                              h1: ({children}) => <h1 className="text-lg font-bold text-white mb-2 mt-4">{children}</h1>,
+                              h2: ({children}) => <h2 className="text-base font-bold text-white mb-2 mt-3">{children}</h2>,
+                              h3: ({children}) => <h3 className="text-sm font-bold text-white mb-1 mt-2">{children}</h3>,
+                              blockquote: ({children}) => <blockquote className="border-l-4 border-blue-500 pl-3 italic text-slate-400 my-2">{children}</blockquote>,
+                              table: ({children}) => <div className="overflow-x-auto my-3 rounded-lg border border-slate-700"><table className="min-w-full divide-y divide-slate-700">{children}</table></div>,
+                              thead: ({children}) => <thead className="bg-slate-800">{children}</thead>,
+                              tbody: ({children}) => <tbody className="divide-y divide-slate-700 bg-slate-900/50">{children}</tbody>,
+                              tr: ({children}) => <tr className="hover:bg-slate-800/50 transition-colors">{children}</tr>,
+                              th: ({children}) => <th className="px-3 py-2 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">{children}</th>,
+                              td: ({children}) => <td className="px-3 py-2 text-sm text-slate-300 whitespace-nowrap">{children}</td>,
                             }}
                           >
                             {msg.text}
