@@ -640,17 +640,19 @@ class PersonalFinanceOrchestrator:
 
             def _add():
                 client.add_memory(user_query, role="user")
-                client.add_memory(
-                    final_report, role="assistant", metadata={"type": "report"}
-                )
-                # pre_context removed to save storage
                 
+                # Attach lessons to report metadata instead of creating separate entry
+                meta = {"type": "report"}
                 if lessons:
-                    client.add_memory(
-                        {"lessons": [l.model_dump() for l in lessons]},
-                        role="assistant",
-                        metadata={"type": "lesson"},
-                    )
+                    meta["lessons"] = [l.model_dump() for l in lessons]
+                    
+                client.add_memory(
+                    final_report, role="assistant", metadata=meta
+                )
+                
+                # pre_context removed to save storage
+                # lessons separate entry logic removed to avoid duplicate assistant messages
+                
                 client.finalize()
 
             await asyncio.to_thread(_add)
