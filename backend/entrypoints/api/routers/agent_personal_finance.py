@@ -1,0 +1,110 @@
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+from typing import Dict, List, AsyncGenerator
+import json
+import logging
+from pydantic import BaseModel
+from langchain_core.messages import HumanMessage
+
+from backend.app.agents.personal_finance.models import AssetItem, PriceUpdateMap, PriceUpdate, PortfolioSnapshot
+from backend.app.services.personal_finance_service import update_prices, get_portfolio, save_portfolio
+from backend.app.agents.personal_finance.agent import create_personal_finance_graph
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/personal-finance", tags=["Personal Finance"])
+
+class UpdatePricesRequest(BaseModel):
+    assets: List[AssetItem]
+
+@router.get("/portfolio", response_model=PortfolioSnapshot)
+async def get_user_portfolio(user_id: str = "default_user"):
+    """
+    Get user portfolio.
+    """
+    try:
+        return await get_portfolio(user_id)
+    except Exception as e:
+        logger.error(f"Error getting portfolio: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/portfolio", response_model=PortfolioSnapshot)
+async def save_user_portfolio(snapshot: PortfolioSnapshot, user_id: str = "default_user"):
+    """
+    Save user portfolio.
+    """
+    try:
+        return await save_portfolio(user_id, snapshot)
+    except Exception as e:
+        logger.error(f"Error saving portfolio: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/update-prices", response_model=PriceUpdateMap)
+async def update_asset_prices(request: UpdatePricesRequest):
+    """
+    Batch update asset prices.
+    Currently supports:
+    - Stock (via Sina)
+    - Fund (via AkShare)
+    Other types will be ignored in the update but original data structure is preserved by frontend.
+    """
+    try:
+        updated_prices = await update_prices(request.assets)
+        return updated_prices
+    except Exception as e:
+        logger.error(f"Error updating prices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def stream_analysis(portfolio: PortfolioSnapshot) -> AsyncGenerator[str, None]:
+    """
+    Streams analysis updates and final report.
+    """
+    graph = create_personal_finance_graph()
+    
+    # Initial State
+    initial_state = {
+        "messages": [HumanMessage(content="Please analyze my portfolio and give me advice.")],
+        "portfolio": portfolio.dict(),
+        "user_id": "default_user", # TODO: Get from auth
+        "session_id": "default_session"
+    }
+    
+    yield json.dumps({"type": "status", "content": "Analyzing portfolio context..."}) + "\n"
+    
+    try:
+        async for event in graph.astream(initial_state):
+            # event is a dict of {node_name: state_update}
+            for node, update in event.items():
+                if node == "planner":
+                    agents = update.get("selected_agents", [])
+                    yield json.dumps({"type": "status", "content": f"Planned analysis with agents: {', '.join(agents)}"}) + "\n"
+                elif node == "executor":
+                    yield json.dumps({"type": "status", "content": "Sub-agent analysis completed."}) + "\n"
+                elif node == "synthesizer":
+                    # Stream final report tokens? 
+                    # LangGraph astream returns state updates, not tokens. 
+                    # To stream tokens, we'd need to hook into the LLM callback within the node or use astream_events.
+                    # For now, we send the full report at the end.
+                    
+                    report = update.get("final_report", "")
+                    yield json.dumps({"type": "report_chunk", "content": report}) + "\n"
+                    
+                    cards = update.get("recommendation_cards", [])
+                    for card in cards:
+                        yield json.dumps({"type": "card", "data": card.dict()}) + "\n"
+                        
+    except Exception as e:
+        logger.error(f"Analysis failed: {e}", exc_info=True)
+        yield json.dumps({"type": "error", "content": str(e)}) + "\n"
+        
+    yield json.dumps({"type": "done", "content": "Analysis complete"}) + "\n"
+
+@router.post("/analyze")
+async def analyze_portfolio(request: PortfolioSnapshot):
+    """
+    Analyze portfolio using AI agents (Streaming).
+    """
+    return StreamingResponse(
+        stream_analysis(request),
+        media_type="application/x-ndjson"
+    )

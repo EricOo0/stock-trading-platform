@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, TrendingUp, ChevronLeft, ChevronRight, Globe, Gamepad2, Brain, Layers } from 'lucide-react';
+import { Home, TrendingUp, ChevronLeft, ChevronRight, Globe, Gamepad2, Brain, Layers, Wallet } from 'lucide-react';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -39,6 +39,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: "宏观数据",
       icon: <Globe size={20} />,
       color: "text-cyan-500",
+    },
+    {
+      id: "personal-finance",
+      label: "私人理财经理",
+      icon: <Wallet size={20} />,
+      color: "text-emerald-500",
     },
     {
       id: "council",

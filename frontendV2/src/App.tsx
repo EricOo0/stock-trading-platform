@@ -7,6 +7,7 @@ import FinancialAnalysisPage from './pages/FinancialAnalysisPage';
 import MemoryVisualizationPage from './pages/MemoryVisualizationPage';
 import StockSimulationPage from './pages/StockSimulationPage';
 import NewsSentimentPage from './pages/NewsSentimentPage';
+import PersonalFinancePage from './pages/PersonalFinancePage';
 import CouncilRoom from './components/Council/CouncilRoom';
 
 function App() {
@@ -46,6 +47,8 @@ function App() {
         return '自选股票';
       case 'macro-data':
         return '宏观数据';
+      case 'personal-finance':
+        return '私人理财经理';
       case 'memory-viz':
         return '记忆可视化';
       default:
@@ -86,6 +89,8 @@ function App() {
         );
       case 'macro-data':
         return <MacroDataPage />;
+      case 'personal-finance':
+        return <PersonalFinancePage />;
       case 'memory-viz':
         return <MemoryVisualizationPage />;
       default:

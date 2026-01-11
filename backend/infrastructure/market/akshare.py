@@ -373,6 +373,44 @@ class AkShareTool:
             logger.error(f"AkShare get_concept_components failed for {sector_name}: {e}")
             return []
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
+    def get_stock_fund_flow(self, symbol: str) -> List[Dict[str, Any]]:
+        """Get individual stock fund flow history."""
+        try:
+            # AkShare stock_individual_fund_flow requires market prefix or specific params?
+            # Usually stock_individual_fund_flow(stock="000001", market="sz")
+            # We need to determine market.
+            market_code = "sh" if symbol.startswith(('60', '68', '5', '9')) else "sz"
+            
+            df = ak.stock_individual_fund_flow(stock=symbol, market=market_code)
+            if df.empty: return []
+            
+            # Columns: 日期, 收盘价, 涨跌幅, 主力净流入-净额, 主力净流入-净占比, 超大单净流入-净额, ...
+            # Sort by date desc
+            # Note: AkShare usually returns date asc?
+            # Let's inspect columns from experience or assume standard.
+            
+            # Take last 5 days
+            df = df.tail(10).iloc[::-1]
+            
+            flows = []
+            for _, row in df.iterrows():
+                flows.append({
+                    "date": str(row.get('日期', '')),
+                    "close": self._safe_get(row, '收盘价'),
+                    "change_pct": self._safe_get(row, '涨跌幅'),
+                    "main_net_inflow": self._safe_get(row, '主力净流入-净额'),
+                    "main_net_inflow_pct": self._safe_get(row, '主力净流入-净占比'),
+                    "super_large_net_inflow": self._safe_get(row, '超大单净流入-净额'),
+                    "large_net_inflow": self._safe_get(row, '大单净流入-净额'),
+                    "medium_net_inflow": self._safe_get(row, '中单净流入-净额'),
+                    "small_net_inflow": self._safe_get(row, '小单净流入-净额'),
+                })
+            return flows
+        except Exception as e:
+            logger.error(f"AkShare get_stock_fund_flow failed for {symbol}: {e}")
+            return []
+
     # ========================== Macro Data ==========================
     
     @retry(stop=stop_after_attempt(3))

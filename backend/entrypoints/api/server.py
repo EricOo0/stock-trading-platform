@@ -15,6 +15,7 @@ from backend.entrypoints.api.routers import (
     research,
     agent_review,
     agent_market,  # Added
+    agent_personal_finance,  # Added
 )
 import logging
 import uvicorn
@@ -71,6 +72,7 @@ app.include_router(agent_sentiment.router)
 app.include_router(research.router)
 app.include_router(agent_review.router)
 app.include_router(agent_market.router)
+app.include_router(agent_personal_finance.router)
 
 
 @app.get("/health")
