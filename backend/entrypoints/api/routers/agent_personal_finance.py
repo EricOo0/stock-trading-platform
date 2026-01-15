@@ -144,7 +144,9 @@ async def stream_analysis(portfolio: PortfolioSnapshot) -> AsyncGenerator[str, N
 
                     cards = update.get("recommendation_cards", [])
                     for card in cards:
-                        yield json.dumps({"type": "card", "data": card.dict()}) + "\n"
+                        # card is already a dict since orchestrator serialized it
+                        card_data = card if isinstance(card, dict) else card.dict()
+                        yield json.dumps({"type": "card", "data": card_data}) + "\n"
 
     except Exception as e:
         logger.error(f"Analysis failed: {e}", exc_info=True)

@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from langchain.agents import create_agent
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from backend.app.agents.personal_finance.llm import get_llm
@@ -37,6 +38,67 @@ from backend.infrastructure.config.loader import config
 logger = logging.getLogger(__name__)
 
 
+PLANNER_SYSTEM_PROMPT = """你是 personal_finance 的 Master（任务生成/分配/反思/收敛）。你必须根据上下文做一个明确动作：
+1) create_plan：创建任务计划（tasks）
+2) add_tasks：在已有计划基础上追加任务（tasks）
+3) conclude：输出最终结论（conclusion）
+
+硬约束：
+- 任务 worker_type 只能是：macro / market / technical / news / daily_review
+- daily_review 可以携带 inputs.portfolio_ops=true，用于输出组合层面的调仓/风控建议。
+- 如果当前没有 pending task 且信息足够，请 conclude。
+- 规划时参考市场快照（指数/板块温度、资金流、20日新高/新低、连阳/连阴、黄金/白银避险）并显式关注缺口。
+- **关键约束**：inputs 中的 "symbols" 必须是**股票代码**（如 000001, 600519, 00700, AAPL），**严禁**使用公司中文名称（如“宗申动力”）。如果不知道代码，请勿生成该 symbols 字段。
+
+输出格式：只输出 JSON，不要输出多余文字。
+
+JSON Schema：
+{ 
+  "action": "create_plan"|"add_tasks"|"conclude",
+  "tasks": [
+    {
+      "title": string,
+      "description": string,
+      "worker_type": "macro"|"market"|"technical"|"news"|"daily_review",
+      "inputs": {"symbols": string[], "portfolio_ops": boolean, "window": {"pre":5,"post":5} }
+    }
+  ],
+    "questions": [string],
+  "conclusion": {
+     "final_report": string,
+     "replay_summary": string|null,
+     "lessons_learned": [{"title": string, "description": string}]
+  }
+}
+
+注意：
+- action=conclude 时 tasks 可以为空数组。
+- action=create_plan 时必须产出 3-7 个任务；包含 daily_review 且 portfolio_ops=true。
+- 任务覆盖面：宏观周期+指数温度/资金流+板块热/冷+新闻/热点+技术/日内复盘（持仓或 Top symbols）。若缺口（数据为空或错误），在 task 描述中标注“缺口”。
+"""
+
+
+SYNTHESIZER_SYSTEM_PROMPT = """你是一位专业的 AI 理财顾问（Synthesizer）。你的核心职责是根据各路专家的分析结果（Context），为用户提供全面、连贯、数据驱动且个性化的投资建议。
+
+你的工作流程：
+1. **综合分析**：
+   - 整合宏观、市场、新闻、技术、复盘等多维数据。
+   - 寻找矛盾点（如：宏观利空但资金流入）。
+   - 进行自省（Reflection），检查是否与用户历史偏好或之前的建议冲突。
+
+2. **制定建议与调仓策略**：
+   - 不仅要回答“怎么样”，还要回答“怎么做”。
+   - 明确指出调仓机会：例如“建议减持科技股，买入消费防守板块”。
+   - 推荐具体的关注标的（板块或个股），并说明理由。
+   - 必须生成 1-3个“推荐卡片”，包含明确的行动指令（买入/卖出/持有/观望）。
+   - 给出详细，精确的分析结论和理论/数据支撑
+
+重要指引：
+- 若市场快照或任何数据存在缺口/时效不足，需在报告中显式标注，而不是忽略。
+- 语气：专业、客观、行动导向。给出具体的板块或代码建议时，务必基于数据支持。
+"""
+
+
 def _safe_json_extract(text: str) -> Optional[Dict[str, Any]]:
     text = (text or "").strip()
     if text.startswith("```json"):
@@ -59,6 +121,28 @@ def _safe_json_extract(text: str) -> Optional[Dict[str, Any]]:
             return json.loads(m.group(0))
         except Exception:
             return None
+
+
+def _extract_response_content(resp: Any) -> str:
+    """Helper to extract string content from various agent response formats."""
+    # Case 1: AIMessage or object with content attribute
+    if hasattr(resp, "content"):
+        return str(resp.content)
+    
+    # Case 2: Dict response (AgentExecutor or Chain)
+    if isinstance(resp, dict):
+        # Prefer 'output' key (AgentExecutor default)
+        if "output" in resp:
+            return str(resp["output"])
+        
+        # Fallback: check for 'messages' key (LangGraph state)
+        if "messages" in resp and isinstance(resp["messages"], list) and resp["messages"]:
+            last_msg = resp["messages"][-1]
+            if hasattr(last_msg, "content"):
+                return str(last_msg.content)
+    
+    # Case 3: Fallback string conversion
+    return str(resp)
 
 
 def _summarize_portfolio(
@@ -151,9 +235,19 @@ class PersonalFinanceMaster:
 
     def __init__(self):
         self.llm = get_llm(temperature=0.3)
+        self.planner_agent = create_agent(
+            model=self.llm,
+            tools=[],
+            system_prompt=PLANNER_SYSTEM_PROMPT
+        )
+        self.synthesizer_agent = create_agent(
+            model=self.llm,
+            tools=[],
+            system_prompt=SYNTHESIZER_SYSTEM_PROMPT
+        )
 
     async def decide_next(
-        self, *, pre_context_markdown: str, user_query: str, plan: Optional[Plan]
+        self, *, pre_context_markdown: str, user_query: str, plan: Optional[Plan], market_snapshot_md: str = ""
     ) -> MasterDecision:
         plan_status = (
             "No plan yet. You must create a plan."
@@ -161,43 +255,11 @@ class PersonalFinanceMaster:
             else _format_plan_status(plan)
         )
         prompt = f"""
-你是 personal_finance 的 Master（任务生成/分配/反思/收敛）。你必须根据上下文做一个明确动作：
-1) create_plan：创建任务计划（tasks）
-2) add_tasks：在已有计划基础上追加任务（tasks）
-3) conclude：输出最终结论（conclusion）
-
-硬约束：
-- 任务 worker_type 只能是：macro / market / technical / news / daily_review
-- daily_review 可以携带 inputs.portfolio_ops=true，用于输出组合层面的调仓/风控建议。
-- 如果当前没有 pending task 且信息足够，请 conclude。
-
-输出格式：只输出 JSON，不要输出多余文字。
-
-JSON Schema：
-{{
-  "action": "create_plan"|"add_tasks"|"conclude",
-  "tasks": [
-    {{
-      "title": string,
-      "description": string,
-      "worker_type": "macro"|"market"|"technical"|"news"|"daily_review",
-      "inputs": {{"symbols": string[], "portfolio_ops": boolean, "window": {{"pre":5,"post":5}} }}
-    }}
-  ],
-  "questions": [string],
-  "conclusion": {{
-     "final_report": string,
-     "replay_summary": string|null,
-     "lessons_learned": [{{"title": string, "description": string}}]
-  }}
-}}
-
-注意：
-- action=conclude 时 tasks 可以为空数组。
-- action=create_plan 时必须产出 3-7 个任务；包含 daily_review 且 portfolio_ops=true。
-
 === PreContext ===
 {pre_context_markdown}
+
+=== Market Snapshot ===
+{market_snapshot_md}
 
 === User Query ===
 {user_query}
@@ -205,14 +267,12 @@ JSON Schema：
 === Plan Status ===
 {plan_status}
 """
-
-        resp = await self.llm.ainvoke(
-            [
-                SystemMessage(content="You are a helpful assistant."),
-                HumanMessage(content=prompt),
-            ]
+        print(f"[Master] Planner prompt: {prompt}")
+        resp = await self.planner_agent.ainvoke(
+            {"messages": [HumanMessage(content=prompt)]}
         )
-        data = _safe_json_extract(resp.content) or {}
+        content = _extract_response_content(resp)
+        data = _safe_json_extract(content) or {}
 
         action = data.get("action") or ("create_plan" if not plan else "conclude")
         tasks = data.get("tasks") or []
@@ -229,8 +289,6 @@ JSON Schema：
 
     async def synthesize_cards(self, *, context: str) -> List[RecommendationCard]:
         card_prompt = f"""
-{MASTER_AGENT_SYSTEM_PROMPT}
-
 根据上下文，为用户生成 1-3 张高价值的“推荐卡片”。返回 JSON：{{"cards": [ ... ]}}。
 
 卡片 schema：
@@ -248,8 +306,9 @@ JSON Schema：
 """
         cards: List[RecommendationCard] = []
         try:
-            resp = await self.llm.ainvoke([HumanMessage(content=card_prompt)])
-            data = _safe_json_extract(resp.content) or {}
+            resp = await self.synthesizer_agent.ainvoke({"messages": [HumanMessage(content=card_prompt)]})
+            content = _extract_response_content(resp)
+            data = _safe_json_extract(content) or {}
             for item in data.get("cards", []) or []:
                 if isinstance(item, dict):
                     # Normalize confidence score if needed
@@ -274,8 +333,6 @@ JSON Schema：
 
     async def synthesize_report(self, *, context: str) -> str:
         report_prompt = f"""
-{MASTER_AGENT_SYSTEM_PROMPT}
-
 将上下文综合成一份连贯、易读、行动导向的 Markdown 报告。
 
 硬约束：
@@ -289,8 +346,9 @@ JSON Schema：
 上下文：
 {context}
 """
-        resp = await self.llm.ainvoke([HumanMessage(content=report_prompt)])
-        return resp.content
+        logger.info(f"[Master] Synthesize report with prompt: {report_prompt[:100]}...")
+        resp = await self.synthesizer_agent.ainvoke({"messages": [HumanMessage(content=report_prompt)]})
+        return _extract_response_content(resp)
 
 
 class PersonalFinanceOrchestrator:
@@ -299,6 +357,8 @@ class PersonalFinanceOrchestrator:
     def __init__(self):
         self.pre = PreProcessAgent()
         self.master = PersonalFinanceMaster()
+        # Cache latest snapshot markdown for sub-agent calls
+        self.latest_snapshot_md: str = ""
 
     async def astream(
         self, initial_state: Dict[str, Any]
@@ -334,10 +394,13 @@ class PersonalFinanceOrchestrator:
         pre_context = await self.pre.run(
             user_query=user_query, memory_context=memory_context, portfolio=portfolio
         )
+        if hasattr(pre_context, "rendered_market_context_markdown"):
+            self.latest_snapshot_md = pre_context.rendered_market_context_markdown
         yield {
             "pre_process": {
                 "pre_context": pre_context.model_dump(),
-                "pre_context_markdown": pre_context.rendered_markdown,
+                "pre_context_markdown": pre_context.rendered_pre_context_markdown,
+                "market_context_markdown": pre_context.rendered_market_context_markdown,
                 "replay_enabled": pre_context.replay.enabled,
                 "lessons_count": len(pre_context.lessons.items),
             }
@@ -353,9 +416,10 @@ class PersonalFinanceOrchestrator:
                 plan.turn = turn
 
             decision = await self.master.decide_next(
-                pre_context_markdown=pre_context.rendered_markdown,
+                pre_context_markdown=pre_context.rendered_pre_context_markdown,
                 user_query=user_query,
                 plan=plan,
+                market_snapshot_md=getattr(pre_context, "rendered_market_context_markdown", "") or "",
             )
 
             if decision.action == "create_plan":
@@ -412,11 +476,11 @@ class PersonalFinanceOrchestrator:
                 yield {
                     "synthesizer": {
                         "final_report": final_report,
-                        "recommendation_cards": cards,
+                        "recommendation_cards": [c.model_dump() for c in cards],
                         "plan": plan.model_dump() if plan else None,
                     }
                 }
-
+                print(f"[Master] Final report: {final_report}")
                 await self._save_memory(
                     user_id=user_id,
                     pre_context=pre_context,
@@ -516,10 +580,28 @@ class PersonalFinanceOrchestrator:
                 WorkerType.NEWS,
             ):
                 symbols = top_symbols
+            
+            # --- 增加 Symbol 格式校验 ---
+            valid_symbols = []
+            for s in symbols:
+                s_str = str(s).strip()
+                # 简单规则：必须包含数字，或者是美股纯字母但长度通常较短且非中文
+                # 如果包含非ascii（例如中文），则认为非法
+                if not all(ord(c) < 128 for c in s_str):
+                    logger.warning(f"[Orchestrator] Invalid symbol format (non-ascii): {s_str}. Dropping.")
+                    continue
+                valid_symbols.append(s_str.replace("sh", "").replace("sz", ""))
+            
+            if not valid_symbols and symbols:
+                logger.warning(f"[Orchestrator] All symbols for task {t.get('title')} were invalid. Using top symbols fallback.")
+                valid_symbols = [str(s).replace("sh", "").replace("sz", "") for s in top_symbols]
+
             inputs = TaskInputs(
-                symbols=[str(s).replace("sh", "").replace("sz", "") for s in symbols],
+                symbols=valid_symbols,
                 portfolio_ops=bool(inputs_dict.get("portfolio_ops", False)),
             )
+            # ---------------------------
+
             task_id = f"pf_task_{int(time.time())}_{i}_{wt.value}"
             built.append(
                 PlanTask(
@@ -568,15 +650,23 @@ class PersonalFinanceOrchestrator:
         logger.info(f"[Executor] Starting task: {task.title} (type={task.worker_type.value})")
         wt = task.worker_type
         if wt == WorkerType.MACRO:
-            return await run_macro_analysis()
+            snapshot_md = getattr(self, "latest_snapshot_md", "")
+            return await run_macro_analysis(market_snapshot=snapshot_md)
         if wt == WorkerType.MARKET:
-            return await run_market_analysis()
+            snapshot_md = getattr(self, "latest_snapshot_md", "")
+            return await run_market_analysis(market_snapshot=snapshot_md)
         if wt == WorkerType.TECHNICAL:
             symbols = task.inputs.symbols or _extract_top_symbols(portfolio, limit=50)
             if not symbols:
                 return "No symbols for technical analysis."
             res = await asyncio.gather(
-                *[run_technical_analysis(sym) for sym in symbols]
+                *[
+                    run_technical_analysis(
+                        sym,
+                        market_snapshot=getattr(self, "latest_snapshot_md", ""),
+                    )
+                    for sym in symbols
+                ]
             )
             return "\n\n".join([str(r) for r in res])
         if wt == WorkerType.NEWS:
@@ -586,17 +676,26 @@ class PersonalFinanceOrchestrator:
                 if symbols
                 else "Latest market news"
             )
-            return await run_news_analysis(q)
+            return await run_news_analysis(q, market_snapshot=getattr(self, "latest_snapshot_md", ""))
         if wt == WorkerType.DAILY_REVIEW:
             symbols = task.inputs.symbols or _extract_top_symbols(portfolio, limit=50)
             analyst = DailyReviewAnalyst()
             if task.inputs.portfolio_ops:
                 return await analyst.analyze_portfolio_ops(
-                    symbols=symbols, portfolio=portfolio
+                    symbols=symbols,
+                    portfolio=portfolio,
+                    market_snapshot=getattr(self, "latest_snapshot_md", ""),
                 )
             if not symbols:
                 return "No symbols for daily review."
-            res = await asyncio.gather(*[analyst.analyze(sym) for sym in symbols])
+            res = await asyncio.gather(
+                *[
+                    analyst.analyze(
+                        sym, market_snapshot=getattr(self, "latest_snapshot_md", "")
+                    )
+                    for sym in symbols
+                ]
+            )
             return "\n\n".join([str(r) for r in res])
         return "Unsupported worker type"
 
@@ -613,8 +712,12 @@ class PersonalFinanceOrchestrator:
             for t in plan.tasks:
                 tasks_summary += f"\n\n### [{t.status}] {t.title} ({t.worker_type.value})\n{t.result or ''}"
 
+        snapshot_md = getattr(pre_context, "rendered_market_context_markdown", "") or ""
+
         return f"""
-【PreContext】\n{pre_context.rendered_markdown}
+【Market Context】\n{snapshot_md}
+
+【PreContext】\n{pre_context.rendered_pre_context_markdown}
 
 【投资组合摘要】\n{json.dumps(port_summary, ensure_ascii=False, indent=2)}
 

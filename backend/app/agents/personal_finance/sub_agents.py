@@ -16,7 +16,7 @@ registry = Tools()
 
 
 class SpecializedAnalyst:
-    """Base class for lightweight specialized analysts."""
+    """Base class for lightweight specialized analysts with optional market snapshot context."""
 
     def __init__(self, name: str, role_prompt: str):
         self.name = name
@@ -52,13 +52,14 @@ class SpecializedAnalyst:
             model=model_name, base_url=base_url, api_key=api_key, temperature=0.3
         )
 
-    async def run(self, query: str, context_data: str = "") -> str:
+    async def run(self, query: str, context_data: str = "", market_snapshot: Optional[str] = None) -> str:
         """Run the analyst logic."""
         logger.info(f"[{self.name}] analyzing: {query}")
+        snapshot_block = f"\n\nMarket Snapshot:\n{market_snapshot}" if market_snapshot else ""
         try:
             messages = [
                 SystemMessage(content=self.role_prompt),
-                HumanMessage(content=f"Task: {query}\n\nData Context:\n{context_data}"),
+                HumanMessage(content=f"Task: {query}\n\nData Context:\n{context_data}{snapshot_block}"),
             ]
             response = await self.llm.ainvoke(messages)
             return response.content
@@ -77,7 +78,7 @@ class MacroAnalyst(SpecializedAnalyst):
             role_prompt="你是宏观经济分析师。你的任务是根据提供的经济数据（GDP, CPI, PMI等）分析当前经济周期和趋势。请言简意赅。",
         )
 
-    async def analyze(self) -> str:
+    async def analyze(self, market_snapshot: Optional[str] = None) -> str:
         # 1. Fetch Data
         try:
             # Parallel fetch of key indicators
@@ -100,7 +101,8 @@ class MacroAnalyst(SpecializedAnalyst):
             context = f"Error fetching macro data: {e}"
 
         # 2. Analyze
-        return await self.run("分析当前宏观经济环境及其对市场的影响。", context)
+        query = "分析当前宏观经济环境及其对市场的影响，结合指数温度/资金流/避险资产（若提供）。"
+        return await self.run(query, context, market_snapshot=market_snapshot)
 
 
 # --- 2. Market Analyst ---
@@ -113,7 +115,7 @@ class MarketAnalyst(SpecializedAnalyst):
             role_prompt="你是市场策略分析师。根据板块资金流向和市场情绪，判断当前市场热点和风险。",
         )
 
-    async def analyze(self) -> str:
+    async def analyze(self, market_snapshot: Optional[str] = None) -> str:
         # 1. Fetch Data
         try:
             # Hot sectors
@@ -131,7 +133,8 @@ class MarketAnalyst(SpecializedAnalyst):
             context = f"Error fetching market data: {e}"
 
         # 2. Analyze
-        return await self.run("分析当前市场情绪和资金流向。", context)
+        query = "分析当前市场情绪和资金流向，输出行业/概念热冷榜与资金方向，结合指数温度与缺口（若有）。"
+        return await self.run(query, context, market_snapshot=market_snapshot)
 
 
 # --- 3. News Analyst ---
@@ -144,7 +147,7 @@ class NewsAnalyst(SpecializedAnalyst):
             role_prompt="你是财经新闻分析师。根据搜索到的新闻，提炼对投资组合有重大影响的信息。",
         )
 
-    async def analyze(self, query: str) -> str:
+    async def analyze(self, query: str, market_snapshot: Optional[str] = None) -> str:
         # 1. Search News
         try:
             # Use registry search
@@ -156,7 +159,8 @@ class NewsAnalyst(SpecializedAnalyst):
             context = f"Error searching news: {e}"
 
         # 2. Analyze
-        return await self.run(f"总结关于'{query}'的关键新闻及其潜在影响。", context)
+        task = f"总结关于'{query}'的关键新闻及其潜在影响，标注利好/利空、主体（个股/板块/指数），若数据缺口需说明。"
+        return await self.run(task, context, market_snapshot=market_snapshot)
 
 
 # --- 4. Technical Analyst ---
@@ -169,7 +173,7 @@ class TechnicalAnalyst(SpecializedAnalyst):
             role_prompt="你是技术分析师。根据K线数据和指标，判断资产的趋势和关键支撑/阻力位。",
         )
 
-    async def analyze(self, symbol: str) -> str:
+    async def analyze(self, symbol: str, market_snapshot: Optional[str] = None) -> str:
         # 1. Fetch K-line & Indicators
         try:
             # Get recent history
@@ -186,7 +190,11 @@ class TechnicalAnalyst(SpecializedAnalyst):
             context = f"Error fetching technical data: {e}"
 
         # 2. Analyze
-        return await self.run(f"分析 {symbol} 的技术走势。", context)
+        return await self.run(
+            f"分析 {symbol} 的技术走势，并结合所属板块/大盘温度提示趋势风险或背离。",
+            context,
+            market_snapshot=market_snapshot,
+        )
 
 
 # --- 5. Daily Review Analyst ---
@@ -199,7 +207,7 @@ class DailyReviewAnalyst(SpecializedAnalyst):
             role_prompt="你是日内交易复盘分析师。根据今日分时走势和资金流向，判断主力意图和次日预期。",
         )
 
-    async def analyze(self, symbol: str) -> str:
+    async def analyze(self, symbol: str, market_snapshot: Optional[str] = None) -> str:
         # 1. Fetch Data
         try:
             # Intraday Data (30m candles for last 5 days to see trend)
@@ -223,9 +231,13 @@ class DailyReviewAnalyst(SpecializedAnalyst):
             context = f"Error fetching daily review data: {e}"
 
         # 2. Analyze
-        return await self.run(f"复盘 {symbol} 今日走势及资金流向。", context)
+        return await self.run(
+            f"复盘 {symbol} 今日走势及资金流向，标注板块/指数温度及缺口。",
+            context,
+            market_snapshot=market_snapshot,
+        )
 
-    async def analyze_portfolio_ops(self, symbols: List[str], portfolio: dict) -> str:
+    async def analyze_portfolio_ops(self, symbols: List[str], portfolio: dict, market_snapshot: Optional[str] = None) -> str:
         """Generate portfolio-level actions based on intraday review + holdings context."""
 
         # 1. Fetch data for a few key symbols
@@ -286,4 +298,4 @@ class DailyReviewAnalyst(SpecializedAnalyst):
 
         # 2. Analyze
         query = "基于组合持仓与关键标的的日内走势/资金流向，输出可执行的调仓与风控建议（包含仓位、触发条件、替代方案）。"
-        return await self.run(query, context)
+        return await self.run(query, context, market_snapshot=market_snapshot)

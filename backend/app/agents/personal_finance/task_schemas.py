@@ -101,7 +101,10 @@ class PreContext(BaseModel):
     focus: FocusBlock = Field(default_factory=FocusBlock)
     open_questions: List[str] = Field(default_factory=list)
     data_provenance: DataProvenance = Field(default_factory=DataProvenance)
+    market_snapshot: Dict[str, Any] = Field(default_factory=dict)
     rendered_markdown: str = ""
+    rendered_pre_context_markdown: str = ""
+    rendered_market_context_markdown: str = ""
 
 
 class TaskInputs(BaseModel):

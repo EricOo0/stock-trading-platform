@@ -184,6 +184,57 @@ class AkShareTool:
 
     # ========================== Market Data ==========================
 
+    def get_a_share_indices_spot(self, target_indices: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Get A-share key indices latest spot data.
+        target_indices: list of names to filter, default common benchmarks.
+        """
+        try:
+            import akshare as ak
+            df = ak.stock_zh_index_spot_em()
+            if df.empty:
+                return []
+            targets = target_indices or ["上证指数", "深证成指", "创业板指", "科创50", "沪深300", "中证500", "北证50"]
+            filtered = df[df["名称"].isin(targets)]
+            return filtered.to_dict(orient="records")
+        except Exception as e:
+            logger.error(f"AkShare get_a_share_indices_spot failed: {e}")
+            return []
+
+    def get_hk_index_latest(self, symbol: str, name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get latest HK index quote via sina daily interface.
+        """
+        try:
+            import akshare as ak
+            df = ak.stock_hk_index_daily_sina(symbol=symbol)
+            if df.empty:
+                return {}
+            last = df.iloc[-1].to_dict()
+            if name:
+                last["name"] = name
+            return last
+        except Exception as e:
+            logger.error(f"AkShare get_hk_index_latest failed for {symbol}: {e}")
+            return {"error": str(e), "symbol": symbol}
+
+    def get_us_index_latest(self, symbol: str, name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get latest US index quote via sina interface.
+        """
+        try:
+            import akshare as ak
+            df = ak.index_us_stock_sina(symbol=symbol)
+            if df.empty:
+                return {}
+            last = df.iloc[-1].to_dict()
+            if name:
+                last["name"] = name
+            return last
+        except Exception as e:
+            logger.error(f"AkShare get_us_index_latest failed for {symbol}: {e}")
+            return {"error": str(e), "symbol": symbol}
+
     def _is_likely_etf(self, symbol: str) -> bool:
         """Check if symbol looks like an ETF."""
         return symbol.startswith(("51", "159", "56", "58", "16"))
@@ -917,6 +968,71 @@ class AkShareTool:
         except Exception as e:
             logger.error(f"AkShare get_macro_history failed: {e}")
             return {"error": str(e)}
+
+    # ========================== Calendar / Events ==========================
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def get_economic_calendar(self, date_str: str = None) -> List[Dict[str, Any]]:
+        """
+        Get economic calendar events.
+        :param date_str: YYYYMMDD string. If None, use today.
+        """
+        try:
+            if not date_str:
+                date_str = datetime.now().strftime("%Y%m%d")
+                
+            df = ak.news_economic_baidu(date=date_str)
+            if df.empty:
+                return []
+                
+            # Filter for key regions/events (optional, but raw data is safer for upstream filtering)
+            # Columns: ['日期', '时间', '地区', '事件', '公布', '预期', '前值', '重要性']
+            events = []
+            for _, row in df.iterrows():
+                # Filter logic can be here or in caller. Let's keep it broad but prioritize CN/US
+                region = str(row['地区'])
+                if region not in ["中国", "美国", "欧元区"]:
+                    continue
+                    
+                events.append({
+                    "date": str(row['日期']),
+                    "time": str(row['时间']),
+                    "region": region,
+                    "event": str(row['事件']),
+                    "previous": row['前值'],
+                    "consensus": row['预期'],
+                    "actual": row['公布'],
+                    "importance": row['重要性']
+                })
+            return events
+        except Exception as e:
+            logger.error(f"AkShare get_economic_calendar failed: {e}")
+            return []
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def get_headline_news(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get headline financial news.
+        Uses TongHuaShun (stock_info_global_ths) as source.
+        """
+        try:
+            # Columns: 标题, 内容, 发布时间, 链接
+            df = ak.stock_info_global_ths()
+            if df.empty:
+                return []
+            
+            news = []
+            for _, row in df.head(limit).iterrows():
+                news.append({
+                    "title": str(row['标题']),
+                    "publish_time": str(row['发布时间']),
+                    "link": str(row['链接']),
+                    "content": str(row['内容']) if row.get('内容') else str(row['标题']) # Content might be short
+                })
+            return news
+        except Exception as e:
+            logger.error(f"AkShare get_headline_news (THS) failed: {e}")
+            return []
 
     # ========================== Helpers ==========================
 
