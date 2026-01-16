@@ -4,7 +4,7 @@ import asyncio
 import datetime
 from typing import Optional, Dict, Any, List
 
-from backend.infrastructure.market.akshare import AkShareTool
+from backend.infrastructure.market._akshare import AkShareTool
 from backend.app.agents.personal_finance.sub_agents import (
     MacroAnalyst,
     MarketAnalyst,

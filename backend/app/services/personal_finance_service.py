@@ -7,7 +7,7 @@ from backend.app.agents.personal_finance.models import AssetItem, PriceUpdateMap
 from backend.app.agents.personal_finance.db import engine, init_db
 from backend.app.agents.personal_finance.db_models import Portfolio, Asset as DBAsset
 from backend.infrastructure.market.sina import SinaFinanceTool
-from backend.infrastructure.market.akshare import AkShareTool
+from backend.infrastructure.market._akshare import AkShareTool
 
 # Initialize DB tables
 init_db()

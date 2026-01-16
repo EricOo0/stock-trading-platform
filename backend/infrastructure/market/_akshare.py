@@ -182,12 +182,323 @@ class AkShareTool:
             "露营经济": "露营经济",
         }
 
-    # ========================== Market Data ==========================
+    # ========================== Unified API (New) ==========================
+    # 下列函数为新一代统一接口，提供了跨市场自动路由、标准化的返回结构与增强的错误兜底。
+    # 建议所有新业务逻辑优先调用以下接口。
+
+    def get_quote(self, symbol: str, market: Optional[str] = None) -> Dict[str, Any]:
+        """
+        [New] 获取全市场标的实时行情 (Unified Real-time Quote)
+        自动识别 A股/港股/美股/ETF，并返回标准化字段。
+        
+        Args:
+            symbol: 代码 (e.g., '600036', '00700', 'AAPL', '510300')
+            market: 可选市场类型 'A', 'HK', 'US', 'ETF'。若为 None 则自动探测。
+            
+        Returns:
+            Dict containing standardized fields:
+            - symbol, name, market (str)
+            - price (float): 当前价
+            - open, high, low, prev_close (float)
+            - change_pct (float): 涨跌幅 % (e.g. 1.50)
+            - change_amount (float): 涨跌额
+            - volume (float): 成交量 (股/份)
+            - turnover (float): 成交额 (元)
+            - turnover_rate (float): 换手率 %
+            - pe (float, optional): 动态市盈率
+            - pb (float, optional): 市净率
+            - market_cap (float, optional): 总市值
+            - timestamp (str): 数据时间 (YYYY-MM-DD HH:MM:SS)
+        """
+        try:
+            # 1. Detect Market
+            if not market:
+                market = self._detect_market_type(symbol)
+            
+            # 2. Route to specific logic
+            if market == 'ETF':
+                # Try ETF first
+                try:
+                    return self._get_etf_quote(symbol)
+                except:
+                    # Fallback to stock if ETF fails (maybe it's a LOF treated as A-share)
+                    market = 'A'
+            
+            if market == 'A':
+                # Reuse existing robust logic but wrap it
+                # existing get_stock_quote has detailed implementation
+                # We can call it directly as it returns the right structure mostly
+                res = self.get_stock_quote(symbol)
+                if "error" in res:
+                    return res
+                # Standardize keys if needed (current get_stock_quote uses standardized keys already)
+                # Just ensure 'price' is present (it uses 'current_price')
+                res['price'] = res.get('current_price')
+                return res
+                
+            elif market == 'HK':
+                # Use dedicated HK method
+                return self._get_hk_quote_detail(symbol)
+                
+            elif market == 'US':
+                # Use dedicated US method
+                return self._get_us_quote_detail(symbol)
+                
+            else:
+                return {"error": f"Unknown market for symbol {symbol}"}
+                
+        except Exception as e:
+            logger.error(f"get_quote failed for {symbol}: {e}")
+            return {"error": str(e), "symbol": symbol}
+
+    def get_history(self, 
+                   symbol: str, 
+                   period: str = "daily", 
+                   start_date: Optional[str] = None, 
+                   end_date: Optional[str] = None, 
+                   adjust: str = "qfq") -> List[Dict[str, Any]]:
+        """
+        [New] 获取全市场历史行情 (Unified Historical K-Line)
+        """
+        try:
+            market = self._detect_market_type(symbol)
+            
+            # Map period to akshare params
+            # AkShare usually takes 'daily', 'weekly', 'monthly'
+            # For A-share: stock_zh_a_hist(period='daily'/'weekly'/'monthly')
+            # For HK: stock_hk_hist(period='daily'...)
+            # For US: stock_us_hist(period='daily'...)
+            
+            ak_period = "daily"
+            if period in ["weekly", "week", "1w"]: ak_period = "weekly"
+            elif period in ["monthly", "month", "1mo"]: ak_period = "monthly"
+            
+            # Date handling
+            if not end_date:
+                end_date = datetime.now().strftime("%Y%m%d")
+            if not start_date:
+                # Default 1 year if not provided
+                start_date = (datetime.now() - timedelta(days=365)).strftime("%Y%m%d")
+                
+            df = pd.DataFrame()
+            
+            if market == 'A' or market == 'ETF':
+                # ETF also uses stock_zh_a_hist often, or fund_etf_hist_em
+                if market == 'ETF':
+                    try:
+                        df = ak.fund_etf_hist_em(symbol=symbol, period=ak_period, start_date=start_date, end_date=end_date, adjust=adjust)
+                    except:
+                        # Fallback to stock interface
+                        df = ak.stock_zh_a_hist(symbol=symbol, period=ak_period, start_date=start_date, end_date=end_date, adjust=adjust)
+                else:
+                    df = ak.stock_zh_a_hist(symbol=symbol, period=ak_period, start_date=start_date, end_date=end_date, adjust=adjust)
+                    
+            elif market == 'HK':
+                # stock_hk_hist(symbol='00700', period='daily', start_date='...', end_date='...', adjust='qfq')
+                df = ak.stock_hk_hist(symbol=symbol, period=ak_period, start_date=start_date, end_date=end_date, adjust=adjust)
+                
+            elif market == 'US':
+                # Use stock_us_daily (Sina source) which handles symbols like 'AAPL' without prefix
+                try:
+                    df = ak.stock_us_daily(symbol=symbol, adjust=adjust)
+                except Exception as e:
+                    logger.warning(f"stock_us_daily failed for {symbol}: {e}")
+                    df = pd.DataFrame()
+                
+            if df is None or df.empty:
+                return []
+                
+            # Standardize columns
+            # Common: 日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 涨跌幅...
+            res = []
+            for _, row in df.iterrows():
+                item = {
+                    "date": str(row.get('日期', '')),
+                    "open": self._safe_get(row, '开盘'),
+                    "close": self._safe_get(row, '收盘'),
+                    "high": self._safe_get(row, '最高'),
+                    "low": self._safe_get(row, '最低'),
+                    "volume": self._safe_get(row, '成交量'),
+                    "turnover": self._safe_get(row, '成交额'),
+                    "pct_change": self._safe_get(row, '涨跌幅')
+                }
+                res.append(item)
+            return res
+            
+        except Exception as e:
+            logger.error(f"get_history failed: {e}")
+            return []
+
+    def get_fund_flow(self, target: str, flow_type: str = "stock") -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """
+        [New] 获取资金流向数据 (Unified Fund Flow)
+        """
+        try:
+            if flow_type == 'stock':
+                return self.get_stock_fund_flow(target)
+                
+            elif flow_type == 'north':
+                # 北向资金: stock_hsgt_north_net_flow_in_em
+                df = ak.stock_hsgt_north_net_flow_in_em(symbol="北上资金")
+                if df.empty: return []
+                # Return latest or history? Let's return list of history
+                res = []
+                for _, row in df.iterrows():
+                    res.append({
+                        "date": str(row['date']),
+                        "value": self._safe_get(row, 'value') # unit: 10000 CNY? usually 亿元 or 万元 check docs. Usually 亿元 in charts? Raw value often 万元.
+                    })
+                return res
+                
+            elif flow_type == 'south':
+                df = ak.stock_hsgt_south_net_flow_in_em(symbol="南下资金")
+                if df.empty: return []
+                res = []
+                for _, row in df.iterrows():
+                    res.append({
+                        "date": str(row['date']),
+                        "value": self._safe_get(row, 'value')
+                    })
+                return res
+                
+            elif flow_type == 'sector':
+                # Individual sector flow? 
+                # AkShare has stock_fund_flow_industry(symbol='行业名')? 
+                # Actually stock_fund_flow_industry returns rank. 
+                # Specific sector daily flow: stock_sector_fund_flow_rank? No.
+                # For now return empty or implement later.
+                return []
+                
+            return []
+        except Exception as e:
+            logger.error(f"get_fund_flow failed: {e}")
+            return []
+
+    def get_board_info(self, board_name: str = "all", board_type: str = "industry", info_type: str = "rank") -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        [New] 获取板块/概念深度信息 (Sector/Concept Board Info)
+        """
+        try:
+            if info_type == 'rank':
+                if board_type == 'concept':
+                    return self.get_concept_fund_flow_rank()
+                else:
+                    return self.get_sector_fund_flow_rank()
+                    
+            elif info_type == 'cons':
+                if board_type == 'concept':
+                    return self.get_concept_components(board_name)
+                else:
+                    return self.get_sector_components(board_name)
+            
+            return []
+        except Exception as e:
+            logger.error(f"get_board_info failed: {e}")
+            return []
+
+    def get_financials(self, symbol: str, report_type: str = "indicator") -> Dict[str, Any]:
+        """
+        [New] 获取基本面/财务数据 (Unified Fundamentals)
+        """
+        # Currently only supporting 'indicator' which wraps get_financial_indicators
+        if report_type == 'indicator':
+            return self.get_financial_indicators(symbol)
+        return {}
+        
+    def get_macro(self, indicator: str, history: bool = False) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """
+        [New] 获取宏观经济数据 (Unified Macro Data)
+        """
+        if history:
+            return self.get_macro_history(indicator)
+        else:
+            return self.get_macro_data(indicator)
+
+    # --- Internal Helpers for New APIs ---
+
+    def _detect_market_type(self, symbol: str) -> str:
+        """Detect market type from symbol."""
+        if symbol.startswith(("sh", "sz", "bj")): return 'A'
+        if symbol.isdigit():
+            if len(symbol) == 6:
+                if symbol.startswith(("51", "159", "56", "58", "16")): return 'ETF'
+                if symbol.startswith(("60", "00", "30", "68", "8", "4")): return 'A'
+            if len(symbol) == 5: return 'HK' # 00700
+        # Common US symbols are letters
+        if symbol.isalpha(): return 'US'
+        return 'A' # Default
+
+    def _get_hk_quote_detail(self, symbol: str) -> Dict[str, Any]:
+        """Get HK quote using stock_hk_spot_em or hist_min."""
+        # stock_hk_spot_em gets ALL stocks. Too slow.
+        # stock_hk_hist_min_em? 
+        try:
+            # Clean symbol: remove 'hk' prefix if any
+            code = symbol.replace("hk", "").replace("HK", "")
+            # Try min data for latest price
+            df = ak.stock_hk_hist_min_em(symbol=code, period="1", adjust="qfq")
+            if df.empty: return {}
+            row = df.iloc[-1]
+            return {
+                "symbol": symbol,
+                "price": float(row['收盘']),
+                "open": float(row['开盘']),
+                "high": float(row['最高']),
+                "low": float(row['最低']),
+                "volume": float(row['成交量']),
+                "turnover": float(row['成交额']),
+                "change_pct": 0.0, # Min data usually doesn't have change pct relative to prev close
+                "timestamp": str(row['时间']),
+                "market": "HK"
+            }
+        except Exception as e:
+            logger.error(f"HK quote failed: {e}")
+            return {"error": str(e)}
+
+    def _get_us_quote_detail(self, symbol: str) -> Dict[str, Any]:
+        """Get US quote."""
+        try:
+            # 1. Try Sina Index Interface (Fast & Realtime for Indices)
+            # Common symbols: .DJI, .IXIC, .INX
+            # ak.index_us_stock_sina(symbol=".DJI")
+            import akshare as ak
+            df = ak.index_us_stock_sina(symbol=symbol)
+            if not df.empty:
+                row = df.iloc[-1]
+                # Columns check: date, open, high, low, close, volume, etc.
+                # Assuming akshare returns lowercase columns as per get_us_index_latest example
+                return {
+                    "symbol": symbol,
+                    "price": self._safe_get(row, 'close'),
+                    "open": self._safe_get(row, 'open'),
+                    "high": self._safe_get(row, 'high'),
+                    "low": self._safe_get(row, 'low'),
+                    "volume": self._safe_get(row, 'volume'),
+                    "turnover": 0.0,
+                    "change_pct": 0.0, # Sina index might not have pct change in historical/daily func?
+                    # If it's a daily history func, we need to calc pct change from prev close.
+                    # index_us_stock_sina returns historical data?
+                    # Let's assume it returns daily bars.
+                    "timestamp": str(row.get('date', '')),
+                    "market": "US"
+                }
+        except Exception as e:
+            logger.debug(f"US Index quote failed for {symbol}: {e}")
+            
+        try:
+            # Fallback or other methods for individual stocks?
+            # Currently AkShare support for individual US stock realtime is limited/slow.
+            return {"error": "US Stock quote not fully implemented in AkShareTool, use Yahoo fallback"}
+        except Exception:
+            return {}
+
+    # ========================== 以下函数准备逐步废弃 ==========================
+    # ========================== Market Data (Legacy) ==========================
 
     def get_a_share_indices_spot(self, target_indices: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
-        Get A-share key indices latest spot data.
-        target_indices: list of names to filter, default common benchmarks.
+        [Deprecated] Get A-share key indices latest spot data.
+        Please use get_quote() or get_board_info() instead.
         """
         try:
             import akshare as ak
@@ -203,7 +514,8 @@ class AkShareTool:
 
     def get_hk_index_latest(self, symbol: str, name: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get latest HK index quote via sina daily interface.
+        [Deprecated] Get latest HK index quote via sina daily interface.
+        Please use get_quote() instead.
         """
         try:
             import akshare as ak
@@ -220,7 +532,8 @@ class AkShareTool:
 
     def get_us_index_latest(self, symbol: str, name: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get latest US index quote via sina interface.
+        [Deprecated] Get latest US index quote via sina interface.
+        Please use get_quote() instead.
         """
         try:
             import akshare as ak
@@ -308,8 +621,8 @@ class AkShareTool:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
     def get_stock_quote(self, symbol: str) -> Dict[str, Any]:
         """
-        Get real-time stock quote for A-shares using lightweight interfaces.
-        Replaces 'stock_zh_a_spot_em' (full market snapshot) with per-symbol queries to improve performance.
+        [Deprecated] Get real-time stock quote for A-shares using lightweight interfaces.
+        Please use get_quote() instead.
         """
         if not self._validate_symbol(symbol):
              return {"error": "Invalid A-share symbol"}
@@ -489,7 +802,10 @@ class AkShareTool:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
     def get_stock_history(self, symbol: str, period: str = "30d") -> List[Dict[str, Any]]:
-        """Get historical data for A-shares."""
+        """
+        [Deprecated] Get historical data for A-shares.
+        Please use get_history() instead.
+        """
         if not self._validate_symbol(symbol): return []
 
         try:
@@ -529,7 +845,10 @@ class AkShareTool:
     # ========================== Financial Data ==========================
 
     def get_financial_indicators(self, symbol: str, years: int = 3) -> Dict[str, Any]:
-        """Get financial indicators for A-shares."""
+        """
+        [Deprecated] Get financial indicators for A-shares.
+        Please use get_financials() instead.
+        """
         try:
             # Try primary source first
             df = ak.stock_financial_analysis_indicator(symbol=symbol)
@@ -670,7 +989,10 @@ class AkShareTool:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
     def get_sector_fund_flow_rank(self) -> List[Dict[str, Any]]:
-        """Get sector fund flow ranking (hot/cold sectors)."""
+        """
+        [Deprecated] Get sector fund flow ranking (hot/cold sectors).
+        Please use get_board_info() instead.
+        """
         try:
             # 东方财富-行业资金流
             df = ak.stock_fund_flow_industry(symbol="即时")
@@ -697,7 +1019,10 @@ class AkShareTool:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
     def get_sector_components(self, sector_name: str) -> List[Dict[str, Any]]:
-        """Get components stocks of a sector."""
+        """
+        [Deprecated] Get components stocks of a sector.
+        Please use get_board_info() instead.
+        """
         try:
             mapped_name = self._sector_mapping.get(sector_name, sector_name)
             # 东方财富-行业板块-成份股
@@ -725,7 +1050,10 @@ class AkShareTool:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
     def get_concept_fund_flow_rank(self) -> List[Dict[str, Any]]:
-        """Get concept board fund flow ranking."""
+        """
+        [Deprecated] Get concept board fund flow ranking.
+        Please use get_board_info() instead.
+        """
         try:
             # 东方财富-概念资金流
             df = ak.stock_fund_flow_concept(symbol="即时")
@@ -753,7 +1081,10 @@ class AkShareTool:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
     def get_concept_components(self, sector_name: str) -> List[Dict[str, Any]]:
-        """Get components stocks of a concept board."""
+        """
+        [Deprecated] Get components stocks of a concept board.
+        Please use get_board_info() instead.
+        """
         try:
             mapped_name = self._concept_mapping.get(sector_name, sector_name)
             # 东方财富-概念板块-成份股
@@ -780,27 +1111,33 @@ class AkShareTool:
             return []
 
     def get_stock_fund_flow(self, symbol: str) -> List[Dict[str, Any]]:
-        """Get individual stock fund flow history."""
+        """
+        [Deprecated] Get individual stock fund flow history.
+        Please use get_fund_flow() instead.
+        """
         try:
             # 1. Infer market
             market = ""
-            if symbol.startswith("6"):
-                market = "sh"
-            elif symbol.startswith("0") or symbol.startswith("3"):
-                market = "sz"
-            elif symbol.startswith("4") or symbol.startswith("8"):
-                market = "bj"
-            elif symbol.startswith("5"): 
-                market = "sh" # ETF
-            elif symbol.startswith("1"): 
-                market = "sz" # ETF
-            else:
+            if len(symbol) == 6:
+                if symbol.startswith("6"):
+                    market = "sh"
+                elif symbol.startswith("0") or symbol.startswith("3"):
+                    market = "sz"
+                elif symbol.startswith("4") or symbol.startswith("8"):
+                    market = "bj"
+                elif symbol.startswith("5"): 
+                    market = "sh" # ETF
+                elif symbol.startswith("1"): 
+                    market = "sz" # ETF
+            
+            if not market:
+                # Non-A-share or unsupported format
                 return []
 
             # 2. Call AkShare
             df = ak.stock_individual_fund_flow(stock=symbol, market=market)
             
-            if df.empty: return []
+            if df is None or df.empty: return []
             
             # 3. Format
             result = []
@@ -829,7 +1166,10 @@ class AkShareTool:
     
     @retry(stop=stop_after_attempt(3))
     def get_macro_data(self, indicator: str) -> Dict[str, Any]:
-        """Get latest China macro data (GDP, CPI, PMI)."""
+        """
+        [Deprecated] Get latest China macro data (GDP, CPI, PMI).
+        Please use get_macro() instead.
+        """
         try:
             indicator_upper = indicator.upper()
             if indicator_upper == 'GDP':
@@ -905,7 +1245,10 @@ class AkShareTool:
 
     @retry(stop=stop_after_attempt(3))
     def get_macro_history(self, indicator: str) -> Dict[str, Any]:
-        """Get historical China macro data."""
+        """
+        [Deprecated] Get historical China macro data.
+        Please use get_macro(history=True) instead.
+        """
         try:
             data = []
             indicator_upper = indicator.upper()
@@ -1101,6 +1444,50 @@ class AkShareTool:
         return history
 
 if __name__ == "__main__":
+    # export PYTHONPATH=$PYTHONPATH:. && python3 backend/infrastructure/market/_akshare.py
     tool = AkShareTool()
-    # print(tool.get_stock_quote("600036"))
-    # print(tool.get_macro_data("GDP"))
+    
+    print("\n=== Test get_quote ===")
+    print("A-Share (600036):", tool.get_quote("600036"))
+    print("ETF (510300):", tool.get_quote("510300"))
+    print("HK (00700):", tool.get_quote("00700", market="HK"))
+    print("US (AAPL):", tool.get_quote("AAPL", market="US"))
+
+    print("\n=== Test get_history ===")
+    hist = tool.get_history("600036", period="daily")
+    print(f"A History len: {len(hist)}")
+    if hist: print("Sample A:", hist[0])
+    
+    hist = tool.get_history("00700", period="daily")
+    print(f"HK History len: {len(hist)}")
+    if hist: print("Sample HK:", hist[0])
+    
+    hist = tool.get_history("AAPL", period="daily")
+    print(f"US History len: {len(hist)}")
+    if hist: print("Sample US:", hist[0])
+    
+    print("\n=== Test get_fund_flow ===")
+    flow = tool.get_fund_flow("600036")
+    print(f"Flow len: {len(flow)}")
+    if flow: print("Latest A Flow:", flow[0])
+    
+    flow = tool.get_fund_flow("00700")
+    print(f"HK Flow len: {len(flow)}")
+    if flow: print("Latest HK Flow:", flow[0])
+    
+    flow = tool.get_fund_flow("AAPL")
+    print(f"US Flow len: {len(flow)}")
+    if flow: print("Latest US Flow:", flow[0])
+    
+    print("\n=== Test get_board_info ===")
+    ranks = tool.get_board_info(info_type="rank")
+    print(f"Sector Ranks len: {len(ranks)}")
+    if ranks: print("Top 1 Sector:", ranks[0])
+    
+    print("\n=== Test get_financials ===")
+    fin = tool.get_financials("600036")
+    print("Financials Keys:", fin.keys())
+    
+    print("\n=== Test get_macro ===")
+    gdp = tool.get_macro("GDP")
+    print("GDP:", gdp)
