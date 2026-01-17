@@ -1,5 +1,6 @@
 export interface StockData {
     timestamp: string;
+    date?: string; // Add support for date field
     open: number;
     high: number;
     low: number;

@@ -1,6 +1,6 @@
 import os
 from sqlmodel import create_engine, SQLModel, Session
-from backend.app.agents.personal_finance.db_models import Portfolio, Asset
+from backend.app.agents.personal_finance.db_models import Portfolio, Asset, DecisionRecord
 
 # Define path relative to this agent
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))

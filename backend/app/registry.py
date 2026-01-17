@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, List, Union
 from backend.infrastructure.config.loader import config
 
 # Market Tools
-from backend.infrastructure.market.akshare import AkShareTool
+from backend.infrastructure.market.akshare_tool import AkShareTool
 from backend.infrastructure.market.fred import FredTool
 from backend.infrastructure.market.sina import SinaFinanceTool
 from backend.infrastructure.market.yahoo import YahooFinanceTool
@@ -84,13 +84,25 @@ class Tools:
         If market is provided ('A-share', 'US', 'HK'), auto-detection is skipped.
         """
         market = market or self._detect_market(symbol)
+        market_map = {"A-share": "A", "HK": "HK", "US": "US"}
+        ak_market = market_map.get(market, None)
 
+        # 1. Try Unified AkShareTool First (It handles ETF/A/HK/US)
+        try:
+            res = self.akshare.get_quote(symbol, market=ak_market)
+            if not self._is_error(res):
+                # Standardize output if needed? AkShare get_quote returns standard fields.
+                # Just return it.
+                # But we might want to ensure 'market' field matches registry's convention 'A-share' vs 'A'
+                # Registry uses 'A-share', AkShare uses 'A'.
+                if res.get("market") == "A": res["market"] = "A-share"
+                return res
+        except Exception as e:
+            logger.warning(f"AkShare get_quote failed for {symbol}: {e}")
+
+        # 2. Fallback Strategies (Legacy)
         # Strategy: A-share (Sina->AkShare->Yahoo), US/HK (Yahoo->Sina)
         if market == "A-share":
-            # Prefer AkShare for better metadata (PE, PB, etc) if using spot data
-            res = self.akshare.get_stock_quote(symbol)
-            if not self._is_error(res):
-                return res
             # Fallback to Sina
             res = self.sina.get_stock_quote(symbol, market="A-share")
             if not self._is_error(res):
@@ -237,39 +249,33 @@ class Tools:
         - US/HK: Yahoo
         """
         market = self._detect_market(symbol)
-        print("market:", market)
-        print("symbol:", symbol)
+        
+        # 1. Try AkShare Unified (Mainly for A-share, but structure is ready for others)
         if market == "A-share":
-            # 1. Try AkShare
-            indicators = self.akshare.get_financial_indicators(symbol, years)
+            try:
+                indicators = self.akshare.get_financials(symbol, report_type="indicator")
+                # Validation check (reuse logic)
+                is_valid = False
+                if indicators and "error" not in indicators:
+                    has_data = any(
+                        indicators.get(cat, {}).get(key) not in [None, 0, 0.0]
+                        for cat in ["revenue", "profit", "cashflow", "debt"]
+                        for key in indicators.get(cat, {}).keys()
+                    )
+                    if has_data:
+                        is_valid = True
+                
+                if is_valid:
+                    return indicators
+            except Exception as e:
+                logger.warning(f"AkShare get_financials failed: {e}")
 
-            # Check if data is valid (not empty)
-            # Logic adapted from skills/financial_report_tool/modules/metrics.py
-            is_valid = False
-            if indicators and "error" not in indicators:
-                # Check if we have actual data in key fields
-                # We check if all main categories have valid data, or at least some.
-                # A stricter check: if all categories are effectively empty, it's invalid.
-                has_data = any(
-                    indicators.get(cat, {}).get(key) not in [None, 0, 0.0]
-                    for cat in ["revenue", "profit", "cashflow", "debt"]
-                    for key in indicators.get(cat, {}).keys()
-                )
-                if has_data:
-                    is_valid = True
-
-            if is_valid:
-                return indicators
-
-            logger.warning(
-                f"AkShare returned insufficient data for {symbol}, falling back to Yahoo"
-            )
-
-            # 2. Fallback to Yahoo
+        # 2. Fallbacks
+        if market == "A-share":
+            # Fallback to Yahoo
             return self.yahoo.get_financial_indicators(
                 symbol, market="A-share", years=years
             )
-
         else:
             # US / HK -> Yahoo
             return self.yahoo.get_financial_indicators(
@@ -502,6 +508,36 @@ class Tools:
     ) -> List[Dict[str, Any]]:
         """Get historical data with market routing."""
         market = self._detect_market(symbol)
+        
+        # 1. Try AkShare Unified Interface (Supports A/HK/ETF, US is weak)
+        try:
+            # AkShare uses 'daily', 'weekly', 'monthly' for period mostly.
+            # Map '30d' -> 'daily' and filter later? 
+            # Or get_history(period='daily', start_date=...) 
+            # Current AkShare get_history handles period mapping (daily/weekly/monthly).
+            # But registry receives '30d'.
+            # If period is 'daily'/'weekly'/'monthly' pass it.
+            # If period is '30d', pass 'daily' and we might get more data, need to slice?
+            # AkShareTool.get_history by default uses start_date=1 year ago if not provided.
+            # Let's use 'daily' as default period if it's '30d'.
+            
+            ak_period = "daily"
+            if "week" in period: ak_period = "weekly"
+            if "month" in period: ak_period = "monthly"
+            
+            res = self.akshare.get_history(symbol, period=ak_period)
+            if res:
+                # Filter by count if needed? '30d' usually implies last 30 days.
+                # get_history returns full range (1 year default).
+                # We can slice it.
+                if period.endswith('d'):
+                    days = int(period[:-1])
+                    return res[-days:]
+                return res
+        except Exception as e:
+            logger.warning(f"AkShare get_history failed for {symbol}: {e}")
+
+        # 2. Fallbacks
         if market == "A-share":
             # Sina is preferred for A-share kline? Or AkShare?
             # Source api_server used MarketDataSkill which used Sina or AkShare.
@@ -511,7 +547,8 @@ class Tools:
             )
             if res:
                 return res
-            return self.akshare.get_historical_data(symbol, period=period)
+            # AkShare fallback (Old Interface, now deprecated but aliased in AkShareTool)
+            return self.akshare.get_stock_history(symbol, period=period)
 
         elif market in ["US", "HK"]:
             return self.yahoo.get_historical_data(
@@ -570,19 +607,21 @@ class Tools:
              try:
                  # Filter data by date
                  cutoff_date = (datetime.now() - timedelta(days=target_days)).date()
-                 
+
                  filtered_data = []
                  for d in full_data:
-                     # Check timestamp format. Usually YYYY-MM-DD
-                     ts = d.get('timestamp', '')
-                     if not ts: continue
-                     
-                     try:
-                         # Handle YYYY-MM-DD format
-                         d_date = datetime.strptime(ts, "%Y-%m-%d").date()
-                         if d_date >= cutoff_date:
-                             filtered_data.append(d)
-                     except ValueError:
+                    # Check timestamp format. Usually YYYY-MM-DD
+                    ts = d.get('timestamp', '') or d.get('date', '')
+                    if not ts: continue
+
+                    try:
+                        # Handle YYYY-MM-DD format
+                        # Convert ts to string if it's not (e.g. date object)
+                        ts = str(ts)
+                        d_date = datetime.strptime(ts, "%Y-%m-%d").date()
+                        if d_date >= cutoff_date:
+                            filtered_data.append(d)
+                    except ValueError:
                          # Handle potential datetime string like YYYY-MM-DDTHH:MM:SS
                          try:
                              d_date = datetime.strptime(ts.split('T')[0], "%Y-%m-%d").date()
@@ -590,7 +629,7 @@ class Tools:
                                  filtered_data.append(d)
                          except:
                              pass
-                             
+
                  return filtered_data
                  
              except Exception as e:
@@ -602,19 +641,13 @@ class Tools:
     def get_macro_history(self, query: str, period: str = "1y") -> Dict[str, Any]:
         """Get historical macro data."""
         query = query.lower()
+        
+        # 1. China Data via AkShare Unified
         if "china" in query or "cn" in query:
-            if "gdp" in query:
-                return self.akshare.get_macro_history("gdp")
-            if "cpi" in query:
-                return self.akshare.get_macro_history("cpi")
-            if "pmi" in query:
-                return self.akshare.get_macro_history("pmi")
-            if "ppi" in query:
-                return self.akshare.get_macro_history("ppi")
-            if "m2" in query:
-                return self.akshare.get_macro_history("m2")
-            if "lpr" in query:
-                return self.akshare.get_macro_history("lpr")
+            indicators = ["gdp", "cpi", "pmi", "ppi", "m2", "lpr"]
+            for ind in indicators:
+                if ind in query:
+                    return self.akshare.get_macro(ind, history=True)
 
         # FRED macro Data
         if "unemployment" in query:
@@ -652,21 +685,13 @@ class Tools:
     def get_macro_data(self, query: str) -> Dict[str, Any]:
         """Get macro economic data based on query."""
         query = query.lower()
+        
+        # 1. China Data via AkShare Unified
         if "china" in query or "cn" in query:
-            if "gdp" in query:
-                return self.akshare.get_macro_data("gdp")
-            if "cpi" in query:
-                return self.akshare.get_macro_data("cpi")
-            if "pmi" in query:
-                return self.akshare.get_macro_data("pmi")
-            if "ppi" in query:
-                return self.akshare.get_macro_data("ppi")
-            if "m2" in query:
-                return self.akshare.get_macro_data("m2")
-            if "lpr" in query:
-                return self.akshare.get_macro_data("lpr")
-            if "social" in query:
-                return self.akshare.get_macro_data("SOCIAL_FINANCING")
+            indicators = ["gdp", "cpi", "pmi", "ppi", "m2", "lpr", "social"]
+            for ind in indicators:
+                if ind in query:
+                    return self.akshare.get_macro(ind, history=False)
 
         if "vix" in query:
             return self.yahoo.get_macro_data("VIX")
@@ -700,6 +725,14 @@ class Tools:
                 return self.fred.get_macro_history("DFEDTARU", "1y")
 
         return {"error": "Unknown macro indicator requested"}
+
+    def get_fund_flow(self, target: str, flow_type: str = "stock") -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """Get fund flow data (stock, north, south, sector)."""
+        return self.akshare.get_fund_flow(target, flow_type=flow_type)
+
+    def get_board_info(self, board_name: str = "all", board_type: str = "industry", info_type: str = "rank") -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+        """Get board info (rankings or components)."""
+        return self.akshare.get_board_info(board_name, board_type=board_type, info_type=info_type)
 
     def search_market_news(
         self,

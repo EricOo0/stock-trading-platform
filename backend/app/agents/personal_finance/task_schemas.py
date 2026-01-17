@@ -64,45 +64,33 @@ class LessonItem(BaseModel):
     confidence: Optional[float] = None
 
 
-class LessonsBlock(BaseModel):
-    items: List[LessonItem] = Field(default_factory=list)
+class HistoricalValidation(BaseModel):
+    replay: ReplayBlock = Field(default_factory=ReplayBlock)
+    lessons: List[LessonItem] = Field(default_factory=list)
 
 
-class QueryBlock(BaseModel):
-    raw: str
-    intent: Optional[str] = None
-    constraints: List[str] = Field(default_factory=list)
-
-
-class DataProvenanceCall(BaseModel):
-    tool_name: str
-    params: Dict[str, Any] = Field(default_factory=dict)
-    time_range: Optional[str] = None
-    status: str = "success"
-    error: Optional[str] = None
-
-
-class DataProvenance(BaseModel):
-    tool_calls: List[DataProvenanceCall] = Field(default_factory=list)
-    generated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-
-class FocusBlock(BaseModel):
-    priority: str = "risk_first"
-    must_cover: List[str] = Field(default_factory=list)
+class DecisionReviewResult(BaseModel):
+    decision_id: int
+    symbol: str
+    original_action: str
+    original_price: float
+    current_price: float
+    is_correct: bool
+    reason: str  # 归因分析
 
 
 class PreContext(BaseModel):
-    version: str = "pf_pre_context/v1"
-    query: QueryBlock
-    memory_blocks: Dict[str, Any] = Field(default_factory=dict)
-    replay: ReplayBlock = Field(default_factory=ReplayBlock)
-    lessons: LessonsBlock = Field(default_factory=LessonsBlock)
-    focus: FocusBlock = Field(default_factory=FocusBlock)
-    open_questions: List[str] = Field(default_factory=list)
-    data_provenance: DataProvenance = Field(default_factory=DataProvenance)
-    market_snapshot: Dict[str, Any] = Field(default_factory=dict)
-    rendered_markdown: str = ""
+    query: str
+    
+    # New structured fields
+    review_results: List[DecisionReviewResult] = Field(default_factory=list)
+    reminders: List[str] = Field(default_factory=list)
+    
+    # Existing fields
+    # precautions: List[str] = Field(default_factory=list) # Removed as requested
+    lessons: List[LessonItem] = Field(default_factory=list) # Replaced historical_validation.lessons
+    
+    # Rendering cache
     rendered_pre_context_markdown: str = ""
     rendered_market_context_markdown: str = ""
 

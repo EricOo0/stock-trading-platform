@@ -32,3 +32,27 @@ class Asset(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     portfolio: Optional[Portfolio] = Relationship(back_populates="assets")
+
+
+class DecisionRecord(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: str = Field(index=True)
+    symbol: str = Field(index=True)
+    action: str  # buy, sell, hold
+    price_at_suggestion: float
+    reasoning: str  # 核心理由
+    status: str = Field(default="active")  # active, closed, ignored
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # 复盘字段
+    review_result: Optional[str] = None # correct, incorrect
+    review_comment: Optional[str] = None
+
+
+class LessonRecord(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: str = Field(index=True)
+    title: str
+    description: str
+    confidence: float = Field(default=1.0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
