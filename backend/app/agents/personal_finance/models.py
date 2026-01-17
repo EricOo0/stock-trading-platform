@@ -52,6 +52,12 @@ class RecommendationCard(BaseModel):
     action: RecommendationAction = Field(..., description="Recommended Action")
     confidence_score: float = Field(..., description="Confidence 0-1")
     risk_level: str = Field(..., description="Risk Level: low, medium, high")
+    
+    # Execution Strategy
+    suggested_symbol: Optional[str] = Field(None, description="Specific symbol to execute (e.g. sh512480)")
+    suggested_price: Optional[float] = Field(None, description="Suggested execution price")
+    suggested_quantity: Optional[float] = Field(None, description="Suggested execution quantity")
+    reasoning: Optional[str] = Field(None, description="Short reasoning for the strategy")
 
     # Optional fields from previous version if we want to keep them or strictly follow new schema
     # For now, let's stick to the prompt schema

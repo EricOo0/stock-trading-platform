@@ -40,6 +40,7 @@ class DecisionRecord(SQLModel, table=True):
     symbol: str = Field(index=True)
     action: str  # buy, sell, hold
     price_at_suggestion: float
+    suggested_quantity: float = Field(default=0.0) # 新增字段：建议数量
     reasoning: str  # 核心理由
     status: str = Field(default="active")  # active, closed, ignored
     created_at: datetime = Field(default_factory=datetime.utcnow)

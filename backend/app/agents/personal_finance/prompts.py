@@ -88,14 +88,23 @@ MASTER_SYNTHESIZER_SYSTEM_PROMPT = """你是一位专业的 AI 理财顾问（Sy
 MASTER_CARD_GENERATION_PROMPT_TEMPLATE = """
 根据上下文，为用户生成 1-3 张高价值的“推荐卡片”。返回 JSON：{{"cards": [ ... ]}}。
 
+**重要要求**：
+1. **必须给出具体的执行策略**：如果是买入/卖出建议，必须指定具体的标的代码（suggested_symbol）、建议价格（suggested_price，如无特定价格可填当前价或null）和**建议数量（suggested_quantity）**。
+2. **数量计算**：请根据用户的总资产、现金余额（在PreContext中）和风险偏好，给出一个合理的建议数量（例如：买入 1000 股，或 10% 仓位对应的股数）。不要只给模糊建议。
+3. **标的选择**：如果是板块建议（如“半导体”），请给出具体的 ETF 代码（如 512480）或龙头股代码。
+
 卡片 schema：
 {{
   "title": string,
   "description": string,
-  "asset_id": string|null,
+  "asset_id": string|null, // 关联的现有持仓代码，如果是新开仓可为null
   "action": "buy"|"sell"|"hold"|"monitor",
-  "confidence_score": number, // 范围 0.0 - 1.0 (例如 0.85 代表 85%)
-  "risk_level": "low"|"medium"|"high"
+  "confidence_score": number, // 范围 0.0 - 1.0
+  "risk_level": "low"|"medium"|"high",
+  "suggested_symbol": string|null, // 具体的执行标的代码，如 "sh512480"
+  "suggested_price": number|null,  // 建议买入/卖出价格
+  "suggested_quantity": number|null, // 建议买入/卖出数量 (绝对数值，不是百分比)
+  "reasoning": string|null // 策略理由
 }}
 
 上下文：

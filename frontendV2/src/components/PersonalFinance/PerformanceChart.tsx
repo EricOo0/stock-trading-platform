@@ -12,8 +12,8 @@ import {
 
 export interface PerformanceData {
     date: string;
-    nav_user: number;
-    nav_ai: number;
+    nav_user: number | null;
+    nav_ai: number | null;
     nav_sh: number;
     nav_sz: number;
 }

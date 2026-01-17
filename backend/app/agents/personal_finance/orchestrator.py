@@ -181,16 +181,16 @@ class PersonalFinanceOrchestrator:
         # Cache latest snapshot markdown for sub-agent calls
         self.latest_snapshot_md: str = ""
 
-    async def _save_decisions_to_db(self, *, user_id: str, cards: List[RecommendationCard]):
-        """Save recommendation cards as active decisions."""
+    async def _save_decisions_to_db(self, *, user_id: str, cards: List[RecommendationCard]) -> List[Dict[str, Any]]:
+        """Save recommendation cards as active decisions and return shadow trade requests."""
         if not cards:
-            return
+            return []
         
         try:
-            await asyncio.to_thread(self.repo.save_decisions, user_id, cards)
-            logger.info(f"[Orchestrator] Saved {len(cards)} decision records via Repo.")
+            return await asyncio.to_thread(self.repo.save_decisions, user_id, cards)
         except Exception as e:
             logger.error(f"[Orchestrator] Failed to save decision records: {e}")
+            return []
 
     async def _save_lessons_to_db(self, *, user_id: str, lessons: List[LessonItem]):
         """Replace user lessons with refined list."""
@@ -224,8 +224,25 @@ class PersonalFinanceOrchestrator:
 
         cards = await self.master.synthesize_cards(context=context)
         
-        # Save decisions
-        await self._save_decisions_to_db(user_id=user_id, cards=cards)
+        # Save decisions and get shadow trade requests
+        shadow_requests = await self._save_decisions_to_db(user_id=user_id, cards=cards)
+        
+        # --- Shadow Trade Execution ---
+        if shadow_requests:
+            for req in shadow_requests:
+                try:
+                    await asyncio.to_thread(
+                        self.repo.execute_shadow_trade,
+                        user_id=user_id,
+                        symbol=req["symbol"],
+                        action=req["action"],
+                        quantity=req["quantity"],
+                        price=req["price"]
+                    )
+                    logger.info(f"[Orchestrator] Executed shadow trade: {req['action']} {req['symbol']} qty={req['quantity']}")
+                except Exception as e:
+                    logger.error(f"[Orchestrator] Failed to execute shadow trade for {req.get('symbol')}: {e}")
+        # ------------------------------
         
         # Save Lessons (Directly from PreContext, trusting PreProcessAgent's management)
         await self._save_lessons_to_db(user_id=user_id, lessons=pre_context.lessons)
