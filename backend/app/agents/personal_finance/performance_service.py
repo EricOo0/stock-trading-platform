@@ -1,10 +1,13 @@
 import logging
+import asyncio
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Set
 from sqlmodel import Session, select
 from backend.app.agents.personal_finance.db_models import (
     PerformanceHistory, Portfolio, ShadowPortfolio, Asset, ShadowAsset
 )
+from backend.infrastructure.market.akshare_tool import AkShareTool
+import akshare as ak
 
 logger = logging.getLogger(__name__)
 
@@ -12,10 +15,94 @@ async def fetch_market_history_batch(dates: List[str], symbols: List[str]) -> Di
     """
     Fetches historical close prices for a batch of dates and symbols.
     Returns: { "YYYY-MM-DD": { "SYMBOL": price, ... }, ... }
-    
-    This function should be mocked in tests or implemented with a real data provider.
     """
-    raise NotImplementedError("fetch_market_history_batch is not implemented yet")
+    if not dates or not symbols:
+        return {}
+
+    tool = AkShareTool()
+    loop = asyncio.get_running_loop()
+    
+    # 1. Prepare result structure
+    # dates are strings "YYYY-MM-DD"
+    result: Dict[str, Dict[str, float]] = {d: {} for d in dates}
+    
+    # Calculate global start/end for optimization
+    sorted_dates = sorted(dates)
+    start_date_obj = datetime.strptime(sorted_dates[0], "%Y-%m-%d")
+    end_date_obj = datetime.strptime(sorted_dates[-1], "%Y-%m-%d")
+    
+    # AkShare expects YYYYMMDD
+    start_str = start_date_obj.strftime("%Y%m%d")
+    end_str = end_date_obj.strftime("%Y%m%d")
+    
+    # 2. Fetch function
+    async def fetch_one(sym: str):
+        try:
+            # A. Indices Handling
+            if sym == "000001.SS":
+                # SH Index
+                # Run in executor to avoid blocking
+                df = await loop.run_in_executor(None, lambda: ak.stock_zh_index_daily_em(symbol="sh000001"))
+                if df is not None and not df.empty:
+                    # Filter by date range in memory
+                    # df['date'] is YYYY-MM-DD string
+                    for _, row in df.iterrows():
+                        d_str = str(row['date'])
+                        if d_str in result:
+                            result[d_str][sym] = float(row['close'])
+                return
+
+            if sym == "399001.SZ":
+                # SZ Index
+                df = await loop.run_in_executor(None, lambda: ak.stock_zh_index_daily_em(symbol="sz399001"))
+                if df is not None and not df.empty:
+                    for _, row in df.iterrows():
+                        d_str = str(row['date'])
+                        if d_str in result:
+                            result[d_str][sym] = float(row['close'])
+                return
+
+            # B. Regular Stocks / ETFs
+            # Use AkShareTool.get_history which handles A/HK/US/ETF
+            # Note: get_history returns List[Dict] with 'date' as 'YYYY-MM-DD'
+            hist = await loop.run_in_executor(
+                None, 
+                lambda: tool.get_history(sym, period="daily", start_date=start_str, end_date=end_str, adjust="qfq")
+            )
+            
+            for item in hist:
+                d_str = item['date']
+                if d_str in result:
+                    result[d_str][sym] = float(item['close'])
+                    
+        except Exception as e:
+            logger.error(f"Failed to fetch market history for {sym}: {e}")
+
+    # 3. Execute concurrently
+    # Limit concurrency if needed, but for <50 symbols it's usually fine
+    tasks = [fetch_one(s) for s in symbols]
+    await asyncio.gather(*tasks)
+    
+    # 4. Handle Missing Data (Fill Forward)
+    # If a date is missing (e.g. suspension), use previous date's price
+    # We iterate sorted dates
+    for sym in symbols:
+        last_price = 0.0
+        # Try to find an initial price from before start_date? 
+        # For simplicity, we assume if Day 1 is missing, price is 0 (or maybe we should fetch Day 0)
+        # In ensure_performance_history we fetch [latest_record.date] + missing_dates.
+        # latest_record.date SHOULD have data from DB, but here we fetch fresh.
+        # Ideally we carry forward.
+        
+        for d in sorted_dates:
+            price = result[d].get(sym)
+            if price and price > 0:
+                last_price = price
+            elif last_price > 0:
+                # Fill missing
+                result[d][sym] = last_price
+                
+    return result
 
 def calculate_portfolio_value(
     cash: float, 
