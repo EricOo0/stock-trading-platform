@@ -153,3 +153,51 @@ def test_shadow_portfolio_auto_creation():
         assert perf is not None
         assert perf.nav_user == 1.0
         assert perf.nav_ai == 1.0
+
+@pytest.mark.asyncio
+async def test_execute_shadow_trade():
+    from backend.app.services.personal_finance_service import execute_shadow_trade, save_portfolio
+    from backend.app.agents.personal_finance.models import PortfolioSnapshot, AssetItem
+    from backend.app.agents.personal_finance.db_models import ShadowPortfolio, ShadowAsset
+    from backend.app.agents.personal_finance.db import engine
+    from sqlmodel import Session, select
+    
+    user_id = "test_user_shadow_trade"
+    
+    # 1. Setup Initial Portfolio (and Shadow)
+    snapshot = PortfolioSnapshot(
+        assets=[
+            AssetItem(symbol="AAPL", type="Stock", quantity=10, cost_basis=100.0, current_price=100.0)
+        ],
+        cash_balance=10000.0
+    )
+    # save_portfolio is async
+    await save_portfolio(user_id, snapshot)
+    
+    # 2. Execute Shadow Trade: BUY 5 AAPL at 120.0
+    # Assuming execute_shadow_trade signature: (user_id, symbol, action, quantity, price)
+    await execute_shadow_trade(user_id, "AAPL", "BUY", 5, 120.0)
+    
+    # 3. Verify Shadow Portfolio Updated
+    with Session(engine) as session:
+        shadow = session.exec(select(ShadowPortfolio).where(ShadowPortfolio.user_id == user_id)).first()
+        assert shadow.cash_balance == 10000.0 - (5 * 120.0) # 9400.0
+        
+        assets = session.exec(select(ShadowAsset).where(ShadowAsset.portfolio_id == shadow.id)).all()
+        assert len(assets) == 1
+        aapl = assets[0]
+        assert aapl.quantity == 15 # 10 + 5
+        # Avg cost update: (10*100 + 5*120) / 15 = 1600 / 15 = 106.666...
+        assert abs(aapl.avg_cost - 106.67) < 0.1
+        
+    # 4. Execute Shadow Trade: SELL 5 AAPL at 130.0
+    await execute_shadow_trade(user_id, "AAPL", "SELL", 5, 130.0)
+    
+    # 5. Verify Update
+    with Session(engine) as session:
+        shadow = session.exec(select(ShadowPortfolio).where(ShadowPortfolio.user_id == user_id)).first()
+        assert shadow.cash_balance == 9400.0 + (5 * 130.0) # 10050.0
+        
+        assets = session.exec(select(ShadowAsset).where(ShadowAsset.portfolio_id == shadow.id)).all()
+        aapl = assets[0]
+        assert aapl.quantity == 10

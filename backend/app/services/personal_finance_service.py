@@ -208,3 +208,71 @@ async def update_prices(assets: List[AssetItem]) -> PriceUpdateMap:
             continue
             
     return PriceUpdateMap(prices=price_map)
+
+async def execute_shadow_trade(user_id: str, symbol: str, action: str, quantity: float, price: float) -> None:
+    """
+    Execute a trade on the Shadow Portfolio.
+    """
+    with Session(engine) as session:
+        # 1. Get Shadow Portfolio
+        shadow = session.exec(select(ShadowPortfolio).where(ShadowPortfolio.user_id == user_id)).first()
+        if not shadow:
+            raise ValueError(f"Shadow Portfolio not found for user {user_id}")
+
+        total_value = quantity * price
+
+        if action.upper() == "BUY":
+            # Update Cash
+            shadow.cash_balance -= total_value
+            
+            # Find or Create Asset
+            asset = session.exec(
+                select(ShadowAsset)
+                .where(ShadowAsset.portfolio_id == shadow.id)
+                .where(ShadowAsset.symbol == symbol)
+            ).first()
+            
+            if asset:
+                # Update Avg Cost
+                # (Old Qty * Old Avg + New Qty * Price) / (Old Qty + New Qty)
+                current_total_cost = asset.quantity * asset.avg_cost
+                new_quantity = asset.quantity + quantity
+                
+                if new_quantity > 0:
+                    asset.avg_cost = (current_total_cost + total_value) / new_quantity
+                
+                asset.quantity = new_quantity
+                session.add(asset)
+            else:
+                asset = ShadowAsset(
+                    portfolio_id=shadow.id,
+                    symbol=symbol,
+                    quantity=quantity,
+                    avg_cost=price
+                )
+                session.add(asset)
+                
+        elif action.upper() == "SELL":
+            # Find Asset
+            asset = session.exec(
+                select(ShadowAsset)
+                .where(ShadowAsset.portfolio_id == shadow.id)
+                .where(ShadowAsset.symbol == symbol)
+            ).first()
+            
+            if not asset:
+                raise ValueError(f"Asset {symbol} not found in shadow portfolio")
+                
+            if asset.quantity < quantity:
+                raise ValueError(f"Insufficient quantity for {symbol}: have {asset.quantity}, trying to sell {quantity}")
+            
+            # Update Cash
+            shadow.cash_balance += total_value
+            
+            # Update Quantity
+            asset.quantity -= quantity
+            session.add(asset)
+            
+        shadow.updated_at = datetime.utcnow()
+        session.add(shadow)
+        session.commit()
