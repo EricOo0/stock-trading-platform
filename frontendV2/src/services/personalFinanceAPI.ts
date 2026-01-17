@@ -20,6 +20,19 @@ export interface BackendPortfolioSnapshot {
   query?: string;
 }
 
+export interface PerformanceDataPoint {
+  date: string;
+  nav_user: number;
+  nav_ai: number;
+  nav_sh: number;
+  nav_sz: number;
+}
+
+export interface PerformanceResponse {
+  start_date: string;
+  series: PerformanceDataPoint[];
+}
+
 // Mapper Functions
 const toBackendAsset = (asset: AssetItem): BackendAssetItem => ({
   id: asset.id,
@@ -119,6 +132,19 @@ export const personalFinanceAPI = {
       return data.prices || {};
     } catch (error) {
       console.error('Error updating prices:', error);
+      throw error;
+    }
+  },
+
+  getPerformanceHistory: async (): Promise<PerformanceResponse> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/performance`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch performance history');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching performance history:', error);
       throw error;
     }
   }

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { AssetItem, PortfolioSummary, Transaction } from '../types/personalFinance';
 import AssetDashboard from '../components/PersonalFinance/AssetDashboard';
 import AssetAllocationChart from '../components/PersonalFinance/AssetAllocationChart';
-import { PerformanceChart, PerformanceData } from '../components/PersonalFinance/PerformanceChart';
+import { PerformanceChart, type PerformanceData } from '../components/PersonalFinance/PerformanceChart';
 import AssetTable from '../components/PersonalFinance/AssetTable';
 import AssetOperationModal from '../components/PersonalFinance/AssetOperationModal';
 import FinanceAssistantWidget from '../components/PersonalFinance/FinanceAssistantWidget';
@@ -18,8 +18,8 @@ const PersonalFinancePage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 加载数据
-  useEffect(() => {
+    // 加载数据
+    useEffect(() => {
     const loadPortfolio = async () => {
       try {
         setIsLoading(true);
@@ -27,25 +27,15 @@ const PersonalFinancePage: React.FC = () => {
         setAssets(data.assets);
         setCash(data.cash);
         
-        // Mock Performance Data
-        const mockData: PerformanceData[] = Array.from({ length: 30 }, (_, i) => {
-            const date = new Date();
-            date.setDate(date.getDate() - (29 - i));
-            const baseValue = 1.0;
-            // Add some randomness but keep trends roughly logical
-            const volatility = 0.02;
-            const trendUser = 0.002 * i; // Slight upward trend
-            const trendAI = 0.003 * i;   // Better upward trend
-            
-            return {
-                date: date.toISOString().split('T')[0],
-                nav_user: baseValue + trendUser + (Math.random() - 0.5) * volatility,
-                nav_ai: baseValue + trendAI + (Math.random() - 0.5) * volatility,
-                nav_sh: baseValue + (Math.random() - 0.5) * volatility,
-                nav_sz: baseValue + (Math.random() - 0.5) * volatility * 1.2,
-            };
-        });
-        setPerformanceHistory(mockData);
+        // Load Performance Data
+        try {
+            const perfResponse = await personalFinanceAPI.getPerformanceHistory();
+            if (perfResponse && perfResponse.series) {
+                setPerformanceHistory(perfResponse.series);
+            }
+        } catch (err) {
+            console.error('Failed to load performance history:', err);
+        }
 
       } catch (error) {
         console.error('Failed to load portfolio:', error);

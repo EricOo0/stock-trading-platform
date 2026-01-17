@@ -5,6 +5,7 @@ import json
 import logging
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
+from sqlmodel import select, Session
 
 from backend.app.agents.personal_finance.models import (
     AssetItem,
@@ -18,6 +19,9 @@ from backend.app.services.personal_finance_service import (
     save_portfolio,
 )
 from backend.app.agents.personal_finance.agent import create_personal_finance_graph
+from backend.app.agents.personal_finance.db import engine
+from backend.app.agents.personal_finance.db_models import PerformanceHistory
+from backend.app.agents.personal_finance.performance_service import ensure_performance_history
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,18 @@ router = APIRouter(prefix="/api/personal-finance", tags=["Personal Finance"])
 
 class UpdatePricesRequest(BaseModel):
     assets: List[AssetItem]
+
+
+class PerformanceDataPoint(BaseModel):
+    date: str
+    nav_user: float
+    nav_ai: float
+    nav_sh: float
+    nav_sz: float
+
+class PerformanceResponse(BaseModel):
+    start_date: str
+    series: List[PerformanceDataPoint]
 
 
 @router.get("/portfolio", response_model=PortfolioSnapshot)
@@ -69,6 +85,35 @@ async def update_asset_prices(request: UpdatePricesRequest):
     except Exception as e:
         logger.error(f"Error updating prices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/performance", response_model=PerformanceResponse)
+async def get_performance_history(user_id: str = "default_user"):
+    with Session(engine) as session:
+        # 1. Ensure history is up to date (Lazy Backfill)
+        await ensure_performance_history(user_id, session)
+
+        # 2. Fetch all history
+        stmt = select(PerformanceHistory).where(PerformanceHistory.user_id == user_id).order_by(PerformanceHistory.date)
+        history = session.exec(stmt).all()
+
+        if not history:
+            return PerformanceResponse(start_date="", series=[])
+
+        series = []
+        for h in history:
+            series.append(PerformanceDataPoint(
+                date=h.date,
+                nav_user=h.nav_user,
+                nav_ai=h.nav_ai,
+                nav_sh=h.nav_sh,
+                nav_sz=h.nav_sz
+            ))
+
+        return PerformanceResponse(
+            start_date=history[0].date,
+            series=series
+        )
 
 
 async def stream_analysis(portfolio: PortfolioSnapshot) -> AsyncGenerator[str, None]:
