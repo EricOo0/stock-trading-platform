@@ -43,7 +43,7 @@ const TechnicalAnalysisPage: React.FC<TechnicalAnalysisProps> = ({ sharedSymbol 
 
     // Separate Data States for Modes
     const [technicalData, setTechnicalData] = useState<TechnicalAnalysisResult | null>(null);
-    const [aiContextExpanded, setAiContextExpanded] = useState(false);
+    // const [aiContextExpanded, setAiContextExpanded] = useState(false);
 
 
     // Legacy mapping for backwards compatibility in JSX (optional, or just update JSX)

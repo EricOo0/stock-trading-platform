@@ -27,8 +27,7 @@
 ## 4. 资金流向 (Fund Flow)
 多维度的资金监控指标。
 - **个股资金流历史**: `stock_individual_fund_flow`
-- **北向资金流**: `stock_hsgt_north_net_flow_in_em` (沪深港通-北向)
-- **南向资金流**: `stock_hsgt_south_net_flow_in_em` (沪深港通-南向)
+- **北向/南向资金流**: `stock_hsgt_hist_em` (沪深港通资金流向, symbol="北向资金" 或 "南向资金")
 - **两融数据明细**: `stock_margin_detail_szkz_em` (市场整体融资融券情绪)
 
 ## 5. 公司基本面 (Fundamentals)
@@ -56,3 +55,11 @@
 - **全球经济日历**: `news_economic_baidu` (百度财经提供)
 - **全球财经新闻**: `stock_info_global_ths` (同花顺全球快讯)
 - **新闻联播摘要**: `news_cctv` (关键政策风向标)
+
+## 9. 指数行情 (Indices Data)
+获取各大市场指数的实时行情。
+- **批量指数行情**: `get_indices_quote` (获取指定市场如 'CN'/'HK'/'US' 的所有核心指数)
+- **指数实时行情**: `get_index_quote` (支持代码或名称查询，如 "000001", "上证指数", "HSI", ".DJI")
+- **A股指数实时**: `stock_zh_index_spot_em` (支持代码或名称查询)
+- **港股指数实时**: `stock_hk_index_daily_sina` (注意：AkShare 命名为 daily 但包含实时字段)
+- **美股指数实时**: `index_us_stock_sina`

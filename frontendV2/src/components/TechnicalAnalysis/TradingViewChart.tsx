@@ -62,13 +62,20 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({ data, mainIndicator
         // 转换数据格式
         // Lightweight Charts 需要 { time, open, high, low, close }
         // time 可以是 string 'yyyy-mm-dd' 或者 timestamp (number, seconds)
-        const candleData = data.map(d => ({
-            time: (new Date(d.timestamp).getTime() / 1000) as Time,
-            open: d.open,
-            high: d.high,
-            low: d.low,
-            close: d.close,
-        }));
+        const candleData = data.map(d => {
+            const timeStr = d.timestamp || d.date;
+            if (!timeStr) {
+                console.error('Missing timestamp/date for data point:', d);
+                return null;
+            }
+            return {
+                time: (new Date(timeStr).getTime() / 1000) as Time,
+                open: d.open,
+                high: d.high,
+                low: d.low,
+                close: d.close,
+            };
+        }).filter(item => item !== null) as { time: Time; open: number; high: number; low: number; close: number }[];
         
         // 必须按时间升序排序
         candleData.sort((a, b) => (a.time as number) - (b.time as number));
@@ -81,18 +88,34 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({ data, mainIndicator
             const ma20Series = chart.addSeries(LineSeries, { color: '#c084fc', lineWidth: 1, title: 'MA20' });
             const ma60Series = chart.addSeries(LineSeries, { color: '#22c55e', lineWidth: 1, title: 'MA60' });
 
-            ma5Series.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.ma5 || NaN })).filter(d => !isNaN(d.value)));
-            ma10Series.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.ma10 || NaN })).filter(d => !isNaN(d.value)));
-            ma20Series.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.ma20 || NaN })).filter(d => !isNaN(d.value)));
-            ma60Series.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.ma60 || NaN })).filter(d => !isNaN(d.value)));
+            const getMaData = (key: keyof StockData) => data.map(d => {
+                const timeStr = d.timestamp || d.date;
+                return { 
+                    time: (new Date(timeStr!).getTime() / 1000) as Time, 
+                    value: (d[key] as number) || NaN 
+                };
+            }).filter(d => !isNaN(d.value) && !isNaN(d.time as number)).sort((a, b) => (a.time as number) - (b.time as number));
+
+            ma5Series.setData(getMaData('ma5'));
+            ma10Series.setData(getMaData('ma10'));
+            ma20Series.setData(getMaData('ma20'));
+            ma60Series.setData(getMaData('ma60'));
         } else if (mainIndicator === 'BOLL') {
             const upperSeries = chart.addSeries(LineSeries, { color: '#fbbf24', lineWidth: 1, lineStyle: 2, title: 'Upper' });
             const midSeries = chart.addSeries(LineSeries, { color: '#f8fafc', lineWidth: 1, title: 'Mid' });
             const lowerSeries = chart.addSeries(LineSeries, { color: '#c084fc', lineWidth: 1, lineStyle: 2, title: 'Lower' });
 
-            upperSeries.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.boll_upper || NaN })).filter(d => !isNaN(d.value)));
-            midSeries.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.boll_mid || NaN })).filter(d => !isNaN(d.value)));
-            lowerSeries.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.boll_lower || NaN })).filter(d => !isNaN(d.value)));
+            const getBollData = (key: keyof StockData) => data.map(d => {
+                const timeStr = d.timestamp || d.date;
+                return { 
+                    time: (new Date(timeStr!).getTime() / 1000) as Time, 
+                    value: (d[key] as number) || NaN 
+                };
+            }).filter(d => !isNaN(d.value) && !isNaN(d.time as number)).sort((a, b) => (a.time as number) - (b.time as number));
+
+            upperSeries.setData(getBollData('boll_upper'));
+            midSeries.setData(getBollData('boll_mid'));
+            lowerSeries.setData(getBollData('boll_lower'));
         }
 
         // 4. 初始化副图 (如果有)
@@ -143,30 +166,53 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({ data, mainIndicator
                     priceFormat: { type: 'volume' },
                     priceScaleId: '', // Default
                 });
-                volSeries.setData(data.map(d => ({
-                    time: (new Date(d.timestamp).getTime() / 1000) as Time,
-                    value: d.volume,
-                    color: d.close >= d.open ? '#ef4444' : '#22c55e', // 涨红跌绿
-                })));
+                const volData = data.map(d => {
+                    const timeStr = d.timestamp || d.date;
+                    return {
+                        time: (new Date(timeStr!).getTime() / 1000) as Time,
+                        value: d.volume,
+                        color: d.close >= d.open ? '#ef4444' : '#22c55e', // 涨红跌绿
+                    };
+                }).filter(d => !isNaN(d.time as number)).sort((a, b) => (a.time as number) - (b.time as number));
+                volSeries.setData(volData);
             } else if (subIndicator === 'MACD') {
                 const difSeries = subChart.addSeries(LineSeries, { color: '#fbbf24', lineWidth: 1, title: 'DIF' });
                 const deaSeries = subChart.addSeries(LineSeries, { color: '#38bdf8', lineWidth: 1, title: 'DEA' });
                 const barSeries = subChart.addSeries(HistogramSeries, { title: 'MACD' });
 
-                difSeries.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.macd_dif || 0 })).filter(d => !isNaN(d.value)));
-                deaSeries.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.macd_dea || 0 })).filter(d => !isNaN(d.value)));
-                barSeries.setData(data.map(d => ({
-                    time: (new Date(d.timestamp).getTime() / 1000) as Time,
-                    value: d.macd_bar || 0,
-                    color: (d.macd_bar || 0) >= 0 ? '#ef4444' : '#22c55e',
-                })).filter(d => !isNaN(d.value)));
+                const getMacdData = (key: keyof StockData, def = 0) => data.map(d => {
+                    const timeStr = d.timestamp || d.date;
+                    return { 
+                        time: (new Date(timeStr!).getTime() / 1000) as Time, 
+                        value: (d[key] as number) || def 
+                    };
+                }).filter(d => !isNaN(d.value) && !isNaN(d.time as number)).sort((a, b) => (a.time as number) - (b.time as number));
+
+                difSeries.setData(getMacdData('macd_dif'));
+                deaSeries.setData(getMacdData('macd_dea'));
+                barSeries.setData(data.map(d => {
+                    const timeStr = d.timestamp || d.date;
+                    const val = d.macd_bar || 0;
+                    return {
+                        time: (new Date(timeStr!).getTime() / 1000) as Time,
+                        value: val,
+                        color: val >= 0 ? '#ef4444' : '#22c55e',
+                    };
+                }).filter(d => !isNaN(d.value) && !isNaN(d.time as number)).sort((a, b) => (a.time as number) - (b.time as number)));
             } else if (subIndicator === 'RSI') {
                 const rsiSeries = subChart.addSeries(LineSeries, { color: '#c084fc', lineWidth: 1, title: 'RSI' });
                 // 添加 30/70 参考线 (Lightweight charts 原生不支持 ReferenceLine，可以用 LineSeries 模拟)
                 const ref70 = subChart.addSeries(LineSeries, { color: '#ef4444', lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false });
                 const ref30 = subChart.addSeries(LineSeries, { color: '#22c55e', lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false });
 
-                const validRsi = data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.rsi14 || NaN })).filter(d => !isNaN(d.value));
+                const validRsi = data.map(d => {
+                    const timeStr = d.timestamp || d.date;
+                    return { 
+                        time: (new Date(timeStr!).getTime() / 1000) as Time, 
+                        value: d.rsi14 || NaN 
+                    };
+                }).filter(d => !isNaN(d.value) && !isNaN(d.time as number)).sort((a, b) => (a.time as number) - (b.time as number));
+                
                 rsiSeries.setData(validRsi);
                 
                 if (validRsi.length > 0) {
@@ -178,9 +224,17 @@ const TradingViewChart: React.FC<TradingViewChartProps> = ({ data, mainIndicator
                 const dSeries = subChart.addSeries(LineSeries, { color: '#38bdf8', lineWidth: 1, title: 'D' });
                 const jSeries = subChart.addSeries(LineSeries, { color: '#c084fc', lineWidth: 1, title: 'J' });
 
-                kSeries.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.kdj_k || 0 })).filter(d => !isNaN(d.value)));
-                dSeries.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.kdj_d || 0 })).filter(d => !isNaN(d.value)));
-                jSeries.setData(data.map(d => ({ time: (new Date(d.timestamp).getTime() / 1000) as Time, value: d.kdj_j || 0 })).filter(d => !isNaN(d.value)));
+                const getKdjData = (key: keyof StockData) => data.map(d => {
+                    const timeStr = d.timestamp || d.date;
+                    return { 
+                        time: (new Date(timeStr!).getTime() / 1000) as Time, 
+                        value: (d[key] as number) || 0 
+                    };
+                }).filter(d => !isNaN(d.value) && !isNaN(d.time as number)).sort((a, b) => (a.time as number) - (b.time as number));
+
+                kSeries.setData(getKdjData('kdj_k'));
+                dSeries.setData(getKdjData('kdj_d'));
+                jSeries.setData(getKdjData('kdj_j'));
             }
         }
 

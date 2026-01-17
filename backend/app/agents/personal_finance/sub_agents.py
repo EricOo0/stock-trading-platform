@@ -6,6 +6,13 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from backend.app.registry import Tools
 from backend.infrastructure.config.loader import config
+from backend.app.agents.personal_finance.prompts import (
+    SUBAGENT_ROLE_MACRO,
+    SUBAGENT_ROLE_MARKET,
+    SUBAGENT_ROLE_NEWS,
+    SUBAGENT_ROLE_TECHNICAL,
+    SUBAGENT_ROLE_DAILY_REVIEW,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +82,7 @@ class MacroAnalyst(SpecializedAnalyst):
     def __init__(self):
         super().__init__(
             name="MacroAnalyst",
-            role_prompt="你是宏观经济分析师。你的任务是根据提供的经济数据（GDP, CPI, PMI等）分析当前经济周期和趋势。请言简意赅。",
+            role_prompt=SUBAGENT_ROLE_MACRO,
         )
 
     async def analyze(self, market_snapshot: Optional[str] = None) -> str:
@@ -112,7 +119,7 @@ class MarketAnalyst(SpecializedAnalyst):
     def __init__(self):
         super().__init__(
             name="MarketAnalyst",
-            role_prompt="你是市场策略分析师。根据板块资金流向和市场情绪，判断当前市场热点和风险。",
+            role_prompt=SUBAGENT_ROLE_MARKET,
         )
 
     async def analyze(self, market_snapshot: Optional[str] = None) -> str:
@@ -144,7 +151,7 @@ class NewsAnalyst(SpecializedAnalyst):
     def __init__(self):
         super().__init__(
             name="NewsAnalyst",
-            role_prompt="你是财经新闻分析师。根据搜索到的新闻，提炼对投资组合有重大影响的信息。",
+            role_prompt=SUBAGENT_ROLE_NEWS,
         )
 
     async def analyze(self, query: str, market_snapshot: Optional[str] = None) -> str:
@@ -170,7 +177,7 @@ class TechnicalAnalyst(SpecializedAnalyst):
     def __init__(self):
         super().__init__(
             name="TechnicalAnalyst",
-            role_prompt="你是技术分析师。根据K线数据和指标，判断资产的趋势和关键支撑/阻力位。",
+            role_prompt=SUBAGENT_ROLE_TECHNICAL,
         )
 
     async def analyze(self, symbol: str, market_snapshot: Optional[str] = None) -> str:
@@ -204,7 +211,7 @@ class DailyReviewAnalyst(SpecializedAnalyst):
     def __init__(self):
         super().__init__(
             name="DailyReviewAnalyst",
-            role_prompt="你是日内交易复盘分析师。根据今日分时走势和资金流向，判断主力意图和次日预期。",
+            role_prompt=SUBAGENT_ROLE_DAILY_REVIEW,
         )
 
     async def analyze(self, symbol: str, market_snapshot: Optional[str] = None) -> str:

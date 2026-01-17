@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, List, Union
 from backend.infrastructure.config.loader import config
 
 # Market Tools
-from backend.infrastructure.market._akshare import AkShareTool
+from backend.infrastructure.market.akshare_tool import AkShareTool
 from backend.infrastructure.market.fred import FredTool
 from backend.infrastructure.market.sina import SinaFinanceTool
 from backend.infrastructure.market.yahoo import YahooFinanceTool
@@ -607,19 +607,21 @@ class Tools:
              try:
                  # Filter data by date
                  cutoff_date = (datetime.now() - timedelta(days=target_days)).date()
-                 
+
                  filtered_data = []
                  for d in full_data:
-                     # Check timestamp format. Usually YYYY-MM-DD
-                     ts = d.get('timestamp', '')
-                     if not ts: continue
-                     
-                     try:
-                         # Handle YYYY-MM-DD format
-                         d_date = datetime.strptime(ts, "%Y-%m-%d").date()
-                         if d_date >= cutoff_date:
-                             filtered_data.append(d)
-                     except ValueError:
+                    # Check timestamp format. Usually YYYY-MM-DD
+                    ts = d.get('timestamp', '') or d.get('date', '')
+                    if not ts: continue
+
+                    try:
+                        # Handle YYYY-MM-DD format
+                        # Convert ts to string if it's not (e.g. date object)
+                        ts = str(ts)
+                        d_date = datetime.strptime(ts, "%Y-%m-%d").date()
+                        if d_date >= cutoff_date:
+                            filtered_data.append(d)
+                    except ValueError:
                          # Handle potential datetime string like YYYY-MM-DDTHH:MM:SS
                          try:
                              d_date = datetime.strptime(ts.split('T')[0], "%Y-%m-%d").date()
@@ -627,7 +629,7 @@ class Tools:
                                  filtered_data.append(d)
                          except:
                              pass
-                             
+
                  return filtered_data
                  
              except Exception as e:
