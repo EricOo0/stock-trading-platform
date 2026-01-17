@@ -10,6 +10,10 @@ export interface RecommendationCardProps {
   action: RecommendationAction;
   confidence_score: number;
   risk_level: 'low' | 'medium' | 'high';
+  suggested_symbol?: string | null;
+  suggested_price?: number | null;
+  suggested_quantity?: number | null;
+  reasoning?: string | null;
 }
 
 const actionColors = {
@@ -32,6 +36,10 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
   action,
   confidence_score,
   risk_level,
+  suggested_symbol,
+  suggested_price,
+  suggested_quantity,
+  reasoning
 }) => {
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 shadow-lg hover:border-slate-600 transition-colors">
@@ -51,6 +59,35 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
       <p className="text-slate-300 text-sm mb-4 leading-relaxed">
         {description}
       </p>
+
+      {/* Execution Strategy Block */}
+      {(suggested_symbol || suggested_quantity) && (
+        <div className="mb-4 p-3 bg-slate-900/50 rounded-lg text-xs border border-slate-700/50">
+           <div className="text-slate-500 mb-2 font-medium">执行策略 (AI Execution Strategy)</div>
+           <div className="grid grid-cols-2 gap-2">
+               <div>
+                  <span className="text-slate-400 block mb-0.5">标的 (Symbol)</span>
+                  <span className="text-white font-mono font-medium">{suggested_symbol || asset_id || '-'}</span>
+               </div>
+               <div>
+                  <span className="text-slate-400 block mb-0.5">数量 (Qty)</span>
+                  <span className="text-white font-mono font-medium">{suggested_quantity || '-'}</span>
+               </div>
+               {suggested_price && (
+                   <div className="col-span-2">
+                      <span className="text-slate-400 block mb-0.5">建议价格 (Price)</span>
+                      <span className="text-white font-mono font-medium">¥{suggested_price}</span>
+                   </div>
+               )}
+           </div>
+           {reasoning && (
+             <div className="mt-2 pt-2 border-t border-slate-700/30">
+                <span className="text-slate-400 block mb-0.5">策略理由</span>
+                <span className="text-slate-300 italic">{reasoning}</span>
+             </div>
+           )}
+        </div>
+      )}
       
       <div className="flex items-center justify-between text-xs pt-3 border-t border-slate-700/50">
         <div className="flex items-center gap-1.5 text-slate-400">

@@ -1,10 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from typing import Dict, List, AsyncGenerator
+from typing import Dict, List, AsyncGenerator, Optional
+from datetime import datetime, timedelta
 import json
 import logging
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
+from sqlmodel import select, Session
 
 from backend.app.agents.personal_finance.models import (
     AssetItem,
@@ -18,6 +20,12 @@ from backend.app.services.personal_finance_service import (
     save_portfolio,
 )
 from backend.app.agents.personal_finance.agent import create_personal_finance_graph
+from backend.app.agents.personal_finance.db import engine
+from backend.app.agents.personal_finance.db_models import PerformanceHistory
+from backend.app.agents.personal_finance.performance_service import (
+    ensure_performance_history,
+    fetch_market_history_batch
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +34,18 @@ router = APIRouter(prefix="/api/personal-finance", tags=["Personal Finance"])
 
 class UpdatePricesRequest(BaseModel):
     assets: List[AssetItem]
+
+
+class PerformanceDataPoint(BaseModel):
+    date: str
+    nav_user: Optional[float] = None
+    nav_ai: Optional[float] = None
+    nav_sh: float
+    nav_sz: float
+
+class PerformanceResponse(BaseModel):
+    start_date: str
+    series: List[PerformanceDataPoint]
 
 
 @router.get("/portfolio", response_model=PortfolioSnapshot)
@@ -69,6 +89,72 @@ async def update_asset_prices(request: UpdatePricesRequest):
     except Exception as e:
         logger.error(f"Error updating prices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/performance", response_model=PerformanceResponse)
+async def get_performance_history(user_id: str = "default_user"):
+    with Session(engine) as session:
+        # 1. Ensure history is up to date (Lazy Backfill)
+        await ensure_performance_history(user_id, session)
+
+        # 2. Define Chart Range (Last 30 days)
+        today = datetime.utcnow().date()
+        start_date = today - timedelta(days=30)
+        dates = [(start_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(31)]
+
+        # 3. Fetch Indices for the range (Independent of user history)
+        # We want to display indices even if user has no data yet.
+        indices_data = await fetch_market_history_batch(dates, ["000001.SS", "399001.SZ"])
+
+        # 4. Fetch User History from DB
+        # We only care about history within the chart range
+        stmt = select(PerformanceHistory).where(
+            PerformanceHistory.user_id == user_id,
+            PerformanceHistory.date >= start_date.strftime("%Y-%m-%d")
+        ).order_by(PerformanceHistory.date)
+        
+        user_history = session.exec(stmt).all()
+        user_map = {h.date: h for h in user_history}
+
+        # 5. Build Response Series
+        series = []
+        
+        # Calculate base for indices (First valid price in the range)
+        sh_base = None
+        sz_base = None
+
+        for d in dates:
+            # SH Index
+            sh_price = indices_data.get(d, {}).get("000001.SS")
+            if sh_price and sh_base is None:
+                sh_base = sh_price
+            
+            nav_sh = (sh_price / sh_base) if (sh_base and sh_price) else 1.0
+
+            # SZ Index
+            sz_price = indices_data.get(d, {}).get("399001.SZ")
+            if sz_price and sz_base is None:
+                sz_base = sz_price
+            
+            nav_sz = (sz_price / sz_base) if (sz_base and sz_price) else 1.0
+
+            # User Data (Use DB values directly, as they are already normalized to User Start)
+            u_rec = user_map.get(d)
+            nav_user = u_rec.nav_user if u_rec else None
+            nav_ai = u_rec.nav_ai if u_rec else None
+
+            series.append(PerformanceDataPoint(
+                date=d,
+                nav_user=nav_user,
+                nav_ai=nav_ai,
+                nav_sh=nav_sh,
+                nav_sz=nav_sz
+            ))
+
+        return PerformanceResponse(
+            start_date=dates[0],
+            series=series
+        )
 
 
 async def stream_analysis(portfolio: PortfolioSnapshot) -> AsyncGenerator[str, None]:

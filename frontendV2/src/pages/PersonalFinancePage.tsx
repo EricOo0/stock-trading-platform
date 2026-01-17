@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { AssetItem, PortfolioSummary, Transaction } from '../types/personalFinance';
 import AssetDashboard from '../components/PersonalFinance/AssetDashboard';
 import AssetAllocationChart from '../components/PersonalFinance/AssetAllocationChart';
+import { PerformanceChart, type PerformanceData } from '../components/PersonalFinance/PerformanceChart';
 import AssetTable from '../components/PersonalFinance/AssetTable';
 import AssetOperationModal from '../components/PersonalFinance/AssetOperationModal';
 import FinanceAssistantWidget from '../components/PersonalFinance/FinanceAssistantWidget';
@@ -11,19 +12,31 @@ import { personalFinanceAPI } from '../services/personalFinanceAPI';
 const PersonalFinancePage: React.FC = () => {
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [cash, setCash] = useState<number>(0);
+  const [performanceHistory, setPerformanceHistory] = useState<PerformanceData[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<AssetItem | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 加载数据
-  useEffect(() => {
+    // 加载数据
+    useEffect(() => {
     const loadPortfolio = async () => {
       try {
         setIsLoading(true);
         const data = await personalFinanceAPI.getPortfolio();
         setAssets(data.assets);
         setCash(data.cash);
+        
+        // Load Performance Data
+        try {
+            const perfResponse = await personalFinanceAPI.getPerformanceHistory();
+            if (perfResponse && perfResponse.series) {
+                setPerformanceHistory(perfResponse.series);
+            }
+        } catch (err) {
+            console.error('Failed to load performance history:', err);
+        }
+
       } catch (error) {
         console.error('Failed to load portfolio:', error);
       } finally {
@@ -320,6 +333,11 @@ const PersonalFinancePage: React.FC = () => {
       
       {/* 资产仪表盘 */}
       <AssetDashboard summary={summary} />
+
+      {/* 业绩走势 */}
+      <div className="mb-6">
+          <PerformanceChart data={performanceHistory} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* 左侧：资产分布图 */}

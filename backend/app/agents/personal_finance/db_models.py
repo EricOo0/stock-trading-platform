@@ -40,6 +40,7 @@ class DecisionRecord(SQLModel, table=True):
     symbol: str = Field(index=True)
     action: str  # buy, sell, hold
     price_at_suggestion: float
+    suggested_quantity: float = Field(default=0.0) # 新增字段：建议数量
     reasoning: str  # 核心理由
     status: str = Field(default="active")  # active, closed, ignored
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -56,3 +57,30 @@ class LessonRecord(SQLModel, table=True):
     description: str
     confidence: float = Field(default=1.0)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ShadowPortfolio(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: str = Field(index=True, unique=True)
+    cash_balance: float = Field(default=0.0)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ShadowAsset(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    portfolio_id: int = Field(foreign_key="shadowportfolio.id")
+    symbol: str
+    quantity: float
+    avg_cost: float
+
+
+class PerformanceHistory(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: str = Field(index=True)
+    date: str = Field(index=True)
+    nav_user: float
+    nav_ai: float
+    nav_sh: float
+    nav_sz: float
+    total_assets_user: float
+    total_assets_ai: float

@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlmodel import Session, select
 from backend.app.agents.personal_finance.models import AssetItem, PriceUpdateMap, PriceUpdate, PortfolioSnapshot
 from backend.app.agents.personal_finance.db import engine, init_db
-from backend.app.agents.personal_finance.db_models import Portfolio, Asset as DBAsset
+from backend.app.agents.personal_finance.db_models import Portfolio, Asset as DBAsset, ShadowPortfolio, ShadowAsset, PerformanceHistory
 from backend.infrastructure.market.sina import SinaFinanceTool
 from backend.infrastructure.market.akshare_tool import AkShareTool
 
@@ -82,6 +82,52 @@ async def save_portfolio(user_id: str, snapshot: PortfolioSnapshot) -> Portfolio
             new_assets.append(db_asset)
             
         session.commit()
+        
+        # Check and Init Shadow Portfolio
+        shadow_statement = select(ShadowPortfolio).where(ShadowPortfolio.user_id == user_id)
+        shadow_portfolio = session.exec(shadow_statement).first()
+        
+        if not shadow_portfolio:
+            # Create Shadow Portfolio
+            shadow_portfolio = ShadowPortfolio(
+                user_id=user_id,
+                cash_balance=snapshot.cash_balance
+            )
+            session.add(shadow_portfolio)
+            session.commit()
+            session.refresh(shadow_portfolio)
+            
+            # Create Shadow Assets
+            for item in snapshot.assets:
+                shadow_asset = ShadowAsset(
+                    portfolio_id=shadow_portfolio.id,
+                    symbol=item.symbol or "",
+                    quantity=item.quantity,
+                    avg_cost=item.cost_basis or 0.0
+                )
+                session.add(shadow_asset)
+            
+            # Create Initial Performance History
+            # Use local date for simplicity or utcnow date
+            today_str = datetime.utcnow().strftime("%Y-%m-%d")
+            
+            # Calculate total assets for initial record
+            total_value = snapshot.cash_balance + sum(
+                (a.quantity * (a.current_price or 0)) for a in snapshot.assets
+            )
+            
+            initial_perf = PerformanceHistory(
+                user_id=user_id,
+                date=today_str,
+                nav_user=1.0,
+                nav_ai=1.0,
+                nav_sh=1.0,
+                nav_sz=1.0,
+                total_assets_user=total_value,
+                total_assets_ai=total_value
+            )
+            session.add(initial_perf)
+            session.commit()
         
         # Re-construct snapshot to return with new IDs
         result_assets = []
@@ -162,3 +208,71 @@ async def update_prices(assets: List[AssetItem]) -> PriceUpdateMap:
             continue
             
     return PriceUpdateMap(prices=price_map)
+
+async def execute_shadow_trade(user_id: str, symbol: str, action: str, quantity: float, price: float) -> None:
+    """
+    Execute a trade on the Shadow Portfolio.
+    """
+    with Session(engine) as session:
+        # 1. Get Shadow Portfolio
+        shadow = session.exec(select(ShadowPortfolio).where(ShadowPortfolio.user_id == user_id)).first()
+        if not shadow:
+            raise ValueError(f"Shadow Portfolio not found for user {user_id}")
+
+        total_value = quantity * price
+
+        if action.upper() == "BUY":
+            # Update Cash
+            shadow.cash_balance -= total_value
+            
+            # Find or Create Asset
+            asset = session.exec(
+                select(ShadowAsset)
+                .where(ShadowAsset.portfolio_id == shadow.id)
+                .where(ShadowAsset.symbol == symbol)
+            ).first()
+            
+            if asset:
+                # Update Avg Cost
+                # (Old Qty * Old Avg + New Qty * Price) / (Old Qty + New Qty)
+                current_total_cost = asset.quantity * asset.avg_cost
+                new_quantity = asset.quantity + quantity
+                
+                if new_quantity > 0:
+                    asset.avg_cost = (current_total_cost + total_value) / new_quantity
+                
+                asset.quantity = new_quantity
+                session.add(asset)
+            else:
+                asset = ShadowAsset(
+                    portfolio_id=shadow.id,
+                    symbol=symbol,
+                    quantity=quantity,
+                    avg_cost=price
+                )
+                session.add(asset)
+                
+        elif action.upper() == "SELL":
+            # Find Asset
+            asset = session.exec(
+                select(ShadowAsset)
+                .where(ShadowAsset.portfolio_id == shadow.id)
+                .where(ShadowAsset.symbol == symbol)
+            ).first()
+            
+            if not asset:
+                raise ValueError(f"Asset {symbol} not found in shadow portfolio")
+                
+            if asset.quantity < quantity:
+                raise ValueError(f"Insufficient quantity for {symbol}: have {asset.quantity}, trying to sell {quantity}")
+            
+            # Update Cash
+            shadow.cash_balance += total_value
+            
+            # Update Quantity
+            asset.quantity -= quantity
+            session.add(asset)
+            
+        shadow.updated_at = datetime.utcnow()
+        session.add(shadow)
+        session.commit()
