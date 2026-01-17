@@ -51,6 +51,7 @@ export const PerformanceChart: React.FC<Props> = ({ data, height = 400 }) => {
                         axisLine={false}
                         tickLine={false}
                         domain={['auto', 'auto']}
+                        tickFormatter={(value) => `${((value - 1) * 100).toFixed(0)}%`}
                     />
                     <Tooltip
                         contentStyle={{
@@ -61,7 +62,7 @@ export const PerformanceChart: React.FC<Props> = ({ data, height = 400 }) => {
                             fontSize: '12px'
                         }}
                         itemStyle={{ padding: '2px 0' }}
-                        formatter={(value: number) => [value.toFixed(4), '']}
+                        formatter={(value: number) => [`${((value - 1) * 100).toFixed(2)}%`, '']}
                     />
                     <Legend 
                         verticalAlign="top" 
@@ -70,46 +71,46 @@ export const PerformanceChart: React.FC<Props> = ({ data, height = 400 }) => {
                         wrapperStyle={{ fontSize: '12px', color: '#4b5563' }}
                     />
                     
-                    {/* User: Blue/Primary */}
+                    {/* User: Red/Primary */}
                     <Line
                         type="monotone"
                         dataKey="nav_user"
                         name="我的组合"
-                        stroke="#2563eb" // blue-600
+                        stroke="#ef4444" // red-500
                         strokeWidth={2}
                         dot={false}
                         activeDot={{ r: 6 }}
                     />
                     
-                    {/* AI: Purple/Accent */}
+                    {/* AI: Blue/Accent */}
                     <Line
                         type="monotone"
                         dataKey="nav_ai"
                         name="AI推荐"
-                        stroke="#9333ea" // purple-600
+                        stroke="#3b82f6" // blue-500
                         strokeWidth={2}
                         dot={false}
                         activeDot={{ r: 6 }}
                     />
                     
-                    {/* SH Index: Gray/Dashed */}
+                    {/* SH Index: Orange/Dashed */}
                     <Line
                         type="monotone"
                         dataKey="nav_sh"
                         name="上证指数"
-                        stroke="#9ca3af" // gray-400
+                        stroke="#f97316" // orange-500
                         strokeDasharray="5 5"
                         strokeWidth={1.5}
                         dot={false}
                         activeDot={{ r: 4 }}
                     />
                     
-                    {/* SZ Index: Gray/Dotted */}
+                    {/* SZ Index: Cyan/Dotted */}
                     <Line
                         type="monotone"
                         dataKey="nav_sz"
                         name="深证成指"
-                        stroke="#6b7280" // gray-500
+                        stroke="#06b6d4" // cyan-500
                         strokeDasharray="3 3"
                         strokeWidth={1.5}
                         dot={false}
