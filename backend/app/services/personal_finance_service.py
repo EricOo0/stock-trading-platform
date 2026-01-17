@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlmodel import Session, select
 from backend.app.agents.personal_finance.models import AssetItem, PriceUpdateMap, PriceUpdate, PortfolioSnapshot
 from backend.app.agents.personal_finance.db import engine, init_db
-from backend.app.agents.personal_finance.db_models import Portfolio, Asset as DBAsset
+from backend.app.agents.personal_finance.db_models import Portfolio, Asset as DBAsset, ShadowPortfolio, ShadowAsset, PerformanceHistory
 from backend.infrastructure.market.sina import SinaFinanceTool
 from backend.infrastructure.market.akshare_tool import AkShareTool
 
@@ -82,6 +82,52 @@ async def save_portfolio(user_id: str, snapshot: PortfolioSnapshot) -> Portfolio
             new_assets.append(db_asset)
             
         session.commit()
+        
+        # Check and Init Shadow Portfolio
+        shadow_statement = select(ShadowPortfolio).where(ShadowPortfolio.user_id == user_id)
+        shadow_portfolio = session.exec(shadow_statement).first()
+        
+        if not shadow_portfolio:
+            # Create Shadow Portfolio
+            shadow_portfolio = ShadowPortfolio(
+                user_id=user_id,
+                cash_balance=snapshot.cash_balance
+            )
+            session.add(shadow_portfolio)
+            session.commit()
+            session.refresh(shadow_portfolio)
+            
+            # Create Shadow Assets
+            for item in snapshot.assets:
+                shadow_asset = ShadowAsset(
+                    portfolio_id=shadow_portfolio.id,
+                    symbol=item.symbol or "",
+                    quantity=item.quantity,
+                    avg_cost=item.cost_basis or 0.0
+                )
+                session.add(shadow_asset)
+            
+            # Create Initial Performance History
+            # Use local date for simplicity or utcnow date
+            today_str = datetime.utcnow().strftime("%Y-%m-%d")
+            
+            # Calculate total assets for initial record
+            total_value = snapshot.cash_balance + sum(
+                (a.quantity * (a.current_price or 0)) for a in snapshot.assets
+            )
+            
+            initial_perf = PerformanceHistory(
+                user_id=user_id,
+                date=today_str,
+                nav_user=1.0,
+                nav_ai=1.0,
+                nav_sh=1.0,
+                nav_sz=1.0,
+                total_assets_user=total_value,
+                total_assets_ai=total_value
+            )
+            session.add(initial_perf)
+            session.commit()
         
         # Re-construct snapshot to return with new IDs
         result_assets = []

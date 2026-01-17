@@ -109,3 +109,47 @@ def test_shadow_portfolio_models(session):
     session.add(perf)
     session.commit()
     assert perf.id is not None
+
+def test_shadow_portfolio_auto_creation():
+    user_id = "test_user_shadow_auto"
+    
+    # 1. Create User Portfolio via API (which calls save_portfolio)
+    payload = {
+        "assets": [
+            {
+                "symbol": "AAPL",
+                "type": "Stock",
+                "quantity": 10,
+                "cost_basis": 150.0,
+                "current_price": 175.0,
+                "total_value": 1750.0
+            }
+        ],
+        "cash_balance": 5000.0
+    }
+    
+    response = client.post(f"/api/personal-finance/portfolio?user_id={user_id}", json=payload)
+    assert response.status_code == 200
+
+    # 2. Verify Shadow Portfolio exists
+    from backend.app.agents.personal_finance.db_models import ShadowPortfolio, ShadowAsset, PerformanceHistory
+    from backend.app.agents.personal_finance.db import engine
+    from sqlmodel import Session, select
+    
+    with Session(engine) as session:
+        # Check Shadow Portfolio
+        shadow = session.exec(select(ShadowPortfolio).where(ShadowPortfolio.user_id == user_id)).first()
+        assert shadow is not None
+        assert shadow.cash_balance == 5000.0
+        
+        # Check Shadow Assets
+        assets = session.exec(select(ShadowAsset).where(ShadowAsset.portfolio_id == shadow.id)).all()
+        assert len(assets) == 1
+        assert assets[0].symbol == "AAPL"
+        assert assets[0].quantity == 10
+        
+        # Check Initial Performance History
+        perf = session.exec(select(PerformanceHistory).where(PerformanceHistory.user_id == user_id)).first()
+        assert perf is not None
+        assert perf.nav_user == 1.0
+        assert perf.nav_ai == 1.0
