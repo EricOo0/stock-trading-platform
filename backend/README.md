@@ -60,11 +60,6 @@ cp .config.yaml.example .config.yaml
 python -m backend.entrypoints.api.server
 ```
 
-或使用开发模式（自动重载）：
-
-```bash
-python backend/dev_server.py
-```
 
 ## 📚 API 文档
 
