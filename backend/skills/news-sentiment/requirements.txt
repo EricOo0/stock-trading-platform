@@ -1,0 +1,4 @@
+snscrape
+beautifulsoup4
+requests
+textblob

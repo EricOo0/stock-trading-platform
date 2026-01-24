@@ -1,0 +1,5 @@
+akshare
+yfinance
+pandas
+requests
+pysqlite3-binary
