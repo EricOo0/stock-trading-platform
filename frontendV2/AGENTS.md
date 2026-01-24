@@ -1,7 +1,29 @@
-# AGENT 行为准则
+# Frontend Knowledge Base
 
-## 1. 前端页面部署在localhost:3000端口
+## OVERVIEW
+TypeScript/React frontend for stock trading platform.
 
-## 开始任务前，请进行任务规划，并将决策产物和任务列表以md文件形式保存下来（项目根目录/spec/task_name/xxx.md）
+## STRUCTURE
+```
+frontendV2/
+├── src/
+│   ├── pages/         # UI pages
+│   ├── components/    # Reusable components
+│   ├── services/      # API services
+│   └── ...
+├── public/
+└── package.json
+```
 
-## 要结束任务之前，请审查自己的是否按照决策执行，任务是否完成以及是否有错误，如果有错误请进行修正
+## WHERE TO LOOK
+| Task | Location | Notes |
+|------|----------|-------|
+| New page | src/pages/ | Add page component |
+| Component | src/components/ | Create reusable component |
+| API call | src/services/ | Add service function |
+
+## CONVENTIONS
+Use TypeScript, follow lint rules.
+
+## ANTI-PATTERNS
+No visual changes without delegation.
