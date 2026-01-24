@@ -1,3 +1,7 @@
+---
+name: macro-economy
+description: 提供中美宏观数据（GDP、CPI、PMI等）、全球风险指标（VIX、10Y、DXY等）与经济日历事件，适合宏观监控与投研背景信息。
+---
 # Macro Economy Skill
 
 Provides macro economic data for China and US, global market risk indicators, and economic calendar events.

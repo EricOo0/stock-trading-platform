@@ -1,3 +1,7 @@
+---
+name: market-data
+description: 提供A股/美股/港股的实时行情、历史K线、指数批量查询、板块排行与成分、资金流向及市场成交额等数据能力，适合市场快照与基础分析。
+---
 # Market Data Skill
 
 Provides real-time quotes, historical K-lines, fund flow, sector data, and market turnover for A-share, HK, and US markets.

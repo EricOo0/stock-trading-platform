@@ -1,3 +1,7 @@
+---
+name: news-sentiment
+description: 提供财新闻检索、社媒话题抓取（Twitter/Reddit）与文本情绪分析，适合热点追踪与情绪研判。
+---
 # News & Sentiment Skill
 
 This skill provides tools for retrieving financial news and social media sentiment.

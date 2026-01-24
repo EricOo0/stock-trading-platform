@@ -1,3 +1,7 @@
+---
+name: financial-report
+description: 提供财务指标获取、财报检索与内容访问能力，覆盖A股/美股/港股，适合基本面分析与公司研究。
+---
 # Financial Report Skill
 
 This skill provides financial data analysis and report retrieval capabilities for global stock markets (A-share, US, HK).

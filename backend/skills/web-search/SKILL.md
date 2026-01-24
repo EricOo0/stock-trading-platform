@@ -1,3 +1,7 @@
+---
+name: web-search
+description: 使用 Tavily 提供网页搜索与新闻检索，支持结果数、主题与时间范围配置，适合信息查找与新闻追踪。
+---
 # Web Search Skill
 
 This skill provides web search capabilities using Tavily.
