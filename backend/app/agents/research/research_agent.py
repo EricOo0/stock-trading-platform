@@ -3,7 +3,9 @@ from backend.infrastructure.config.loader import config
 from backend.app.agents.research.tools import tools
 from backend.app.agents.research.callbacks import ResearchAgentCallback
 from backend.app.agents.research.prompts import RESEARCH_SYSTEM_PROMPT
+from backend.infrastructure.langfuse import create_langfuse_callback, build_langfuse_metadata
 from langchain.agents import create_agent
+
 from typing import Dict, Any, List
 import os
 import logging
@@ -77,7 +79,15 @@ async def run_agent(job_id: str, query: str):
         return
 
     user_id = job.user_id or "default_user"
-    callback = ResearchAgentCallback(job_id, user_id=user_id)
+
+    # 创建回调列表
+    research_callback = ResearchAgentCallback(job_id, user_id=user_id)
+    callbacks = [research_callback]
+
+    # 如果 Langfuse 启用，添加 Langfuse 回调
+    langfuse_callback = create_langfuse_callback(user_id=user_id, session_id=job_id)
+    if langfuse_callback:
+        callbacks.append(langfuse_callback)
 
     # Load config
     model_name = config.get("model", "gpt-4o")
@@ -118,7 +128,7 @@ async def run_agent(job_id: str, query: str):
         logger.info(f"Starting run_agent for job_id={job_id} with query='{query}'")
 
         graph = create_agent(
-            model=llm,  # Passing the initialized LLM object
+            model=llm,
             tools=tools,
             system_prompt=RESEARCH_SYSTEM_PROMPT,
         )
@@ -227,8 +237,21 @@ async def run_agent(job_id: str, query: str):
         # The new agent returns a graph that we stream or invoke.
         # We need to bridge the graph stream events to our ResearchAgentCallback.
 
-        # Trying standard invoke with callbacks config first, as LangGraph usually supports it.
-        result = await graph.ainvoke(inputs, config={"callbacks": [callback]})
+        # 构建 Langfuse metadata（在 v3 中，user_id/session_id 通过 metadata 传递）
+        langfuse_metadata = build_langfuse_metadata(
+            user_id=user_id,
+            session_id=job_id,
+            tags=["research"],
+        )
+
+        # 使用标准 invoke，支持多个 callbacks 和 metadata
+        result = await graph.ainvoke(
+            inputs,
+            config={
+                "callbacks": callbacks,
+                "metadata": langfuse_metadata,
+            }
+        )
         logger.info(f"Agent finished with result: {result}")
 
     except Exception as e:
@@ -248,6 +271,7 @@ async def run_agent(job_id: str, query: str):
 
 
 if __name__ == "__main__":
+    # (PYTHONPATH=/Users/bytedance/GolandProjects/AI-funding-backup/stock-trading-platform/.worktrees/feature-langfuse-observability/backend python3 app/agents/research/research_agent.py)
     import asyncio
     from backend.infrastructure.adk.core.llm import configure_environment
     from backend.infrastructure.database.engine import create_db_and_tables

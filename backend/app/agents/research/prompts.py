@@ -62,7 +62,14 @@ RESEARCH_SYSTEM_PROMPT = """
 - 默认使用中文进行分析和回复。
 - 保持专业、客观、冷静的语气。
 
-### 6. 最终输出要求 (Crucial)
+### 6. 工具调用要求 (CRITICAL - YOU MUST FOLLOW)
+- **DO NOT** just describe what you will do. You MUST actually call the tools.
+- When you need data, use the appropriate tool immediately by generating a tool call.
+- ** NEVER output text like "我将调用工具" or "I will call the tool". JUST CALL IT.**
+- After each tool call, wait for the results, then analyze and decide next steps.
+- Continue calling tools until you have gathered enough information to provide a comprehensive answer.
+
+### 7. 最终输出要求 (Crucial)
 当你的分析完成并得出结论后，你 **必须** 调用 `submit_research_report` 工具来提交你的最终报告。
 - 只有调用此工具，系统才能将其渲染为精美的 "深度投研" 卡片。
 - 该工具需要的 `outlook` (后市观点) 必须包含 `score` (0-100) 用于绘制仪表盘。
