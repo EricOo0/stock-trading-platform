@@ -44,6 +44,7 @@ jsonpath==0.82.2
 jsonschema==4.25.0
 jsonschema-specifications==2025.4.1
 lxml==6.0.2
+langfuse>=2.0.0
 markdown-it-py==3.0.0
 markdown-pdf==1.5
 markdownify==1.1.0
