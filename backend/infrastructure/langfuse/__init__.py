@@ -5,8 +5,6 @@ Langfuse 可观测性基础设施
 
 使用方法:
     from backend.infrastructure.langfuse import (
-        get_langfuse_client,
-        langfuse_enabled,
         create_langfuse_callback,
         build_langfuse_metadata,
         observable,
@@ -18,9 +16,9 @@ from .callback import create_langfuse_callback, build_langfuse_metadata
 from .decorators import observable
 
 __all__ = [
-    "get_langfuse_client",
-    "langfuse_enabled",
     "create_langfuse_callback",
     "build_langfuse_metadata",
     "observable",
+    "get_langfuse_client",
+    "langfuse_enabled",
 ]

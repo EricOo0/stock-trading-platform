@@ -1,20 +1,40 @@
 """
-Langfuse Callback Handler
+Langfuse Callback Handler (v3)
 
-Provides LangChain CallbackHandler for Langfuse observability integration.
+使用 Langfuse v3 的 langchain.CallbackHandler 进行 LangChain 集成。
 
-在 Langfuse v3 中，user_id 和 session_id 需要通过 metadata 传递：
-- metadata["langfuse_user_id"] - 用户 ID
-- metadata["langfuse_session_id"] - 会话 ID
-- metadata["langfuse_tags"] - 标签列表
+v3 变化：
+- 导入路径：from langfuse.langchain import CallbackHandler
+- CallbackHandler 不再接受 user_id/session_id 参数，需要通过 metadata 传递
+- 首次导入时会自动创建全局客户端，因此需要先设置环境变量
 """
 
 import logging
+import os
 from typing import Optional, Dict, Any
 
-from .client import langfuse_enabled
+from .client import langfuse_enabled, ensure_env_vars
 
 logger = logging.getLogger(__name__)
+
+# 标记 CallbackHandler 是否可用
+_CALLBACK_HANDLER_AVAILABLE = False
+_CallbackHandler = None
+
+# 在导入 CallbackHandler 之前，先确保环境变量已设置
+# 这是关键：v3 的 CallbackHandler 导入会触发全局客户端创建
+if langfuse_enabled():
+    ensure_env_vars()
+    # 确保环境变量设置后再导入
+    try:
+        from langfuse.langchain import CallbackHandler as _CallbackHandler
+        _CALLBACK_HANDLER_AVAILABLE = True
+        logger.debug("Langfuse v3 CallbackHandler imported successfully")
+    except ImportError as e:
+        logger.warning(f"Langfuse CallbackHandler not available: {e}")
+        logger.warning("Install with: pip install 'langfuse>=3.0.0'")
+else:
+    logger.debug("Langfuse not enabled, skipping CallbackHandler import")
 
 
 def create_langfuse_callback(
@@ -24,22 +44,27 @@ def create_langfuse_callback(
     metadata: Optional[dict] = None,
 ):
     """
-    创建 Langfuse CallbackHandler 实例。
+    创建 Langfuse CallbackHandler 实例（v3 API）。
 
-    如果 Langfuse 未配置，返回 None（优雅降级）。
+    在 v3 中，CallbackHandler 不再接受 user_id/session_id 等参数。
+    这些参数需要通过 config["metadata"] 在 invoke 时传递。
+
+    如果 Langfuse 未配置或 CallbackHandler 不可用，返回 None（优雅降级）。
 
     Args:
-        user_id: 用户 ID，用于追踪
-        session_id: 会话 ID，用于分组
-        tags: 可选的标签列表
+        user_id: 用户 ID（v3 中仅用于日志记录，实际通过 metadata 传递）
+        session_id: 会话 ID（v3 中仅用于日志记录，实际通过 metadata 传递）
+        tags: 可选的标签列表（v3 中通过 metadata 传递）
         metadata: 额外的元数据
 
     Returns:
         langfuse.langchain.CallbackHandler 实例或 None
 
     用法:
-        # 1. 创建回调
-        callback = create_langfuse_callback(user_id="user123", session_id="session456")
+        from backend.infrastructure.langfuse import create_langfuse_callback, build_langfuse_metadata
+
+        # 1. 创建回调（无需参数）
+        callback = create_langfuse_callback()
 
         # 2. 与现有回调一起使用
         callbacks = [
@@ -48,15 +73,19 @@ def create_langfuse_callback(
         ]
         callbacks = [cb for cb in callbacks if cb is not None]
 
-        # 3. 在 agent 调用处通过 metadata 传递 user_id/session_id
+        # 3. 构建 metadata（包含 user_id/session_id/tags）
+        langfuse_metadata = build_langfuse_metadata(
+            user_id=user_id,
+            session_id=session_id,
+            tags=["research"],
+        )
+
+        # 4. 在 agent 调用处通过 metadata 传递
         await graph.ainvoke(
             inputs,
             config={
                 "callbacks": callbacks,
-                "metadata": {
-                    "langfuse_user_id": "user123",
-                    "langfuse_session_id": "session456",
-                }
+                "metadata": langfuse_metadata,
             }
         )
     """
@@ -64,11 +93,13 @@ def create_langfuse_callback(
         logger.debug("Langfuse not enabled, callback disabled")
         return None
 
-    from langfuse.langchain import CallbackHandler
+    if not _CALLBACK_HANDLER_AVAILABLE or _CallbackHandler is None:
+        logger.debug("Langfuse CallbackHandler not available, skipping")
+        return None
 
-    # Langfuse v3 中，user_id/session_id 需要通过 metadata 传递
-    # 不在 CallbackHandler 初始化时传递，而是在 agent 调用处传递
-    return CallbackHandler()
+    # v3: CallbackHandler 不接受参数，返回空实例
+    logger.debug(f"Creating Langfuse CallbackHandler (v3)")
+    return _CallbackHandler()
 
 
 def build_langfuse_metadata(
@@ -78,9 +109,10 @@ def build_langfuse_metadata(
     metadata: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """
-    构建 Langfuse metadata 字典。
+    构建 Langfuse metadata 字典（v3 API）。
 
-    在 Langfuse v3 中，user_id、session_id、tags 需要通过特定的 metadata 键传递。
+    在 v3 中，user_id、session_id、tags 需要通过 metadata 传递，
+    使用特定的键名前缀 langfuse_*。
 
     Args:
         user_id: 用户 ID

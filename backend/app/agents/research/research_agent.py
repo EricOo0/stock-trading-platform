@@ -5,6 +5,7 @@ from backend.app.agents.research.callbacks import ResearchAgentCallback
 from backend.app.agents.research.prompts import RESEARCH_SYSTEM_PROMPT
 from backend.infrastructure.langfuse import create_langfuse_callback, build_langfuse_metadata
 from langchain.agents import create_agent
+
 from typing import Dict, Any, List
 import os
 import logging
@@ -81,14 +82,12 @@ async def run_agent(job_id: str, query: str):
 
     # 创建回调列表
     research_callback = ResearchAgentCallback(job_id, user_id=user_id)
-    langfuse_callback = create_langfuse_callback(user_id=user_id, session_id=job_id)
+    callbacks = [research_callback]
 
-    # 过滤 None（当 langfuse 禁用时）
-    callbacks = [
-        research_callback,
-        langfuse_callback,
-    ]
-    callbacks = [cb for cb in callbacks if cb is not None]
+    # 如果 Langfuse 启用，添加 Langfuse 回调
+    langfuse_callback = create_langfuse_callback(user_id=user_id, session_id=job_id)
+    if langfuse_callback:
+        callbacks.append(langfuse_callback)
 
     # Load config
     model_name = config.get("model", "gpt-4o")
@@ -129,7 +128,7 @@ async def run_agent(job_id: str, query: str):
         logger.info(f"Starting run_agent for job_id={job_id} with query='{query}'")
 
         graph = create_agent(
-            model=llm,  # Passing the initialized LLM object
+            model=llm,
             tools=tools,
             system_prompt=RESEARCH_SYSTEM_PROMPT,
         )
@@ -272,6 +271,7 @@ async def run_agent(job_id: str, query: str):
 
 
 if __name__ == "__main__":
+    # (PYTHONPATH=/Users/bytedance/GolandProjects/AI-funding-backup/stock-trading-platform/.worktrees/feature-langfuse-observability/backend python3 app/agents/research/research_agent.py)
     import asyncio
     from backend.infrastructure.adk.core.llm import configure_environment
     from backend.infrastructure.database.engine import create_db_and_tables
