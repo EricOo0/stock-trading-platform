@@ -44,35 +44,6 @@ def create_langfuse_callback(
 
     Returns:
         langfuse.langchain.CallbackHandler 实例或 None
-
-    用法:
-        from backend.infrastructure.langfuse import create_langfuse_callback, build_langfuse_metadata
-
-        # 1. 创建回调（无需参数）
-        callback = create_langfuse_callback()
-
-        # 2. 与现有回调一起使用
-        callbacks = [
-            ResearchAgentCallback(),
-            callback,  # 如果未配置则为 None
-        ]
-        callbacks = [cb for cb in callbacks if cb is not None]
-
-        # 3. 构建 metadata（包含 user_id/session_id/tags）
-        langfuse_metadata = build_langfuse_metadata(
-            user_id=user_id,
-            session_id=session_id,
-            tags=["research"],
-        )
-
-        # 4. 在 agent 调用处通过 metadata 传递
-        await graph.ainvoke(
-            inputs,
-            config={
-                "callbacks": callbacks,
-                "metadata": langfuse_metadata,
-            }
-        )
     """
     if not langfuse_enabled():
         logger.debug("Langfuse not enabled, callback disabled")
