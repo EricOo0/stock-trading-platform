@@ -21,21 +21,6 @@ logger = logging.getLogger(__name__)
 _CALLBACK_HANDLER_AVAILABLE = False
 _CallbackHandler = None
 
-# 在导入 CallbackHandler 之前，先确保环境变量已设置
-# 这是关键：v3 的 CallbackHandler 导入会触发全局客户端创建
-if langfuse_enabled():
-    ensure_env_vars()
-    # 确保环境变量设置后再导入
-    try:
-        from langfuse.langchain import CallbackHandler as _CallbackHandler
-        _CALLBACK_HANDLER_AVAILABLE = True
-        logger.debug("Langfuse v3 CallbackHandler imported successfully")
-    except ImportError as e:
-        logger.warning(f"Langfuse CallbackHandler not available: {e}")
-        logger.warning("Install with: pip install 'langfuse>=3.0.0'")
-else:
-    logger.debug("Langfuse not enabled, skipping CallbackHandler import")
-
 
 def create_langfuse_callback(
     user_id: Optional[str] = None,
@@ -91,6 +76,19 @@ def create_langfuse_callback(
     """
     if not langfuse_enabled():
         logger.debug("Langfuse not enabled, callback disabled")
+        return None
+
+    # 在导入前先确保环境变量已设置（避免模块级别导入触发全局客户端创建）
+    ensure_env_vars()
+
+    # 确保 env vars 设置后再导入 CallbackHandler
+    try:
+        from langfuse.langchain import CallbackHandler as _CallbackHandler
+        _CALLBACK_HANDLER_AVAILABLE = True
+        logger.debug("Langfuse v3 CallbackHandler imported successfully")
+    except ImportError as e:
+        logger.warning(f"Langfuse CallbackHandler not available: {e}")
+        logger.warning("Install with: pip install 'langfuse>=3.0.0'")
         return None
 
     if not _CALLBACK_HANDLER_AVAILABLE or _CallbackHandler is None:
