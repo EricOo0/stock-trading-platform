@@ -1,0 +1,4377 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: ericoo0/stock-trading-platform
+    source: https://github.com/ericoo0/stock-trading-platform
+    branch: main
+    commit: "6a306e3c"
+    scope: [agent/api/models.py, agent/core/a2a_client.py, agent/core/agent.py, agent/core/agents/a2a_base.py, agent/core/agents/chairman.py,
+      agent/core/agents/critic.py, agent/core/agents/macro.py, agent/core/agents/market.py, agent/core/agents/receptionist.py,
+      agent/core/agents/sentiment.py, agent/core/agents/utils.py, agent/core/agents/web_search.py, agent/core/config.py, agent/tools/manager.py,
+      agent/tools/skill_adapter.py, backend/app/agents/fintech/chairman.py, backend/app/agents/fintech/macro.py, backend/app/agents/fintech/market.py,
+      backend/app/agents/fintech/report.py, backend/app/agents/macro/agent.py, backend/app/agents/macro/callbacks.py, backend/app/agents/macro/prompts.py,
+      backend/app/agents/macro/tools.py, backend/app/agents/market/tools.py, backend/app/agents/news_sentiment/callbacks.py,
+      backend/app/agents/news_sentiment/master.py, backend/app/agents/news_sentiment/prompts.py, backend/app/agents/news_sentiment/schemas.py,
+      backend/app/agents/news_sentiment/tools.py, backend/app/agents/news_sentiment/worker.py, backend/app/agents/personal_finance/db_models.py,
+      backend/app/agents/personal_finance/market_context.py, backend/app/agents/personal_finance/models.py, backend/app/agents/personal_finance/orchestrator.py,
+      backend/app/agents/personal_finance/pre_process.py, backend/app/agents/personal_finance/repository.py, backend/app/agents/personal_finance/sub_agents.py,
+      backend/app/agents/personal_finance/utils.py, backend/app/agents/research/callbacks.py, backend/app/agents/research/tools.py,
+      backend/app/agents/review/tools.py, backend/app/agents/technical_analysis/agent.py, backend/app/agents/technical_analysis/callbacks.py,
+      backend/app/agents/technical_analysis/prompts.py, backend/app/agents/technical_analysis/tools.py, backend/app/registry.py,
+      backend/app/services/fintech_service.py, backend/app/services/macro_agent_service.py, backend/app/services/market_service.py,
+      backend/app/services/personal_finance_service.py, backend/app/services/simulation_service.py, backend/app/services/technical_agent_service.py,
+      backend/domain/entities/report_content.py, backend/entrypoints/api/routers/macro.py, backend/entrypoints/api/routers/market.py,
+      backend/entrypoints/api/routers/report.py, backend/entrypoints/cli/debug/debug_macro_full.py, backend/entrypoints/cli/debug/find_cme_data.py,
+      backend/entrypoints/cli/debug/find_fed_data.py, backend/entrypoints/cli/debug/find_fed_data_v2.py, backend/entrypoints/cli/debug/find_fed_data_v3.py,
+      backend/entrypoints/cli/debug/verify_macro.py, backend/entrypoints/cli/debug/verify_nan_macro.py, backend/entrypoints/cli/debug/verify_registry.py,
+      backend/entrypoints/cli/debug/verify_tools.py, backend/infrastructure/adk/core/agent_factory.py, backend/infrastructure/adk/core/memory_agent.py,
+      backend/infrastructure/adk/core/memory_callback.py, backend/infrastructure/adk/core/memory_client.py, backend/infrastructure/adk/core/tools.py,
+      backend/infrastructure/analysis/finbert.py, backend/infrastructure/config/loader.py, backend/infrastructure/langfuse/decorators.py,
+      backend/infrastructure/market/akshare_tool.py, backend/infrastructure/market/sina.py, backend/infrastructure/market/yahoo.py,
+      backend/skills/financial-report/scripts/finance.py, backend/skills/market-data/scripts/market_data.py, memory_system/api/schemas.py,
+      memory_system/core/extractor.py, memory_system/storage/vector_store.py, skills/financial_report_tool/modules/content_extractor.py,
+      skills/financial_report_tool/modules/metrics.py, skills/financial_report_tool/skill.py, skills/macro_data_tool/services/yahoo_service.py,
+      skills/macro_data_tool/skill.py, skills/macro_data_tool/utils.py, skills/market_data_tool/data_sources/akshare_data
+        copy.py, skills/market_data_tool/data_sources/akshare_data.py, skills/market_data_tool/data_sources/base.py, skills/market_data_tool/data_sources/sina_finance.py,
+      skills/market_data_tool/data_sources/yahoo_finance.py, skills/market_data_tool/models/schemas.py, skills/market_data_tool/services/a_share_service.py,
+      skills/market_data_tool/services/hk_stock_service.py, skills/market_data_tool/services/us_stock_service.py, skills/market_data_tool/skill.py,
+      skills/market_data_tool/utils/circuit_breaker.py, skills/pdf_parsing_tool/skill.py, skills/sentiment_analysis_tool/services/news_search.py,
+      skills/sentiment_analysis_tool/services/sentiment.py, skills/sentiment_analysis_tool/skill.py, skills/web_search_tool/skill.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T16:45:29Z'
+    url: https://a2as.org/certified/agents/ericoo0/stock-trading-platform
+  signatures:
+    digest: sha256:vQf5CULRp1sEODzeYV-bOfn4dxGSPqNe1N5r87i7EXY
+    key: ed25519:Ida7D8i4nw6qOVeIg6lVeHh-WkKPRQVbIEaS4zdyhlQ
+    sig: ed25519:q6COQGFaDcXdQIvvP91BxHkm5AT5i09ghK5JCsjVzkyd-M9C6GgXqPLqAITlJoM3JcG2Pl0pXTvWwyJZUL2sCw
+
+agents:
+  agent.0:
+    type: instance
+    models: [finbert]
+    tools: [search_google, get_market_data, get_macro_economic_data, get_technical_indicators, get_financial_metrics, get_company_report,
+      get_discussion_wordcloud, get_sector_fund_flow, get_sector_top_stocks]
+    params:
+      name: news_sentiment_master
+      instruction: [你是一名**首席舆情分析师 (Master Analyst)**。, '**核心工作流:**', '1.  **初步规划 (Initial Planning)**:', '2.  **动态调度与迭代 (Dynamic
+          Scheduling & Iteration)**:', '- **深度反思 (Deep Reflection)**:', '- **行动**:', '3.  **最终汇总 (Final Conclusion)**:', '**可用工具:**',
+        '- `generate_conclusion(...)`: 输出最终结论。', '**思考模式:**', '**输出规范:**', '- 语言: 中文。']
+      description: Master Analyst
+      function: run_step
+      instance: agent
+  agent.1:
+    type: instance
+    models: [finbert]
+    tools: [get_stock_price, get_historical_data, get_technical_indicators]
+    params:
+      name: technical_analysis_agent
+      instruction: ['### 输入数据 (Input Context)', '2.  **价格行为 (Price Action)**: 15日 OHLCV 数据，用于形态识别。', '3.  **技术指标**: 均线 (MA/EMA)、动量
+          (RSI/MACD/KDJ)、波动率 (ATR/Bollinger)、成交量 (OBV)。', '4.  **关键位**: 枢轴点 (Pivot Points)、近期高低点。', '### 分析框架 (Analysis Framework)',
+        '#### 1. 趋势与结构 (Trend & Structure)', '*   **道氏理论 (Dow Theory)**:', '*   **波浪理论 (Elliott Wave)**:', '#### 2. 主力行为与供需
+          (Smart Money & Supply/Demand)', '*   **威科夫操盘法 (Wyckoff Method)**:', '*   当前处于什么阶段？(吸筹 Accumulation / 上升 Markup /
+          派发 Distribution / 下降 Markdown)。', '#### 3. 形态与时机 (Patterns & Timing)', '#### 4. 其他理论依据 (Others)', '**动量与强度 (Momentum
+          & Strength)**: 趋势是在加速还是衰竭？(检查 RSI, MACD 柱状图, OBV 配合情况)。', '### 输出格式 (Strict JSON)', '{', '"signal": "BULLISH" |
+          "BEARISH" | "NEUTRAL",  // 最终信号', '"confidence": 0.0 到 1.0,                    // 结合多理论共振程度给出的置信度', '"key_levels":
+          {', '},', '}', '### 思考准则']
+      description: Analyzes stock technical indicators and price action to provide trading signals.
+      function: create_technical_analysis_agent
+      instance: agent
+  agent._create_inner_agent:
+    type: factory
+    models: [finbert]
+    tools: [search_web, inspect_page, fetch_reddit_rss]
+    params:
+      name: news_sentiment_worker
+      instruction: [你是一名**高级舆情研究员 (Senior Researcher)**。, '1.  **深度挖掘 (Deep Dive)**:', '- **ReAct 循环**: 搜索 -> 阅读 -> 思考 ->
+          发现新疑问 -> 再搜索 -> 再阅读。', '2.  **自我纠偏 (Self-Correction)**:', '3.  **任务交付 (关键)**:', '**可用工具:**', '- `search_web(query)`:
+          广度搜索。', '- `inspect_page(url)`: 深度阅读（必须读取正文和**评论区**）。', '- `fetch_reddit_rss(subreddit)`: 社交舆情专用。', '**行为准则:**']
+      description: Worker agent for deep research.
+      function: _create_inner_agent
+  agent.create_macro_agent:
+    type: factory
+    models: [finbert]
+    tools: [get_macro_data, get_macro_history]
+    params:
+      name: macro_analysis_agent
+      instruction: ['### 输入数据 (Input Context)', '1.  **中国经济 (CN)**: GDP增速, CPI/PPI (通胀), PMI (制造业/服务业), 社融/M2 (流动性), LPR利率。',
+        '3.  **市场指标 (Global Markets)**: US10Y (美债收益率), DXY (美元指数), VIX (恐慌指数)。', '### 分析框架 (Analysis Framework)', 请综合考虑以下因素：,
+        '1.  **经济周期 (Economic Cycle)**:', '*   **滞胀 (Stagflation)**: 增长放缓，通胀高企。', '3.  **风险情绪 (Risk Sentiment)**: VIX 和 美债收益率
+          暗示市场是 Risk-On 还是 Risk-Off？', '### 输出格式 (严格 JSON)', '{', '"macro_health_score": 72,  // 0-100, 综合宏观健康度评分', '"macro_health_label":
+          "偏乐观",  // "危险" | "偏悲观" | "中性" | "偏乐观" | "非常乐观"', '"key_metrics": [', '{"name": "CPI (中国)", "value": "2.1%", "trend":
+          "NEUTRAL"},', '{"name": "利率 (美国)", "value": "4.5%", "trend": "DOWN"},', '{"name": "PMI (中国)", "value": "51.2", "trend":
+          "UP"},', '{"name": "失业率 (美国)", "value": "4.8%", "trend": "NEUTRAL"},', '{"name": "M2增速 (中国)", "value": "9.2%", "trend":
+          "UP"}', '],', '"signal": "BULLISH",  // "BULLISH" | "BEARISH" | "NEUTRAL", 对风险资产(股票)的宏观态度', '"confidence": 0.75,   //
+          0.0 到 1.0', '"market_cycle": "Mid Cycle",  // "Early Cycle" | "Mid Cycle" | "Late Cycle" | "Recession"', '"risk_warning":
+          "地产风险、外需疲软",  // 主要风险点', '"summary": "一句话宏观综述。",', '"key_factors": {', '"positive": ["利好因素1", "利好因素2"],', '"negative":
+          ["利空因素1", "利空因素2"]', '}', '}', '### 分析原则']
+      description: Analyzes global macro-economic indicators to provide market cycle judgment.
+      function: create_macro_agent
+  agent.MemoryAwareAgent:
+    type: class
+    models: [gemini-2.5-flash]
+    params:
+      class: MemoryAwareAgent
+      base: Agent
+      agent_id: test_agent_001
+  market_agent:
+    type: instance
+    params:
+      name: name
+      instruction: instruction
+      tools: agent_tools
+      function: create_agent
+
+models:
+  finbert:
+    type: literal
+    agents: [agent.create_macro_agent, agent.1, agent._create_inner_agent, agent.0]
+    params:
+      alias: [openai/ProsusAI/finbert, openai/openai/ProsusAI/finbert, ProsusAI/finbert]
+  gemini-2.5-flash:
+    type: default
+    agents: [agent.MemoryAwareAgent]
+
+tools:
+  fetch_reddit_rss:
+    type: function
+    agents: [agent._create_inner_agent]
+    params:
+      description: "SOCIAL TOOL: Fetches Reddit threads via RSS.\n\nUse this to get realtime/hottest discussions from specific\
+        \ subreddits \n(e.g., 'wallstreetbets', 'stocks', 'investing', 'AAPL').\nReturns a formatted list of threads with\
+        \ links."
+  get_company_report:
+    type: function
+    agents: [agent.0]
+    params:
+      description: |-
+        Get metadata about the latest financial report (Annual/Quarterly).
+
+        Args:
+            symbol: The stock symbol.
+
+        Returns:
+            JSON object with report title, date, and download URL.
+  get_discussion_wordcloud:
+    type: function
+    agents: [agent.0]
+    params:
+      description: |-
+        Get word cloud data and sentiment summary from social media (Xueqiu) for a stock or topic.
+        Returns keywords, weights, and sentiment labels, plus a summary for LLM analysis.
+  get_financial_metrics:
+    type: function
+    agents: [agent.0]
+    params:
+      description: |-
+        Fetches key financial metrics (Revenue, Net Income, etc.) for the last few years.
+        Supports US, HK, and A-share stocks via yfinance (primary) and AkShare (HK fallback).
+  get_historical_data:
+    type: function
+    agents: [agent.1]
+    params:
+      description: Get historical data for a specific indicator.
+  get_macro_data:
+    type: function
+    agents: [agent.create_macro_agent]
+    params:
+      description: |-
+        Get macro-economic data (GDP, CPI, VIX, etc.).
+
+        Args:
+            query: The macro indicator to fetch (e.g., "China GDP", "US CPI", "VIX").
+
+        Returns:
+            JSON object with macro data series.
+  get_macro_economic_data:
+    type: function
+    agents: [agent.0]
+    params:
+      description: |-
+        Get macro economic indicators (e.g. GDP, CPI, Unemployment, Interest Rate).
+        Args:
+            query: Description of the data needed (e.g., 'US CPI', 'China GDP', 'Fed Interest Rate').
+  get_macro_history:
+    type: function
+    agents: [agent.create_macro_agent]
+    params:
+      description: |-
+        [Deprecated] Get historical China macro data.
+        Please use get_macro(history=True) instead.
+  get_market_data:
+    type: function
+    agents: [agent.0]
+    params:
+      description: |-
+        Get historical stock market data (OHLCV).
+        Args:
+            symbol: Stock symbol (e.g., 'AAPL', '00700.HK', '600519').
+            period: Time period. Valid values: '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', 'max'.
+  get_sector_fund_flow:
+    type: function
+    agents: [agent.0]
+    params:
+      description: |-
+        Get A-share sector fund flow ranking to identify hot or cold sectors.
+        Args:
+            limit: Number of sectors to return (default 10).
+            sort_by: 'hot' (highest net inflow) or 'cold' (highest net outflow).
+            sector_type: 'industry' (default) or 'concept'. Use 'concept' to find hot themes/topics.
+  get_sector_top_stocks:
+    type: function
+    agents: [agent.0]
+    params:
+      description: |-
+        Get top component stocks (leaders) of a specific A-share sector.
+        Args:
+            sector_name: Exact name of the sector (e.g. '软件开发', 'Sora概念').
+            limit: Number of stocks to return (default 5).
+            sector_type: 'industry' (default) or 'concept'. Must match the type of sector_name.
+  get_stock_price:
+    type: function
+    agents: [agent.1]
+    params:
+      description: |-
+        Get real-time stock price for a given symbol.
+
+        Args:
+            symbol: The stock symbol (e.g., 'AAPL', '0700.HK', 'sh600519').
+            market: Optional market ('US', 'HK', 'A-share'). Auto-detected if not provided.
+
+        Returns:
+            JSON object containing price, change, and percentage.
+  get_technical_indicators:
+    type: function
+    agents: [agent.1, agent.0]
+    params:
+      description: |-
+        Get calculated technical indicators (MA, RSI, MACD, etc.).
+        Args:
+            symbol: Stock symbol.
+        Returns:
+            Dict of current indicator values.
+  inspect_page:
+    type: function
+    agents: [agent._create_inner_agent]
+    params:
+      description: |-
+        INSPECTION TOOL: Inspects a specific URL using simple HTTP fetching.
+        Note: Browser automation (Steel) is currently disabled.
+  search_google:
+    type: function
+    agents: [agent.0]
+    params:
+      description: |-
+        Search Google (or other providers like Tavily/SerpApi) for real-time market news and information.
+        Use this to find current events, news, or general information not covered by specific data tools.
+  search_web:
+    type: function
+    agents: [agent._create_inner_agent]
+    params:
+      description: |-
+        DISCOVERY TOOL: Searches the web for *Content Entry Points* (URLs).
+
+        Use this to find WHERE to look. Do not rely on the snippets for the final answer.
+        Returns a list of relevant URLs with titles.
+
+imports:
+  '*': validators.*
+  _CallbackHandler: langfuse.langchain.CallbackHandler
+  A2AAgentClient: core.a2a_client.A2AAgentClient
+  A2AMessage: a2a.types.Message
+  A2ATask: a2a.types.Task
+  A2ATaskResponse: core.a2a_client.A2ATaskResponse
+  ABC: abc.ABC
+  abstractmethod: abc.abstractmethod
+  AddMemoryRequest: schemas.AddMemoryRequest
+  AddMemoryResponse: schemas.AddMemoryResponse
+  adk: backend.entrypoints.api.routers.adk
+  agent: backend.entrypoints.api.routers.agent
+  Agent: google.adk.agents.Agent
+  agent_financial: backend.entrypoints.api.routers.agent_financial
+  agent_macro: backend.entrypoints.api.routers.agent_macro
+  agent_market: backend.entrypoints.api.routers.agent_market
+  agent_node: utils.agent_node
+  agent_personal_finance: backend.entrypoints.api.routers.agent_personal_finance
+  agent_review: backend.entrypoints.api.routers.agent_review
+  agent_sentiment: backend.entrypoints.api.routers.agent_sentiment
+  agent_technical: backend.entrypoints.api.routers.agent_technical
+  AgentCard: a2a.types.AgentCard
+  AgentException: utils.exceptions.AgentException
+  AgentState: core.state.AgentState
+  AgentTool: google.adk.tools.agent_tool.AgentTool
+  AgentType: schemas.AgentType
+  AIMessage: langchain_core.messages.AIMessage
+  ak: akshare
+  AkShareDataSource: data_sources.akshare_data.AkShareDataSource
+  AkShareFinancialSource: data_sources.akshare_financial.AkShareFinancialSource
+  AkShareService: services.akshare_service.AkShareService
+  AkShareTool: backend.infrastructure.market.akshare_tool.AkShareTool
+  analyse: jieba.analyse
+  analyze_report: backend.infrastructure.adk.core.tools.analyze_report
+  analyze_report_content: modules.analyst.analyze_report_content
+  analyze_sentiment: backend.infrastructure.adk.core.tools.analyze_sentiment
+  annotations: __future__.annotations
+  Any: typing.Any
+  APIRouter: fastapi.APIRouter
+  app: server.app
+  argparse: argparse
+  AShareService: services.a_share_service.AShareService
+  Asset: backend.app.agents.personal_finance.db_models.Asset
+  AssetItem: backend.app.agents.personal_finance.models.AssetItem
+  async_playwright: playwright.async_api.async_playwright
+  AsyncCallbackHandler: langchain_core.callbacks.base.AsyncCallbackHandler
+  AsyncGenerator: typing.AsyncGenerator
+  asyncio: asyncio
+  auth_manager: backend.infrastructure.browser.auth_repo.auth_manager
+  AutoModelForSequenceClassification: transformers.AutoModelForSequenceClassification
+  AutoTokenizer: transformers.AutoTokenizer
+  BackgroundTasks: fastapi.BackgroundTasks
+  BaseA2AAgent: a2a_base.BaseA2AAgent
+  BaseDataSource: base.BaseDataSource
+  BaseMessage: langchain_core.messages.BaseMessage
+  BaseModel: pydantic.BaseModel
+  BaseSettings: pydantic_settings.BaseSettings
+  BaseTool: langchain.tools.BaseTool
+  BeautifulSoup: bs4.BeautifulSoup
+  Body: fastapi.Body
+  browser: backend.entrypoints.api.routers.browser
+  Browser: playwright.async_api.Browser
+  browser_engine: backend.infrastructure.browser.steel_browser.browser_engine
+  BrowserContext: playwright.async_api.BrowserContext
+  build_langfuse_metadata: backend.infrastructure.langfuse.build_langfuse_metadata
+  cached: cachetools.cached
+  cached_macro_data: utils.cached_macro_data
+  cached_market_data: utils.cached_market_data
+  CacheManager: utils.cache_manager.CacheManager
+  call_a2a_agent_direct: core.a2a_client.call_a2a_agent_direct
+  Callable: typing.Callable
+  CallAgent: core.schema.CallAgent
+  chairman_agent: backend.app.agents.fintech.chairman.chairman_agent
+  chairman_node: core.agents.chairman.chairman_node
+  CHAIRMAN_SYSTEM_PROMPT: core.prompts.CHAIRMAN_SYSTEM_PROMPT
+  ChairmanA2A: core.agents.chairman.ChairmanA2A
+  ChatOpenAI: langchain_openai.ChatOpenAI
+  ChatPromptTemplate: langchain_core.prompts.ChatPromptTemplate
+  ChatRequest: api.models.ChatRequest
+  ChatResponse: api.models.ChatResponse
+  chromadb: chromadb
+  ChromaSettings: chromadb.config.Settings
+  circuit_break: utils.circuit_breaker.circuit_break
+  clean_nans: backend.infrastructure.utils.json_helpers.clean_nans
+  ClearMemoryRequest: schemas.ClearMemoryRequest
+  ClearMemoryResponse: schemas.ClearMemoryResponse
+  ClusterRequest: schemas.ClusterRequest
+  Company: edgar.Company
+  CompiledStateGraph: langgraph.graph.state.CompiledStateGraph
+  compressor: compressor.compressor
+  ConceptCluster: cluster.ConceptCluster
+  Config: config.Config
+  config: backend.infrastructure.config.loader.config
+  ConfigLoader: backend.infrastructure.config.loader.ConfigLoader
+  ConfigUpdateRequest: api.models.ConfigUpdateRequest
+  ConfigUpdateResponse: api.models.ConfigUpdateResponse
+  configure_environment: backend.infrastructure.adk.core.llm.configure_environment
+  ConversationContent: memory_system.api.schemas.ConversationContent
+  ConversationMemory: core.memory.ConversationMemory
+  CORSMiddleware: fastapi.middleware.cors.CORSMiddleware
+  create_agent: langchain.agents.create_agent
+  create_db_and_tables: backend.infrastructure.database.engine.create_db_and_tables
+  create_engine: sqlmodel.create_engine
+  create_error_response: utils.error_handler.create_error_response
+  create_graph: core.graph.create_graph
+  create_langfuse_callback: backend.infrastructure.langfuse.create_langfuse_callback
+  create_macro_node: core.agents.macro.create_macro_node
+  create_market_node: core.agents.market.create_market_node
+  create_memory_tools_for_agent: memory_tools.create_memory_tools_for_agent
+  create_news_sentiment_agent: backend.app.agents.news_sentiment.agent.create_news_sentiment_agent
+  create_personal_finance_graph: backend.app.agents.personal_finance.agent.create_personal_finance_graph
+  create_sentiment_node: core.agents.sentiment.create_sentiment_node
+  create_success_response: utils.error_handler.create_success_response
+  create_technical_analysis_agent: backend.app.agents.technical_analysis.agent.create_technical_analysis_agent
+  create_web_search_node: core.agents.web_search.create_web_search_node
+  critic_node: core.agents.critic.critic_node
+  CRITIC_SYSTEM_PROMPT: core.prompts.CRITIC_SYSTEM_PROMPT
+  CriticA2A: core.agents.critic.CriticA2A
+  DailyReviewAnalyst: backend.app.agents.personal_finance.sub_agents.DailyReviewAnalyst
+  dataclass: dataclasses.dataclass
+  DataSourceError: base.DataSourceError
+  DataSourceTimeout: base.DataSourceTimeout
+  datetime: datetime
+  DBAsset: backend.app.agents.personal_finance.db_models.Asset
+  DDGS: duckduckgo_search.DDGS
+  DecisionRecord: backend.app.agents.personal_finance.db_models.DecisionRecord
+  DecisionReviewResult: backend.app.agents.personal_finance.task_schemas.DecisionReviewResult
+  DeepResearchReport: backend.app.agents.research.models.DeepResearchReport
+  deque: collections.deque
+  Deque: typing.Deque
+  detect_market: market.detect_market
+  Dict: typing.Dict
+  download_and_parse_pdf: modules.content_extractor.download_and_parse_pdf
+  Downloader: sec_edgar_downloader.Downloader
+  DuckDuckGoProvider: providers.ddg_provider.DuckDuckGoProvider
+  DuckDuckGoTool: backend.infrastructure.search.duckduckgo.DuckDuckGoTool
+  embedding_service: utils.embeddings.embedding_service
+  EmbeddingService: memory_system.utils.embeddings.EmbeddingService
+  END: langgraph.graph.END
+  engine: backend.app.agents.personal_finance.db.engine
+  ensure_env_vars: client.ensure_env_vars
+  ensure_performance_history: backend.app.agents.personal_finance.performance_service.ensure_performance_history
+  Enum: enum.Enum
+  EpisodicMemory: episodic_memory.EpisodicMemory
+  ErrorResponse: schemas.ErrorResponse
+  Event: core.bus.Event
+  EventContent: memory_system.api.schemas.EventContent
+  EventSourceResponse: sse_starlette.sse.EventSourceResponse
+  EventType: schemas.EventType
+  extract_response_content: backend.app.agents.personal_finance.utils.extract_response_content
+  extract_sec_report_url: modules.content_extractor.extract_sec_report_url
+  extract_symbols: backend.infrastructure.utils.nlu.extract_symbols
+  extract_top_symbols: backend.app.agents.personal_finance.utils.extract_top_symbols
+  ExtractEventRequest: schemas.ExtractEventRequest
+  extractor: extractor.extractor
+  FastAPI: fastapi.FastAPI
+  feedparser: feedparser
+  fetch_financial_data_as_text: modules.metrics.fetch_financial_data_as_text
+  fetch_market_history_batch: backend.app.agents.personal_finance.performance_service.fetch_market_history_batch
+  fetch_reddit_rss: tools.fetch_reddit_rss
+  Field: pydantic.Field
+  field: dataclasses.field
+  FileFinder: _frozen_importlib_external.FileFinder
+  FinalizeSessionRequest: schemas.FinalizeSessionRequest
+  FinalizeSessionResponse: schemas.FinalizeSessionResponse
+  FinBERTTool: tools.analysis.finbert.FinBERTTool
+  fintech_service: backend.app.services.fintech_service.fintech_service
+  fitz: fitz
+  Fred: fredapi.Fred
+  FredService: services.fred_service.FredService
+  FredTool: tools.market.fred.FredTool
+  functools: functools
+  get_a2a_agent_client: core.a2a_client.get_a2a_agent_client
+  get_client: langfuse.get_client
+  get_company_report: backend.infrastructure.adk.core.tools.get_company_report
+  get_config: agent.core.config.get_config
+  get_event_bus: core.bus.get_event_bus
+  get_financial_indicators: modules.metrics.get_financial_indicators
+  get_financial_metrics: modules.metrics.get_financial_metrics
+  get_historical_data: tools.get_historical_data
+  get_html_content: modules.content_extractor.get_html_content
+  get_langfuse_client: client.get_langfuse_client
+  get_langfuse_config: config.get_langfuse_config
+  get_latest_report_metadata: modules.report_finder.get_latest_report_metadata
+  get_llm: backend.app.agents.personal_finance.llm.get_llm
+  get_macro_data: backend.infrastructure.adk.core.tools.get_macro_data
+  get_macro_history: tools.get_macro_history
+  get_market_context: backend.app.agents.personal_finance.market_context.get_market_context
+  get_model: llm.get_model
+  get_portfolio: backend.app.services.personal_finance_service.get_portfolio
+  get_report_content: backend.infrastructure.adk.core.tools.get_report_content
+  get_retry_decorator: utils.get_retry_decorator
+  get_session: utils.get_session
+  get_stock_price: tools.get_stock_price
+  get_technical_indicators: tools.get_technical_indicators
+  GetContextRequest: schemas.GetContextRequest
+  GetContextResponse: schemas.GetContextResponse
+  GetStatsResponse: schemas.GetStatsResponse
+  glob: glob
+  GoogleSearch: serpapi.GoogleSearch
+  GraphStore: storage.graph_store.GraphStore
+  hashlib: hashlib
+  HealthResponse: api.models.HealthResponse
+  HKStockService: services.hk_stock_service.HKStockService
+  HTTPException: fastapi.HTTPException
+  httpx: httpx
+  HumanMessage: langchain_core.messages.HumanMessage
+  init_db: backend.app.agents.personal_finance.db.init_db
+  InMemorySessionService: google.adk.sessions.InMemorySessionService
+  inspect: inspect
+  inspect_page: tools.inspect_page
+  io: io
+  jieba: jieba
+  JobManager: backend.app.services.research.job_manager.JobManager
+  json: json
+  jsonable_encoder: fastapi.encoders.jsonable_encoder
+  KMeans: sklearn.cluster.KMeans
+  LangChainBaseModel: langchain.pydantic_v1.BaseModel
+  LangChainField: langchain.pydantic_v1.Field
+  Langfuse: langfuse.Langfuse
+  langfuse_enabled: client.langfuse_enabled
+  LessonItem: backend.app.agents.personal_finance.task_schemas.LessonItem
+  LessonRecord: backend.app.agents.personal_finance.db_models.LessonRecord
+  List: typing.List
+  Literal: typing.Literal
+  LlamaParse: llama_cloud_services.LlamaParse
+  LlmAgent: google.adk.agents.LlmAgent
+  LLMClient: llm.client.LLMClient
+  LLMConfig: core.config.LLMConfig
+  LLMError: utils.exceptions.LLMError
+  LLMResult: langchain_core.outputs.LLMResult
+  LLMSymbolExtractor: utils.llm_symbol_extractor.LLMSymbolExtractor
+  logger: loguru.logger
+  logging: logging
+  lru_cache: functools.lru_cache
+  macro: backend.entrypoints.api.routers.macro
+  macro_agent: macro.macro_agent
+  macro_agent_service: backend.app.services.macro_agent_service.macro_agent_service
+  MACRO_AGENT_SYSTEM_PROMPT: core.prompts.MACRO_AGENT_SYSTEM_PROMPT
+  MACRO_ANALYSIS_INSTRUCTION: backend.app.agents.macro.prompts.MACRO_ANALYSIS_INSTRUCTION
+  MACRO_DATA_TOOL_DESCRIPTION: prompts.MACRO_DATA_TOOL_DESCRIPTION
+  MacroA2A: core.agents.macro.MacroA2A
+  MacroAnalyst: backend.app.agents.personal_finance.sub_agents.MacroAnalyst
+  MacroCallbackHandler: callbacks.MacroCallbackHandler
+  MacroDataSkill: skills.macro_data_tool.skill.MacroDataSkill
+  market: backend.entrypoints.api.routers.market
+  market_agent: market.market_agent
+  MARKET_AGENT_SYSTEM_PROMPT: core.prompts.MARKET_AGENT_SYSTEM_PROMPT
+  MARKET_ANALYSIS_SYSTEM_PROMPT: prompts.MARKET_ANALYSIS_SYSTEM_PROMPT
+  MARKET_ANALYSIS_USER_TEMPLATE: prompts.MARKET_ANALYSIS_USER_TEMPLATE
+  market_service: backend.app.services.market_service.market_service
+  MarketA2A: core.agents.market.MarketA2A
+  MarketAnalyst: backend.app.agents.personal_finance.sub_agents.MarketAnalyst
+  MarketDataSkill: skills.market_data_tool.skill.MarketDataSkill
+  MarketResponse: models.schemas.MarketResponse
+  MASTER_CARD_GENERATION_PROMPT_TEMPLATE: backend.app.agents.personal_finance.prompts.MASTER_CARD_GENERATION_PROMPT_TEMPLATE
+  MASTER_INSTRUCTION: prompts.MASTER_INSTRUCTION
+  MASTER_PLANNER_SYSTEM_PROMPT: backend.app.agents.personal_finance.prompts.MASTER_PLANNER_SYSTEM_PROMPT
+  MASTER_PLANNER_USER_PROMPT_TEMPLATE: backend.app.agents.personal_finance.prompts.MASTER_PLANNER_USER_PROMPT_TEMPLATE
+  MASTER_REPORT_GENERATION_PROMPT_TEMPLATE: backend.app.agents.personal_finance.prompts.MASTER_REPORT_GENERATION_PROMPT_TEMPLATE
+  MASTER_SYNTHESIZER_SYSTEM_PROMPT: backend.app.agents.personal_finance.prompts.MASTER_SYNTHESIZER_SYSTEM_PROMPT
+  MasterAgent: master.MasterAgent
+  math: math
+  md5: hashlib.md5
+  MemoryCallbackHandler: memory_callback.MemoryCallbackHandler
+  MemoryClient: backend.infrastructure.adk.core.memory_client.MemoryClient
+  MemoryManager: manager.MemoryManager
+  Message: a2a.types.Message
+  MessagesPlaceholder: langchain_core.prompts.MessagesPlaceholder
+  model_validator: pydantic.model_validator
+  news_agent: news.news_agent
+  NewsAnalyst: backend.app.agents.personal_finance.sub_agents.NewsAnalyst
+  NewsPlan: schemas.NewsPlan
+  NewsSearchService: services.news_search.NewsSearchService
+  NewsTask: schemas.NewsTask
+  np: numpy
+  nx: networkx
+  observable: decorators.observable
+  openai: openai
+  Optional: typing.Optional
+  os: os
+  Page: playwright.async_api.Page
+  parse: urllib.parse
+  partial: functools.partial
+  Path: pathlib.Path
+  pd: pandas
+  PDFParseTool: tools.reports.pdf_parse.PDFParseTool
+  PDFParsingSkill: skill.PDFParsingSkill
+  PerformanceHistory: backend.app.agents.personal_finance.db_models.PerformanceHistory
+  PersonalFinanceOrchestrator: backend.app.agents.personal_finance.orchestrator.PersonalFinanceOrchestrator
+  PersonalFinanceRepository: backend.app.agents.personal_finance.repository.PersonalFinanceRepository
+  pkgutil: pkgutil
+  Plan: backend.app.agents.personal_finance.task_schemas.Plan
+  PlanTask: backend.app.agents.personal_finance.task_schemas.PlanTask
+  Portfolio: backend.app.agents.personal_finance.db_models.Portfolio
+  PortfolioSnapshot: backend.app.agents.personal_finance.models.PortfolioSnapshot
+  praw: praw
+  PreContext: backend.app.agents.personal_finance.task_schemas.PreContext
+  PREPROCESS_SYSTEM_PROMPT: backend.app.agents.personal_finance.prompts.PREPROCESS_SYSTEM_PROMPT
+  PREPROCESS_USER_PROMPT_TEMPLATE: backend.app.agents.personal_finance.prompts.PREPROCESS_USER_PROMPT_TEMPLATE
+  PreProcessAgent: backend.app.agents.personal_finance.pre_process.PreProcessAgent
+  PriceUpdate: backend.app.agents.personal_finance.models.PriceUpdate
+  PriceUpdateMap: backend.app.agents.personal_finance.models.PriceUpdateMap
+  PrivateAttr: pydantic.PrivateAttr
+  pytz: pytz
+  Query: fastapi.Query
+  random: random
+  rate_limiter: utils.rate_limiter.rate_limiter
+  re: re
+  receptionist_node: core.agents.receptionist.receptionist_node
+  RECEPTIONIST_SYSTEM_PROMPT: core.prompts.RECEPTIONIST_SYSTEM_PROMPT
+  ReceptionistA2A: core.agents.receptionist.ReceptionistA2A
+  RecommendationAction: backend.app.agents.personal_finance.models.RecommendationAction
+  RecommendationCard: backend.app.agents.personal_finance.models.RecommendationCard
+  RedditFetcher: reddit_fetcher.RedditFetcher
+  RedirectResponse: fastapi.responses.RedirectResponse
+  Relationship: sqlmodel.Relationship
+  report: backend.entrypoints.api.routers.report
+  report_agent: report.report_agent
+  ReportAnalysisTool: backend.app.services.report_analysis.ReportAnalysisTool
+  ReportContentTool: backend.domain.entities.report_content.ReportContentTool
+  ReportFinderTool: backend.infrastructure.document.report_finder.ReportFinderTool
+  Request: fastapi.Request
+  requests: requests
+  research: backend.entrypoints.api.routers.research
+  RESEARCH_SYSTEM_PROMPT: backend.app.agents.research.prompts.RESEARCH_SYSTEM_PROMPT
+  ResearchAgentCallback: backend.app.agents.research.callbacks.ResearchAgentCallback
+  ResearchArtifact: backend.infrastructure.database.models.research.ResearchArtifact
+  ResearchEvent: backend.infrastructure.database.models.research.ResearchEvent
+  ResearchJob: backend.infrastructure.database.models.research.ResearchJob
+  RetrieveMemoryRequest: schemas.RetrieveMemoryRequest
+  RetrieveMemoryResponse: schemas.RetrieveMemoryResponse
+  retry: tenacity.retry
+  retry_if_exception_type: tenacity.retry_if_exception_type
+  REVIEW_SYSTEM_PROMPT: prompts.REVIEW_SYSTEM_PROMPT
+  REVIEW_USER_PROMPT: prompts.REVIEW_USER_PROMPT
+  Role: memory_system.api.schemas.Role
+  RotatingFileHandler: logging.handlers.RotatingFileHandler
+  router: routes.router
+  run_agent: backend.app.agents.research.research_agent.run_agent
+  run_macro_analysis: backend.app.agents.personal_finance.tools.run_macro_analysis
+  run_market_agent: backend.app.agents.market.agent.run_market_agent
+  run_market_analysis: backend.app.agents.personal_finance.tools.run_market_analysis
+  run_news_analysis: backend.app.agents.personal_finance.tools.run_news_analysis
+  run_react_agent: core.agents.utils.run_react_agent
+  run_review_agent: backend.app.agents.review.agent.run_review_agent
+  run_technical_analysis: backend.app.agents.personal_finance.tools.run_technical_analysis
+  Runner: google.adk.runners.Runner
+  safe_json_extract: backend.app.agents.personal_finance.utils.safe_json_extract
+  save_html_content: modules.content_extractor.save_html_content
+  save_portfolio: backend.app.services.personal_finance_service.save_portfolio
+  search: backend.entrypoints.api.routers.search
+  search_market_news: backend.infrastructure.adk.core.tools.search_market_news
+  search_web: tools.search_web
+  select: sqlmodel.select
+  SemanticMemory: semantic_memory.SemanticMemory
+  SentenceTransformer: sentence_transformers.SentenceTransformer
+  sentiment_agent: sentiment.sentiment_agent
+  SENTIMENT_AGENT_SYSTEM_PROMPT: core.prompts.SENTIMENT_AGENT_SYSTEM_PROMPT
+  SentimentA2A: core.agents.sentiment.SentimentA2A
+  SentimentAnalysisSkill: skills.sentiment_analysis_tool.skill.SentimentAnalysisSkill
+  SentimentResult: schemas.SentimentResult
+  SentimentService: services.sentiment.SentimentService
+  SerpApiProvider: providers.serpapi_provider.SerpApiProvider
+  SerpAppTool: backend.infrastructure.search.serp.SerpAppTool
+  ServerSentEvent: sse_starlette.sse.ServerSentEvent
+  Session: sqlmodel.Session
+  session_manager: session_manager.session_manager
+  Set: typing.Set
+  set_config: core.config.set_config
+  set_identity: edgar.set_identity
+  settings: config.settings
+  setup_a2a: api.a2a.setup_a2a
+  setup_chairman: core.agents.chairman.setup_a2a
+  setup_critic: core.agents.critic.setup_a2a
+  setup_logging: utils.logging.setup_logging
+  setup_macro: core.agents.macro.setup_a2a
+  setup_market: core.agents.market.setup_a2a
+  setup_middleware: api.middleware.setup_middleware
+  setup_receptionist: core.agents.receptionist.setup_a2a
+  setup_sentiment: core.agents.sentiment.setup_a2a
+  setup_web_search: core.agents.web_search.setup_a2a
+  ShadowAsset: backend.app.agents.personal_finance.db_models.ShadowAsset
+  ShadowPortfolio: backend.app.agents.personal_finance.db_models.ShadowPortfolio
+  simulation: backend.entrypoints.api.routers.simulation
+  SimulationService: backend.app.services.simulation_service.SimulationService
+  SinaFinanceDataSource: data_sources.sina_finance.SinaFinanceDataSource
+  SinaFinanceScraper: sina_scraper.SinaFinanceScraper
+  SinaFinanceTool: tools.market.sina.SinaFinanceTool
+  SkillAdapter: tools.skill_adapter.SkillAdapter
+  SkillLoadError: utils.exceptions.SkillLoadError
+  snreddit: snscrape.modules.reddit
+  sntwitter: snscrape.modules.twitter
+  SQLModel: sqlmodel.SQLModel
+  StateGraph: langgraph.graph.StateGraph
+  StaticFiles: fastapi.staticfiles.StaticFiles
+  status: fastapi.status
+  Steel: steel.Steel
+  StockAnalysisAgent: core.agent.StockAnalysisAgent
+  StockData: models.schemas.StockData
+  stop_after_attempt: tenacity.stop_after_attempt
+  stream_manager: backend.app.services.research.stream_manager.stream_manager
+  StreamingResponse: fastapi.responses.StreamingResponse
+  SUBAGENT_ROLE_DAILY_REVIEW: backend.app.agents.personal_finance.prompts.SUBAGENT_ROLE_DAILY_REVIEW
+  SUBAGENT_ROLE_MACRO: backend.app.agents.personal_finance.prompts.SUBAGENT_ROLE_MACRO
+  SUBAGENT_ROLE_MARKET: backend.app.agents.personal_finance.prompts.SUBAGENT_ROLE_MARKET
+  SUBAGENT_ROLE_NEWS: backend.app.agents.personal_finance.prompts.SUBAGENT_ROLE_NEWS
+  SUBAGENT_ROLE_TECHNICAL: backend.app.agents.personal_finance.prompts.SUBAGENT_ROLE_TECHNICAL
+  summarize_portfolio: backend.app.agents.personal_finance.utils.summarize_portfolio
+  SymbolNotFoundError: base.SymbolNotFoundError
+  sys: sys
+  SystemMessage: langchain_core.messages.SystemMessage
+  Task: a2a.types.Task
+  TaskCallbackHandler: callbacks.TaskCallbackHandler
+  TaskInputs: backend.app.agents.personal_finance.task_schemas.TaskInputs
+  TaskStatus: schemas.TaskStatus
+  TaskUpdatePayload: schemas.TaskUpdatePayload
+  TaskUpdateType: schemas.TaskUpdateType
+  TavilyClient: tavily.TavilyClient
+  TavilyProvider: providers.tavily_provider.TavilyProvider
+  TavilyTool: backend.infrastructure.search.tavily.TavilyTool
+  technical_agent_service: backend.app.services.technical_agent_service.technical_agent_service
+  TECHNICAL_ANALYSIS_INSTRUCTION: prompts.TECHNICAL_ANALYSIS_INSTRUCTION
+  TechnicalAnalysisCallbackHandler: backend.app.agents.technical_analysis.callbacks.TechnicalAnalysisCallbackHandler
+  TechnicalAnalysisTool: backend.domain.services.technical_analysis.TechnicalAnalysisTool
+  TechnicalAnalyst: backend.app.agents.personal_finance.sub_agents.TechnicalAnalyst
+  TextBlob: textblob.TextBlob
+  TextPart: a2a.types.TextPart
+  threading: threading
+  time: time
+  timedelta: datetime.timedelta
+  tokenizer: utils.tokenizer.tokenizer
+  tool: langchain_core.tools.tool
+  Tool: langchain.tools.Tool
+  ToolCall: api.models.ToolCall
+  ToolInfo: api.models.ToolInfo
+  ToolMessage: langchain_core.messages.ToolMessage
+  ToolNode: langgraph.prebuilt.ToolNode
+  ToolOutput: tools.base.ToolOutput
+  Tools: backend.app.registry.Tools
+  tools: tools.tools
+  ToolsResponse: api.models.ToolsResponse
+  torch: torch
+  traceback: traceback
+  TTLCache: cachetools.TTLCache
+  Tuple: typing.Tuple
+  Type: typing.Type
+  types: google.genai.types
+  Union: typing.Union
+  update_prices: backend.app.services.personal_finance_service.update_prices
+  USStockService: services.us_stock_service.USStockService
+  util: importlib.util
+  UUID: uuid.UUID
+  uuid: uuid
+  uvicorn: uvicorn
+  validate_price_data: utils.validators.validate_price_data
+  validate_stock_symbol: utils.validators.validate_stock_symbol
+  ValidationError: utils.error_handler.ValidationError
+  validator: pydantic.validator
+  VectorStore: storage.vector_store.VectorStore
+  wait_exponential: tenacity.wait_exponential
+  WEB_SEARCH_AGENT_SYSTEM_PROMPT: core.prompts.WEB_SEARCH_AGENT_SYSTEM_PROMPT
+  WebSearchA2A: core.agents.web_search.WebSearchA2A
+  WebSearchProvider: base.WebSearchProvider
+  WebSearchSkill: skills.web_search_tool.skill.WebSearchSkill
+  WORKER_INSTRUCTION: prompts.WORKER_INSTRUCTION
+  WorkerAgent: worker.WorkerAgent
+  WorkerType: backend.app.agents.personal_finance.task_schemas.WorkerType
+  WorkingMemory: working_memory.WorkingMemory
+  wraps: functools.wraps
+  XueqiuTool: backend.infrastructure.market.xueqiu.XueqiuTool
+  YahooFinanceDataSource: data_sources.yahoo_finance.YahooFinanceDataSource
+  YahooFinanceTool: tools.market.yahoo.YahooFinanceTool
+  YahooMacroService: services.yahoo_service.YahooMacroService
+  yaml: yaml
+  yf: yfinance
+  YFinanceFinancialSource: data_sources.yfinance_financial.YFinanceFinancialSource
+
+functions:
+  __bool__:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [self]
+  __init__:
+    type: sync
+    module: skills.macro_data_tool.skill
+    args: [self]
+  __new__:
+    type: sync
+    module: agent.core.bus
+    args: [cls]
+  __repr__:
+    type: sync
+    module: backend.infrastructure.adk.core.llm
+    args: [self]
+  __str__:
+    type: sync
+    module: backend.infrastructure.adk.core.llm
+    args: [self]
+  _analyze_heuristic:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.sentiment
+    args: [self, news_items]
+    params:
+      returns: Dict
+  _analyze_text_finbert:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.sentiment
+    args: [self, text]
+    params:
+      returns: Dict
+  _analyze_with_finbert:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.sentiment
+    args: [self, news_items]
+    params:
+      returns: Dict
+  _arun:
+    type: async
+    module: skills.macro_data_tool.skill
+    args: [self, query]
+    params:
+      returns: Dict
+  _background_worker:
+    type: async
+    module: memory_system.core.manager
+    args: [self]
+  _build_plan_from_tasks:
+    type: sync
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self, user_query, tasks, portfolio]
+    params:
+      returns: Plan
+  _build_synthesis_context:
+    type: sync
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self, user_query, pre_context, plan]
+    params:
+      returns: str
+  _build_tasks_from_dicts:
+    type: sync
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self, tasks, portfolio]
+    params:
+      returns: List[PlanTask]
+  _calculate_reset_time:
+    type: sync
+    module: skills.market_data_tool.utils.rate_limiter
+    args: [self, market]
+    params:
+      returns: str
+  _calculate_valuation:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, df_fin, price]
+    params:
+      returns: tuple
+  _configure_llm:
+    type: sync
+    module: backend.app.agents.news_sentiment.master
+    args: [self]
+  _convert_symbol:
+    type: sync
+    module: backend.infrastructure.market.yahoo
+    args: [self, symbol, market]
+    params:
+      returns: str
+  _convert_symbol_for_yahoo:
+    type: sync
+    module: skills.market_data_tool.data_sources.yahoo_finance
+    args: [self, symbol, market]
+    params:
+      returns: str
+  _convert_to_sina_format:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, symbol, market]
+    params:
+      returns: str
+  _convert_to_sina_format_for_news:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, symbol]
+    params:
+      returns: str
+  _convert_yahoo_symbol:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, symbol, market]
+    params:
+      returns: str
+  _create_after_callback:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_agent
+    args: [self, original_callback]
+    params:
+      returns: Callable
+  _create_before_callback:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_agent
+    args: [self, original_callback]
+    params:
+      returns: Callable
+  _create_error_response:
+    type: sync
+    module: skills.market_data_tool.data_sources.base
+    args: [self, symbol, error]
+    params:
+      returns: Dict
+  _create_inner_agent:
+    type: sync
+    module: backend.app.agents.news_sentiment.worker
+    args: [self, callbacks]
+    params:
+      returns: Agent
+  _create_task:
+    type: sync
+    module: agent.core.a2a_client
+    args: [self, message, session_id]
+    params:
+      returns: Task
+  _create_tools:
+    type: sync
+    module: backend.app.agents.personal_finance.pre_process
+    args: [self]
+    params:
+      returns: List[Any]
+  _deduplicate:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.news_search
+    args: [self, news_items]
+    params:
+      returns: List[Dict]
+  _deep_update:
+    type: sync
+    module: backend.infrastructure.config.loader
+    args: [source, overrides]
+  _detect_market:
+    type: sync
+    module: skills.market_data_tool.data_sources.base
+    args: [self, symbol]
+    params:
+      returns: str
+  _detect_market_type:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol]
+    params:
+      returns: str
+  _determine_market:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self, symbol]
+    params:
+      returns: Optional[str]
+  _emit:
+    type: async
+    module: backend.app.agents.news_sentiment.callbacks
+    args: [self, update_type, content]
+  _emit_plan_update:
+    type: sync
+    module: backend.app.agents.news_sentiment.master
+    args: [self]
+  _empty_indicators:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self]
+  _ensure_data_dir:
+    type: sync
+    module: backend.app.services.simulation_service
+    args: [self]
+  _ensure_item_limit:
+    type: sync
+    module: memory_system.core.working_memory
+    args: [self]
+    params:
+      returns: None
+  _ensure_token_limit:
+    type: sync
+    module: memory_system.core.working_memory
+    args: [self, new_item_tokens]
+    params:
+      returns: None
+  _ensure_worker_started:
+    type: sync
+    module: memory_system.core.manager
+    args: [self]
+  _execute_task:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self, task, portfolio]
+    params:
+      returns: str
+  _execute_task_safe:
+    type: async
+    module: backend.app.agents.news_sentiment.agent
+    args: [task, ctx, sem]
+  _execute_with_semaphore:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [task]
+  _extract_agent_response:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_agent
+    args: [self, ctx]
+    params:
+      returns: str
+  _extract_ashare_cashflow:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, df]
+  _extract_ashare_debt:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, df]
+  _extract_ashare_history:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, df]
+  _extract_ashare_profit:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, df]
+  _extract_ashare_return:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, df]
+  _extract_ashare_revenue:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, df]
+  _extract_cashflow:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, df]
+  _extract_citations:
+    type: sync
+    module: backend.app.services.report_analysis
+    args: [self, text, anchor_map]
+    params:
+      returns: List[Dict]
+  _extract_debt:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, df]
+  _extract_financial_history:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, df]
+  _extract_profit:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, df]
+  _extract_revenue:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, df]
+  _extract_shareholder_return:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, df]
+  _extract_symbols_from_text:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self, text]
+    params:
+      returns: List[str]
+  _extract_symbols_regex:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self, text]
+    params:
+      returns: List[str]
+  _extract_user_query:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_agent
+    args: [self, ctx]
+    params:
+      returns: str
+  _extract_valuation:
+    type: sync
+    module: backend.infrastructure.market.yahoo
+    args: [self, info]
+  _extract_yahoo_cashflow:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, cashflow, financials]
+  _extract_yahoo_debt:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, bs]
+  _extract_yahoo_history:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, fin, bs]
+  _extract_yahoo_profit:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, financials]
+  _extract_yahoo_return:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, info, fin, bs]
+  _extract_yahoo_revenue:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, financials, cashflow]
+  _extract_yahoo_valuation:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, info]
+  _fallback_parse:
+    type: sync
+    module: skills.pdf_parsing_tool.skill
+    args: [self, file_path]
+    params:
+      returns: Dict
+  _fetch_article_content:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, url]
+    params:
+      returns: str
+  _fetch_cninfo_pdf:
+    type: sync
+    module: skills.financial_report_tool.modules.report_finder
+    args: [symbol, target]
+    params:
+      returns: Dict
+  _fetch_cookies:
+    type: sync
+    module: backend.infrastructure.market.xueqiu
+    args: [self]
+  _fetch_data:
+    type: sync
+    module: backend.app.agents.personal_finance.market_context
+  _fetch_db_data:
+    type: sync
+    module: backend.app.agents.personal_finance.pre_process
+    args: [user_id, portfolio]
+  _fetch_from_reddit:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.news_search
+    args: [self, symbol, limit]
+    params:
+      returns: List[Dict]
+  _fetch_from_sina:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.news_search
+    args: [self, symbol, limit]
+    params:
+      returns: List[Dict]
+  _fetch_hk_financial_data_akshare:
+    type: sync
+    module: skills.financial_report_tool.modules.metrics
+    args: [symbol]
+    params:
+      returns: str
+  _fetch_one:
+    type: async
+    module: backend.app.agents.personal_finance.sub_agents
+    args: [sym]
+  _finalize_and_save:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self]
+  _finalize_memory:
+    type: async
+    module: backend.app.services.research.job_manager
+    args: [self, user_id]
+  _format_context:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_agent
+    args: [self, context]
+    params:
+      returns: str
+  _format_index_items:
+    type: sync
+    module: backend.app.agents.personal_finance.market_context
+    args: [title, items]
+    params:
+      returns: List[str]
+  _format_memory_context:
+    type: sync
+    module: backend.app.agents.research.research_agent
+    args: [context]
+    params:
+      returns: str
+  _format_plan_status:
+    type: sync
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [plan]
+    params:
+      returns: str
+  _format_results:
+    type: sync
+    module: skills.web_search_tool.skill
+    args: [self, results]
+    params:
+      returns: str
+  _gather_market_state:
+    type: sync
+    module: backend.app.services.simulation_service
+    args: [self, symbol, tools_instance]
+    params:
+      returns: Dict
+  _get_a_share_quote:
+    type: sync
+    module: backend.skills.market-data.scripts.market_data
+    args: [self, symbol]
+    params:
+      returns: Dict
+  _get_ashare_indicators:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, symbol, years]
+    params:
+      returns: Dict
+  _get_ashare_indicators_from_abstract:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, symbol, years]
+    params:
+      returns: Dict
+  _get_ashare_report:
+    type: sync
+    module: backend.infrastructure.document.report_finder
+    args: [self, symbol]
+    params:
+      returns: Dict
+  _get_ashare_report_metadata:
+    type: sync
+    module: skills.financial_report_tool.modules.report_finder
+    args: [symbol]
+    params:
+      returns: Dict
+  _get_cninfo_org_id:
+    type: sync
+    module: skills.financial_report_tool.modules.report_finder
+    args: [symbol]
+    params:
+      returns: Optional[str]
+  _get_currency_for_market:
+    type: sync
+    module: skills.market_data_tool.data_sources.yahoo_finance
+    args: [self, market]
+    params:
+      returns: str
+  _get_episodic_memory:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id]
+    params:
+      returns: EpisodicMemory
+  _get_etf_quote:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol]
+    params:
+      returns: Dict
+  _get_hk_quote_detail:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol]
+    params:
+      returns: Dict
+  _get_hk_report:
+    type: sync
+    module: backend.infrastructure.document.report_finder
+    args: [self, symbol]
+    params:
+      returns: Dict
+  _get_hk_report_metadata:
+    type: sync
+    module: skills.financial_report_tool.modules.report_finder
+    args: [symbol]
+    params:
+      returns: Dict
+  _get_indicators_from_abstract:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol, years]
+    params:
+      returns: Dict
+  _get_llm:
+    type: sync
+    module: backend.app.agents.personal_finance.sub_agents
+    args: [self]
+  _get_market_hours:
+    type: sync
+    module: skills.market_data_tool.data_sources.yahoo_finance
+    args: [self, market]
+    params:
+      returns: str
+  _get_mock_news:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.news_search
+    args: [self, symbol, limit]
+    params:
+      returns: List[Dict]
+  _get_proxies:
+    type: sync
+    module: skills.market_data_tool.data_sources.yahoo_finance
+    args: [self]
+    params:
+      returns: Dict
+  _get_remaining_recovery_time:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+    params:
+      returns: int
+  _get_semantic_memory:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id]
+    params:
+      returns: SemanticMemory
+  _get_session:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self]
+  _get_timestamp:
+    type: sync
+    module: backend.app.agents.news_sentiment.agent
+    args: [self]
+  _get_tools:
+    type: sync
+    module: backend.app.agents.news_sentiment.master
+    args: [self]
+  _get_us_quote_detail:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol]
+    params:
+      returns: Dict
+  _get_us_report:
+    type: sync
+    module: backend.infrastructure.document.report_finder
+    args: [self, symbol]
+    params:
+      returns: Dict
+  _get_us_report_manual:
+    type: sync
+    module: backend.infrastructure.document.report_finder
+    args: [self, symbol]
+    params:
+      returns: Dict
+  _get_us_report_metadata:
+    type: sync
+    module: skills.financial_report_tool.modules.report_finder
+    args: [symbol]
+    params:
+      returns: Dict
+  _get_working_memory:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id]
+    params:
+      returns: WorkingMemory
+  _get_yahoo_indicators:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, symbol, market, years]
+    params:
+      returns: Dict
+  _handle_batch_request:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self, symbols]
+    params:
+      returns: Dict
+  _handle_compression:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id, items]
+  _handle_persona_update:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id, items]
+  _handle_single_request:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self, symbol]
+    params:
+      returns: Dict
+  _init_graph:
+    type: sync
+    module: agent.core.agent
+    args: [self]
+    params:
+      returns: CompiledStateGraph
+  _init_llm:
+    type: sync
+    module: memory_system.llm.client
+    args: [self]
+    params:
+      returns: ChatOpenAI
+  _init_reddit:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.reddit_fetcher
+    args: [self]
+  _initialize_agents:
+    type: sync
+    module: agent.core.a2a_client
+    args: [self]
+  _initialize_providers:
+    type: sync
+    module: skills.web_search_tool.skill
+    args: [self]
+  _inspect_generic:
+    type: async
+    module: backend.app.agents.news_sentiment.tools
+    args: [url, scroll_steps]
+    params:
+      returns: str
+  _inspect_reddit:
+    type: async
+    module: backend.app.agents.news_sentiment.tools
+    args: [url]
+    params:
+      returns: str
+  _is_chinese_stock:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.news_search
+    args: [self, symbol]
+    params:
+      returns: bool
+  _is_error:
+    type: sync
+    module: backend.app.registry
+    args: [self, response]
+    params:
+      returns: bool
+  _is_healthy:
+    type: sync
+    module: skills.market_data_tool.services.a_share_service
+    args: [self]
+    params:
+      returns: bool
+  _is_likely_etf:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol]
+    params:
+      returns: bool
+  _is_valid_hk_code:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self, symbol]
+    params:
+      returns: bool
+  _is_valid_share_code:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self, symbol]
+    params:
+      returns: bool
+  _is_valid_us_symbol:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self, symbol]
+    params:
+      returns: bool
+  _lessons_to_markdown:
+    type: sync
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [lessons]
+    params:
+      returns: str
+  _load:
+    type: sync
+    module: memory_system.storage.graph_store
+    args: [self]
+    params:
+      returns: None
+  _load_data:
+    type: sync
+    module: backend.app.services.simulation_service
+    args: [self]
+    params:
+      returns: Dict
+  _load_from_config_loader:
+    type: sync
+    module: backend.infrastructure.langfuse.config
+    args: [self]
+  _load_from_disk:
+    type: sync
+    module: memory_system.core.semantic_memory
+    args: [self]
+    params:
+      returns: None
+  _load_model:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.sentiment
+    args: [self]
+  _load_skill:
+    type: sync
+    module: agent.tools.skill_adapter
+    args: [self]
+    params:
+      returns: None
+  _on_failure:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+  _on_success:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+  _parse_chinese_time:
+    type: sync
+    module: skills.market_data_tool.data_sources.sina_finance
+    args: [self, date_str, time_str]
+    params:
+      returns: datetime
+  _parse_float:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, val]
+  _parse_interval:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, interval]
+    params:
+      returns: int
+  _parse_period:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, period]
+    params:
+      returns: int
+  _parse_sina_kline_data:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, text]
+    params:
+      returns: List[Dict]
+  _parse_sina_response:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, response_text, original_symbol, market]
+    params:
+      returns: Dict
+  _parse_time:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, time_str]
+    params:
+      returns: str
+  _process_data:
+    type: sync
+    module: skills.market_data_tool.services.a_share_service
+    args: [self, raw_data, start_time, data_source]
+    params:
+      returns: Dict
+  _process_finalize_task:
+    type: async
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id]
+  _rate_limit:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self]
+  _rate_limited_request:
+    type: sync
+    module: skills.market_data_tool.data_sources.yahoo_finance
+    args: [self, method, url]
+  _register_tools:
+    type: sync
+    module: agent.tools.manager
+    args: [self]
+    params:
+      returns: None
+  _render_precontext_markdown:
+    type: sync
+    module: backend.app.agents.personal_finance.pre_process
+    args: [pre, portfolio]
+    params:
+      returns: str
+  _rotate_user_agent:
+    type: sync
+    module: backend.infrastructure.market.yahoo
+    args: [self]
+    params:
+      returns: str
+  _run:
+    type: sync
+    module: skills.macro_data_tool.skill
+    args: [self, query]
+    params:
+      returns: Dict
+  _run_sync:
+    type: sync
+    module: agent.tools.skill_adapter
+    args: [self, query]
+    params:
+      returns: str
+  _safe_get:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, row, key, default]
+  _sanitize_markdown:
+    type: sync
+    module: backend.app.services.report_analysis
+    args: [self, text]
+    params:
+      returns: str
+  _save:
+    type: sync
+    module: memory_system.storage.graph_store
+    args: [self]
+    params:
+      returns: None
+  _save_data:
+    type: sync
+    module: backend.app.services.simulation_service
+    args: [self]
+  _save_decisions_to_db:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self]
+    params:
+      returns: List[Dict]
+  _save_lessons_to_db:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self]
+  _save_to_disk:
+    type: sync
+    module: memory_system.core.semantic_memory
+    args: [self]
+    params:
+      returns: None
+  _scrape_reddit:
+    type: sync
+    module: backend.skills.news-sentiment.scripts.news
+    args: [self, query, limit]
+    params:
+      returns: List[Dict]
+  _scrape_twitter:
+    type: sync
+    module: backend.skills.news-sentiment.scripts.news
+    args: [self, query, limit]
+    params:
+      returns: List[Dict]
+  _serialize_args:
+    type: sync
+    module: backend.infrastructure.langfuse.decorators
+    args: [args, kwargs]
+    params:
+      returns: list
+  _serialize_result:
+    type: sync
+    module: backend.infrastructure.langfuse.decorators
+    args: [result]
+    params:
+      returns: Any
+  _setup_session_headers:
+    type: sync
+    module: backend.infrastructure.market.yahoo
+    args: [self]
+  _setup_yfinance_session:
+    type: sync
+    module: backend.skills.macro-economy.scripts.macro
+    args: [self]
+  _should_attempt_reset:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+    params:
+      returns: bool
+  _stringify_value:
+    type: sync
+    module: backend.app.agents.personal_finance.market_context
+    args: [value]
+    params:
+      returns: str
+  _summarize_cluster:
+    type: sync
+    module: memory_system.core.cluster
+    args: [self, docs]
+    params:
+      returns: str
+  _truncate_value:
+    type: sync
+    module: backend.infrastructure.langfuse.decorators
+    args: [value, max_length]
+    params:
+      returns: Any
+  _try_create_artifact:
+    type: async
+    module: backend.app.agents.research.callbacks
+    args: [self, tool_name, output_str]
+  _update_reviewed_decisions:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self]
+  _validate_symbol:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol]
+    params:
+      returns: bool
+  _yahoo_safe_get:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, df, key, idx]
+  add:
+    type: sync
+    module: memory_system.core.working_memory
+    args: [self, memory_item]
+    params:
+      returns: None
+  add_core_principle:
+    type: sync
+    module: memory_system.core.semantic_memory
+    args: [self, content, importance]
+    params:
+      returns: None
+  add_error:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [self, error]
+  add_event:
+    type: sync
+    module: memory_system.core.episodic_memory
+    args: [self, event_type, content, entities, relations, importance, metadata_extra]
+    params:
+      returns: str
+  add_experience:
+    type: sync
+    module: memory_system.core.semantic_memory
+    args: [self, content, category, importance]
+    params:
+      returns: str
+  add_memory:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id, content, role, memory_type, metadata]
+    params:
+      returns: Dict
+  add_remark:
+    type: async
+    module: backend.entrypoints.api.routers.research
+    args: [job_id, payload, background_tasks]
+  add_tasks:
+    type: sync
+    module: backend.app.agents.news_sentiment.master
+    args: [tasks]
+    params:
+      returns: str
+  after_model:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_callback
+    args: [self]
+    params:
+      returns: None
+  after_tool:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_callback
+    args: [self]
+    params:
+      returns: None
+  after_with_memory:
+    type: async
+    module: backend.infrastructure.adk.core.memory_agent
+    args: [callback_context]
+  agent_node:
+    type: sync
+    module: agent.core.agents.utils
+    args: [state, agent, name]
+  analyze:
+    type: async
+    module: backend.app.agents.personal_finance.sub_agents
+    args: [self, symbol, market_snapshot]
+    params:
+      returns: str
+  analyze_content:
+    type: sync
+    module: backend.app.services.report_analysis
+    args: [self, content, symbol, market, report_info, pdf_url, anchor_map]
+    params:
+      returns: Dict
+  analyze_fed_rate_probability:
+    type: sync
+    module: skills.macro_data_tool.services.yahoo_service
+    args: [self]
+    params:
+      returns: Dict
+  analyze_financial_report:
+    type: async
+    module: backend.entrypoints.api.routers.report
+    args: [symbol]
+  analyze_macro:
+    type: async
+    module: backend.entrypoints.api.routers.agent_macro
+    args: [request]
+  analyze_outlook_stream:
+    type: async
+    module: backend.app.services.market_agent_service
+    args: [self]
+    params:
+      returns: AsyncGenerator
+  analyze_portfolio:
+    type: async
+    module: backend.entrypoints.api.routers.agent_personal_finance
+    args: [request]
+  analyze_portfolio_ops:
+    type: async
+    module: backend.app.agents.personal_finance.sub_agents
+    args: [self, symbols, portfolio, market_snapshot]
+    params:
+      returns: str
+  analyze_report:
+    type: sync
+    module: backend.infrastructure.adk.core.tools
+    args: [symbol]
+    params:
+      returns: Dict
+  analyze_sentiment:
+    type: sync
+    module: backend.infrastructure.adk.core.tools
+    args: [text]
+    params:
+      returns: Dict
+  analyze_stream:
+    type: async
+    module: backend.app.services.macro_agent_service
+    args: [self, session_id]
+    params:
+      returns: AsyncGenerator
+  api_key:
+    type: sync
+    module: backend.infrastructure.browser.session_manager
+    args: [self]
+    params:
+      returns: str
+  api_keys:
+    type: sync
+    module: backend.infrastructure.langfuse.config
+    args: [self]
+    params:
+      returns: Optional[tuple]
+  append_event:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self, job_id, event_type, payload]
+    params:
+      returns: ResearchEvent
+  astream:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self, initial_state]
+    params:
+      returns: AsyncGenerator
+  async_wrapper:
+    type: async
+    module: backend.infrastructure.langfuse.decorators
+  base_url:
+    type: sync
+    module: backend.infrastructure.langfuse.config
+    args: [self]
+    params:
+      returns: str
+  before_model:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_callback
+    args: [self]
+    params:
+      returns: None
+  before_tool:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_callback
+    args: [self]
+    params:
+      returns: None
+  before_with_memory:
+    type: async
+    module: backend.infrastructure.adk.core.memory_agent
+    args: [callback_context]
+  bound_save_important_fact:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_tools
+    args: [fact, importance]
+    params:
+      returns: str
+  bound_search_memory:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_tools
+    args: [query]
+    params:
+      returns: str
+  build_langfuse_metadata:
+    type: sync
+    module: backend.infrastructure.langfuse.callback
+    args: [user_id, session_id, tags, metadata]
+    params:
+      returns: Dict
+  cached_macro_data:
+    type: sync
+    module: skills.macro_data_tool.utils
+    args: [func]
+  cached_market_data:
+    type: sync
+    module: skills.macro_data_tool.utils
+    args: [func]
+  calculate_advanced_indicators:
+    type: sync
+    module: backend.domain.services.technical_analysis
+    args: [self, candles]
+    params:
+      returns: Dict
+  calculate_indicators:
+    type: sync
+    module: backend.domain.services.technical_analysis
+    args: [self, candles]
+    params:
+      returns: Dict
+  calculate_indicators_history:
+    type: sync
+    module: backend.domain.services.technical_analysis
+    args: [self, candles]
+    params:
+      returns: List[Dict]
+  calculate_portfolio_value:
+    type: sync
+    module: backend.app.agents.personal_finance.performance_service
+    args: [cash, assets, prices]
+    params:
+      returns: float
+  calculate_td_sequential:
+    type: sync
+    module: backend.domain.services.technical_analysis
+    args: [self, candles]
+    params:
+      returns: Dict
+  call:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self, func]
+    params:
+      returns: Any
+  call_a2a_agent_direct:
+    type: async
+    module: agent.core.a2a_client
+    args: [agent_name, message, session_id, config]
+    params:
+      returns: A2ATaskResponse
+  call_agent:
+    type: async
+    module: agent.core.a2a_client
+    args: [self, agent_name, message, session_id]
+    params:
+      returns: A2ATaskResponse
+  chairman_node:
+    type: async
+    module: agent.core.agents.chairman
+    args: [state, chairman_llm]
+  chairman_wrapper:
+    type: async
+    module: agent.core.graph
+    args: [state]
+  chat:
+    type: async
+    module: backend.entrypoints.api.routers.adk
+    args: [request]
+  chat_financial:
+    type: async
+    module: backend.entrypoints.api.routers.agent_financial
+    args: [request]
+  chat_oneshot:
+    type: async
+    module: backend.app.services.fintech_service
+    args: [self, query, user_id, session_id]
+    params:
+      returns: str
+  chat_stream:
+    type: async
+    module: backend.app.services.fintech_service
+    args: [self, query, user_id, session_id]
+    params:
+      returns: AsyncGenerator
+  check_and_consume:
+    type: sync
+    module: skills.market_data_tool.utils.rate_limiter
+    args: [self, market, tokens]
+    params:
+      returns: bool
+  check_indicator:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_nan_macro
+    args: [ind]
+  circuit_break:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [provider]
+  clear:
+    type: sync
+    module: memory_system.core.episodic_memory
+    args: [self]
+    params:
+      returns: None
+  clear_channel:
+    type: sync
+    module: agent.core.bus
+    args: [self, session_id]
+  clear_memory:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id]
+    params:
+      returns: Dict
+  close:
+    type: async
+    module: backend.infrastructure.browser.steel_browser
+    args: [self]
+  cluster_and_abstract:
+    type: sync
+    module: memory_system.core.cluster
+    args: [self, k]
+    params:
+      returns: List[str]
+  configure_environment:
+    type: sync
+    module: backend.infrastructure.adk.core.llm
+  connect:
+    type: async
+    module: backend.app.services.research.stream_manager
+    args: [self, job_id]
+  consume:
+    type: sync
+    module: skills.market_data_tool.utils.rate_limiter
+    args: [self, tokens]
+    params:
+      returns: bool
+  count:
+    type: sync
+    module: memory_system.storage.vector_store
+    args: [self]
+    params:
+      returns: int
+  create_agent:
+    type: sync
+    module: backend.infrastructure.adk.core.agent_factory
+    args: [name, instruction, tools, description, enable_memory]
+    params:
+      returns: LlmAgent
+  create_app:
+    type: sync
+    module: memory_system.api.server
+    params:
+      returns: FastAPI
+  create_artifact:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self, job_id, artifact_type, data, title]
+    params:
+      returns: ResearchArtifact
+  create_chairman_chain:
+    type: sync
+    module: agent.core.agents.chairman
+    args: [chairman_llm]
+  create_error_response:
+    type: sync
+    module: skills.market_data_tool.utils.error_handler
+    args: [symbol, error_code, error_message, suggestion, context, data_source]
+    params:
+      returns: Dict
+  create_graph:
+    type: sync
+    module: agent.core.graph
+    args: [config]
+  create_job:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self, user_id, query]
+    params:
+      returns: ResearchJob
+  create_langfuse_callback:
+    type: sync
+    module: backend.infrastructure.langfuse.callback
+    args: [user_id, session_id, tags, metadata]
+  create_macro_agent:
+    type: sync
+    module: backend.app.agents.macro.agent
+    args: [callback_handler]
+    params:
+      returns: Agent
+  create_macro_node:
+    type: sync
+    module: agent.core.agents.macro
+    args: [llm, tools]
+  create_market_node:
+    type: sync
+    module: agent.core.agents.market
+    args: [llm, tools]
+  create_memory_tools_for_agent:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_tools
+    args: [agent_id]
+  create_news_sentiment_agent:
+    type: sync
+    module: backend.app.agents.news_sentiment.agent
+    args: [event_queue]
+    params:
+      returns: NewsSentimentAgent
+  create_partial_response:
+    type: sync
+    module: skills.market_data_tool.utils.error_handler
+    args: [results, data_source, total_time_ms]
+    params:
+      returns: Dict
+  create_personal_finance_graph:
+    type: sync
+    module: backend.app.agents.personal_finance.agent
+    params:
+      returns: PersonalFinanceOrchestrator
+  create_plan:
+    type: sync
+    module: backend.app.agents.news_sentiment.master
+    args: [tasks]
+    params:
+      returns: str
+  create_sentiment_node:
+    type: sync
+    module: agent.core.agents.sentiment
+    args: [llm, tools]
+  create_session:
+    type: sync
+    module: backend.infrastructure.browser.session_manager
+    args: [self, release_timeout]
+    params:
+      returns: Optional[Dict]
+  create_success_response:
+    type: sync
+    module: skills.market_data_tool.utils.error_handler
+    args: [symbol, data, data_source, cache_hit, response_time_ms]
+    params:
+      returns: Dict
+  create_task:
+    type: async
+    module: backend.entrypoints.api.routers.simulation
+    args: [payload]
+  create_technical_analysis_agent:
+    type: sync
+    module: backend.app.agents.technical_analysis.agent
+    args: [handler]
+    params:
+      returns: Agent
+  create_web_search_node:
+    type: sync
+    module: agent.core.agents.web_search
+    args: [llm, tools]
+  critic_node:
+    type: sync
+    module: agent.core.agents.critic
+    args: [state, llm]
+  critic_wrapper:
+    type: sync
+    module: agent.core.graph
+    args: [state]
+  decide_next:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self]
+    params:
+      returns: MasterDecision
+  decorator:
+    type: sync
+    module: backend.infrastructure.langfuse.decorators
+    args: [func]
+    params:
+      returns: Callable
+  delete:
+    type: sync
+    module: memory_system.storage.vector_store
+    args: [self, ids]
+    params:
+      returns: None
+  delete_session:
+    type: async
+    module: agent.api.routes
+    args: [session_id]
+  delete_task:
+    type: sync
+    module: backend.app.services.simulation_service
+    args: [self, task_id]
+    params:
+      returns: bool
+  description:
+    type: sync
+    module: agent.tools.skill_adapter
+    args: [self]
+    params:
+      returns: str
+  detect_conflicts:
+    type: sync
+    module: memory_system.core.episodic_memory
+    args: [self, symbol]
+    params:
+      returns: List[Dict]
+  detect_market:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [cls, symbol]
+    params:
+      returns: Optional[str]
+  download_and_parse_pdf:
+    type: sync
+    module: backend.domain.entities.report_content
+    args: [self, url, symbol]
+    params:
+      returns: Tuple
+  embed_documents:
+    type: sync
+    module: memory_system.utils.embeddings
+    args: [self, texts]
+    params:
+      returns: List[List[float]]
+  embed_query:
+    type: sync
+    module: memory_system.utils.embeddings
+    args: [self, text]
+    params:
+      returns: List[float]
+  enabled:
+    type: sync
+    module: backend.infrastructure.langfuse.config
+    args: [self]
+    params:
+      returns: bool
+  ensure_env_vars:
+    type: sync
+    module: backend.infrastructure.langfuse.client
+  ensure_performance_history:
+    type: async
+    module: backend.app.agents.personal_finance.performance_service
+    args: [user_id, session]
+  error_boundary:
+    type: sync
+    module: skills.market_data_tool.utils.error_handler
+    args: [func]
+    params:
+      returns: Callable
+  event_generator:
+    type: async
+    module: agent.api.routes
+  execute:
+    type: async
+    module: backend.app.agents.news_sentiment.worker
+    args: [self, task, global_context]
+    params:
+      returns: str
+  execute_shadow_trade:
+    type: sync
+    module: backend.app.agents.personal_finance.repository
+    args: [self, user_id, symbol, action, quantity, price]
+    params:
+      returns: None
+  extract:
+    type: sync
+    module: memory_system.core.extractor
+    args: [self, text]
+    params:
+      returns: Optional[Dict]
+  extract_investment_insight:
+    type: sync
+    module: memory_system.core.extractor
+    args: [self, text]
+    params:
+      returns: Optional[Dict]
+  extract_response_content:
+    type: sync
+    module: backend.app.agents.personal_finance.utils
+    args: [resp]
+    params:
+      returns: str
+  extract_sec_report_url:
+    type: sync
+    module: backend.domain.entities.report_content
+    args: [self, index_url]
+    params:
+      returns: str
+  extract_symbols:
+    type: sync
+    module: backend.infrastructure.utils.nlu
+    args: [text]
+    params:
+      returns: List[str]
+  extract_top_symbols:
+    type: sync
+    module: backend.app.agents.personal_finance.utils
+    args: [portfolio, limit]
+    params:
+      returns: List[str]
+  extract_user_persona:
+    type: sync
+    module: memory_system.core.extractor
+    args: [self, conversation_text]
+    params:
+      returns: Optional[Dict]
+  fetch_financial_data_as_text:
+    type: sync
+    module: skills.financial_report_tool.modules.metrics
+    args: [symbol, market]
+    params:
+      returns: str
+  fetch_market_history_batch:
+    type: async
+    module: backend.app.agents.personal_finance.performance_service
+    args: [dates, symbols]
+    params:
+      returns: Dict
+  fetch_news:
+    type: sync
+    module: skills.sentiment_analysis_tool.services.reddit_fetcher
+    args: [self, symbol, limit]
+    params:
+      returns: List[Dict]
+  fetch_one:
+    type: async
+    module: backend.app.agents.personal_finance.performance_service
+    args: [sym]
+  fetch_price:
+    type: async
+    module: backend.entrypoints.api.routers.market
+    args: [sym]
+  fetch_reddit_rss:
+    type: async
+    module: backend.app.agents.news_sentiment.tools
+    args: [subreddit, category, limit]
+    params:
+      returns: str
+  filter_df:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [d]
+  finalize:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_client
+    args: [self]
+    params:
+      returns: Optional[str]
+  finalize_session:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id]
+    params:
+      returns: Dict
+  find_module:
+    type: sync
+    module: backend.infrastructure.search.snscrape_tool
+    args: [self, fullname, path]
+  find_path:
+    type: sync
+    module: memory_system.storage.graph_store
+    args: [self, start, end, max_depth]
+    params:
+      returns: List[Any]
+  find_project_root:
+    type: sync
+    module: backend.infrastructure.config.loader
+  force_open:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+  force_open_all:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self, reason]
+  from_yaml:
+    type: sync
+    module: agent.core.config
+    args: [cls, path]
+    params:
+      returns: Config
+  generate_conclusion:
+    type: sync
+    module: backend.app.agents.news_sentiment.master
+    args: [ticker, sentiment, trend, title, summary]
+    params:
+      returns: str
+  get:
+    type: sync
+    module: backend.infrastructure.config.loader
+    args: [cls, key, default]
+    params:
+      returns: Any
+  get_a2a_agent_client:
+    type: sync
+    module: agent.core.a2a_client
+    args: [config]
+    params:
+      returns: A2AAgentClient
+  get_a_share_indices_spot:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, target_indices]
+    params:
+      returns: List[Dict]
+  get_active_decisions:
+    type: sync
+    module: backend.app.agents.personal_finance.repository
+    args: [self, user_id]
+    params:
+      returns: List[DecisionRecord]
+  get_agent:
+    type: sync
+    module: agent.api.routes
+    params:
+      returns: StockAnalysisAgent
+  get_agent_info:
+    type: sync
+    module: agent.core.a2a_client
+    args: [self, agent_name]
+    params:
+      returns: Optional[Dict]
+  get_all_identities:
+    type: sync
+    module: memory_system.core.manager
+    args: [self]
+    params:
+      returns: Dict
+  get_all_rate_limits:
+    type: sync
+    module: skills.market_data_tool.utils.rate_limiter
+    args: [self]
+    params:
+      returns: Dict
+  get_all_stats:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+    params:
+      returns: Dict
+  get_all_tasks:
+    type: sync
+    module: backend.app.services.simulation_service
+    args: [self]
+    params:
+      returns: List[Dict]
+  get_api_key:
+    type: sync
+    module: backend.infrastructure.config.loader
+    args: [cls, provider]
+    params:
+      returns: Optional[str]
+  get_artifacts:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self, job_id]
+    params:
+      returns: List[ResearchArtifact]
+  get_auth_path:
+    type: sync
+    module: backend.infrastructure.browser.auth_repo
+    args: [self, site_name]
+    params:
+      returns: str
+  get_available_tools:
+    type: sync
+    module: agent.core.agent
+    args: [self]
+    params:
+      returns: List[str]
+  get_batch_quotes:
+    type: sync
+    module: skills.market_data_tool.data_sources.base
+    args: [self, symbols]
+    params:
+      returns: Dict
+  get_bin_name:
+    type: sync
+    module: backend.app.services.market_service
+    args: [midpoint]
+  get_board_info:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, board_name, board_type, info_type]
+    params:
+      returns: Union
+  get_card:
+    type: async
+    module: agent.core.agents.web_search
+  get_channel:
+    type: sync
+    module: agent.core.bus
+    args: [self, session_id]
+    params:
+      returns: asyncio.Queue
+  get_china_macro_data:
+    type: sync
+    module: skills.macro_data_tool.services.akshare_service
+    args: [self, indicator]
+    params:
+      returns: Dict
+  get_circuit_breaker:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self, provider]
+    params:
+      returns: CircuitBreaker
+  get_cn_macro:
+    type: sync
+    module: backend.skills.macro-economy.scripts.macro
+    args: [self, indicator]
+    params:
+      returns: Dict
+  get_cold_sectors:
+    type: sync
+    module: backend.app.services.market_service
+    args: [self, limit, sector_type]
+    params:
+      returns: List[Dict]
+  get_company_report:
+    type: sync
+    module: backend.infrastructure.adk.core.tools
+    args: [symbol]
+    params:
+      returns: Dict
+  get_concept_components:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, sector_name]
+    params:
+      returns: List[Dict]
+  get_concept_fund_flow_rank:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self]
+    params:
+      returns: List[Dict]
+  get_config:
+    type: sync
+    module: agent.core.config
+    params:
+      returns: Config
+  get_content:
+    type: async
+    module: backend.infrastructure.browser.actions
+    args: [selector]
+    params:
+      returns: str
+  get_context:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id, query, session_id, limit, max_tokens]
+    params:
+      returns: Dict
+  get_core_principles:
+    type: sync
+    module: memory_system.core.semantic_memory
+    args: [self]
+    params:
+      returns: str
+  get_currency_for_market:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self, market]
+    params:
+      returns: str
+  get_data:
+    type: sync
+    module: backend.infrastructure.market.fred
+    args: [self, series_id, observation_start, observation_end]
+    params:
+      returns: List[Dict]
+  get_data_source_info:
+    type: sync
+    module: skills.market_data_tool.data_sources.akshare_data
+    args: [self]
+    params:
+      returns: Dict
+  get_details:
+    type: sync
+    module: memory_system.core.working_memory
+    args: [self]
+    params:
+      returns: List[Dict]
+  get_discussion_wordcloud:
+    type: tool
+    module: backend.app.agents.research.tools
+    args: [query]
+    params:
+      returns: str
+  get_economic_calendar:
+    type: sync
+    module: backend.skills.macro-economy.scripts.macro
+    args: [self, date_str]
+    params:
+      returns: List[Dict]
+  get_error_stats:
+    type: sync
+    module: skills.market_data_tool.utils.error_handler
+    args: [self]
+    params:
+      returns: Dict
+  get_errors:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [self]
+    params:
+      returns: List[str]
+  get_event_bus:
+    type: sync
+    module: agent.core.bus
+    params:
+      returns: EventBus
+  get_events:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self, job_id]
+    params:
+      returns: List[ResearchEvent]
+  get_fed_probability:
+    type: sync
+    module: backend.app.services.market_service
+    args: [self]
+    params:
+      returns: Dict
+  get_financial_indicators:
+    type: sync
+    module: skills.financial_report_tool.modules.metrics
+    args: [symbol, years]
+    params:
+      returns: Dict
+  get_financial_indicators_post:
+    type: async
+    module: backend.entrypoints.api.routers.report
+    args: [payload]
+  get_financial_metrics:
+    type: sync
+    module: skills.financial_report_tool.modules.metrics
+    args: [symbol]
+    params:
+      returns: Dict
+  get_financial_report:
+    type: async
+    module: backend.entrypoints.api.routers.report
+    args: [symbol]
+  get_financials:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol, report_type]
+    params:
+      returns: Dict
+  get_fund_flow:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, target, flow_type]
+    params:
+      returns: Union
+  get_global_stats:
+    type: sync
+    module: skills.market_data_tool.utils.rate_limiter
+    args: [self]
+    params:
+      returns: Dict
+  get_headline_news:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, limit]
+    params:
+      returns: List[Dict]
+  get_historical:
+    type: async
+    module: backend.entrypoints.api.routers.market
+    args: [symbol, period, interval]
+  get_historical_data:
+    type: sync
+    module: skills.macro_data_tool.skill
+    args: [self, indicator, period]
+    params:
+      returns: Dict
+  get_history:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol, period, start_date, end_date, adjust]
+    params:
+      returns: List[Dict]
+  get_hk_index_latest:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol, name]
+    params:
+      returns: Dict
+  get_hot_sectors:
+    type: sync
+    module: backend.app.services.market_service
+    args: [self, limit, sector_type]
+    params:
+      returns: List[Dict]
+  get_hot_stocks:
+    type: sync
+    module: backend.app.services.market_service
+    args: [self]
+    params:
+      returns: List[Dict]
+  get_html_content:
+    type: sync
+    module: backend.domain.entities.report_content
+    args: [self, url, symbol]
+    params:
+      returns: Tuple
+  get_identities:
+    type: async
+    module: memory_system.api.routes
+  get_index_quote:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol, market]
+    params:
+      returns: Dict
+  get_indicators:
+    type: async
+    module: backend.entrypoints.api.routers.market
+    args: [symbol]
+  get_indices_history:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, market, days]
+    params:
+      returns: Dict
+  get_indices_quote:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, market]
+    params:
+      returns: List[Dict]
+  get_instance:
+    type: sync
+    module: memory_system.core.manager
+    args: [cls]
+    params:
+      returns: MemoryManager
+  get_job:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self, job_id]
+    params:
+      returns: Optional[ResearchJob]
+  get_job_state:
+    type: async
+    module: backend.entrypoints.api.routers.research
+    args: [job_id]
+  get_job_with_events:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self, job_id]
+    params:
+      returns: Optional[ResearchJob]
+  get_kline:
+    type: sync
+    module: backend.skills.market-data.scripts.market_data
+    args: [self, symbol, period, start_date, end_date, adjust, limit]
+    params:
+      returns: List[Dict]
+  get_langfuse_client:
+    type: sync
+    module: backend.infrastructure.langfuse.client
+  get_langfuse_config:
+    type: sync
+    module: backend.infrastructure.langfuse.config
+    params:
+      returns: LangfuseConfig
+  get_last:
+    type: sync
+    module: backend.domain.services.technical_analysis
+    args: [series]
+  get_latest_data:
+    type: sync
+    module: skills.macro_data_tool.services.fred_service
+    args: [self, indicator]
+    params:
+      returns: Dict
+  get_latest_report:
+    type: sync
+    module: backend.infrastructure.document.report_finder
+    args: [self, symbol, market]
+    params:
+      returns: Dict
+  get_latest_report_metadata:
+    type: sync
+    module: skills.financial_report_tool.modules.report_finder
+    args: [symbol]
+    params:
+      returns: Dict
+  get_lessons:
+    type: sync
+    module: backend.app.agents.personal_finance.repository
+    args: [self, user_id]
+    params:
+      returns: List[LessonRecord]
+  get_llm:
+    type: sync
+    module: memory_system.llm.client
+    args: [self]
+    params:
+      returns: ChatOpenAI
+  get_macro:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, indicator, history]
+    params:
+      returns: Union
+  get_macro_data:
+    type: sync
+    module: backend.infrastructure.adk.core.tools
+    args: [query]
+    params:
+      returns: Dict
+  get_macro_economic_data:
+    type: tool
+    module: backend.app.agents.research.tools
+    args: [query]
+    params:
+      returns: str
+  get_macro_history:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, indicator]
+    params:
+      returns: Dict
+  get_market_context:
+    type: async
+    module: backend.app.agents.personal_finance.market_context
+    args: [include_history, as_markdown]
+    params:
+      returns: Dict
+  get_market_data:
+    type: tool
+    module: backend.app.agents.research.tools
+    args: [symbol, period]
+    params:
+      returns: str
+  get_market_fund_flow:
+    type: tool
+    module: backend.app.agents.market.tools
+    params:
+      returns: str
+  get_market_indicators:
+    type: sync
+    module: skills.macro_data_tool.services.yahoo_service
+    args: [self]
+    params:
+      returns: Dict
+  get_market_info:
+    type: sync
+    module: skills.market_data_tool.skill
+    args: [self]
+    params:
+      returns: Dict
+  get_market_news:
+    type: tool
+    module: backend.app.agents.market.tools
+    args: [query]
+    params:
+      returns: str
+  get_market_overview:
+    type: sync
+    module: skills.market_data_tool.services.a_share_service
+    args: [self]
+    params:
+      returns: Dict
+  get_market_risk:
+    type: sync
+    module: backend.skills.macro-economy.scripts.macro
+    args: [self]
+    params:
+      returns: Dict
+  get_market_status:
+    type: sync
+    module: skills.market_data_tool.data_sources.yahoo_finance
+    args: [self, market]
+    params:
+      returns: Dict
+  get_market_turnover:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, market, start_date, end_date]
+    params:
+      returns: Union
+  get_metrics:
+    type: async
+    module: backend.entrypoints.api.routers.market
+    args: [symbol]
+  get_model:
+    type: sync
+    module: backend.infrastructure.adk.core.llm
+  get_page:
+    type: async
+    module: backend.infrastructure.browser.steel_browser
+    args: [self]
+    params:
+      returns: Page
+  get_performance_history:
+    type: async
+    module: backend.entrypoints.api.routers.agent_personal_finance
+    args: [user_id]
+  get_persona_summary:
+    type: sync
+    module: memory_system.core.semantic_memory
+    args: [self]
+    params:
+      returns: str
+  get_portfolio:
+    type: sync
+    module: backend.app.agents.personal_finance.repository
+    args: [self, user_id]
+    params:
+      returns: Optional[Dict]
+  get_price:
+    type: async
+    module: backend.entrypoints.api.routers.market
+    args: [payload]
+  get_quote:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol, market]
+    params:
+      returns: Dict
+  get_rate_limit_info:
+    type: sync
+    module: skills.market_data_tool.utils.rate_limiter
+    args: [self, market]
+    params:
+      returns: Dict
+  get_receptionist_card:
+    type: sync
+    module: agent.core.agents.receptionist
+  get_registry:
+    type: sync
+    module: backend.infrastructure.adk.core.tools
+    params:
+      returns: Tools
+  get_related_entities:
+    type: sync
+    module: memory_system.storage.graph_store
+    args: [self, entities, max_depth]
+    params:
+      returns: List[str]
+  get_report_content:
+    type: sync
+    module: backend.infrastructure.adk.core.tools
+    args: [symbol]
+    params:
+      returns: Dict
+  get_retry_decorator:
+    type: sync
+    module: skills.macro_data_tool.utils
+    args: [max_attempts, min_wait, max_wait]
+  get_review_data:
+    type: tool
+    module: backend.app.agents.review.tools
+    args: [symbol]
+    params:
+      returns: Dict
+  get_sector_components:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, sector_name]
+    params:
+      returns: List[Dict]
+  get_sector_constituents:
+    type: sync
+    module: backend.skills.market-data.scripts.market_data
+    args: [self, sector_name, limit]
+    params:
+      returns: List[Dict]
+  get_sector_details:
+    type: sync
+    module: backend.app.services.market_service
+    args: [self, sector_name, sort_by, limit, sector_type]
+    params:
+      returns: Dict
+  get_sector_fund_flow:
+    type: tool
+    module: backend.app.agents.research.tools
+    args: [limit, sort_by, sector_type]
+    params:
+      returns: str
+  get_sector_fund_flow_rank:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self]
+    params:
+      returns: List[Dict]
+  get_sector_fund_flow_ranking:
+    type: sync
+    module: backend.app.services.market_service
+    args: [self, sort_by, limit, sector_type]
+    params:
+      returns: List[Dict]
+  get_sector_ranking:
+    type: sync
+    module: backend.skills.market-data.scripts.market_data
+    args: [self, board_type, limit]
+    params:
+      returns: List[Dict]
+  get_sector_stocks:
+    type: async
+    module: backend.entrypoints.api.routers.market
+    args: [name, limit, sort_by, sector_type]
+  get_sector_top_stocks:
+    type: tool
+    module: backend.app.agents.research.tools
+    args: [sector_name, limit, sector_type]
+    params:
+      returns: str
+  get_sectors_flow:
+    type: async
+    module: backend.entrypoints.api.routers.market
+    args: [type, limit, sector_type]
+  get_series:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [metric_name]
+  get_service_stats:
+    type: sync
+    module: skills.market_data_tool.services.a_share_service
+    args: [self]
+    params:
+      returns: Dict
+  get_session:
+    type: sync
+    module: skills.macro_data_tool.utils
+    params:
+      returns: requests.Session
+  get_state:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+    params:
+      returns: CircuitState
+  get_state_path_if_exists:
+    type: sync
+    module: backend.infrastructure.browser.auth_repo
+    args: [self, site_name]
+    params:
+      returns: Optional[str]
+  get_stats:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+    params:
+      returns: Dict
+  get_status:
+    type: sync
+    module: skills.market_data_tool.utils.rate_limiter
+    args: [self]
+    params:
+      returns: Dict
+  get_stock_fund_flow:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol]
+    params:
+      returns: List[Dict]
+  get_stock_history:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol, period]
+    params:
+      returns: List[Dict]
+  get_stock_price:
+    type: sync
+    module: backend.infrastructure.adk.core.tools
+    args: [symbol, market]
+    params:
+      returns: Dict
+  get_stock_quote:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, symbol, market]
+    params:
+      returns: Dict
+  get_task:
+    type: async
+    module: backend.entrypoints.api.routers.simulation
+    args: [task_id]
+  get_task_status:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, task_id]
+    params:
+      returns: Dict
+  get_tasks:
+    type: async
+    module: backend.entrypoints.api.routers.simulation
+  get_technical:
+    type: async
+    module: backend.entrypoints.api.routers.market
+    args: [symbol, period]
+  get_technical_context:
+    type: sync
+    module: backend.app.registry
+    args: [self, symbol, period]
+    params:
+      returns: Dict
+  get_technical_history:
+    type: sync
+    module: backend.app.services.market_service
+    args: [self, symbol, period]
+    params:
+      returns: List[Dict]
+  get_technical_indicators:
+    type: sync
+    module: backend.app.agents.technical_analysis.tools
+    args: [symbol]
+    params:
+      returns: Dict
+  get_tool:
+    type: sync
+    module: agent.tools.manager
+    args: [self, name]
+    params:
+      returns: BaseTool
+  get_tool_names:
+    type: sync
+    module: agent.tools.manager
+    args: [self]
+    params:
+      returns: List[str]
+  get_tools:
+    type: sync
+    module: agent.tools.manager
+    args: [self]
+    params:
+      returns: List[Tool]
+  get_unfinalized_details:
+    type: sync
+    module: memory_system.core.working_memory
+    args: [self]
+    params:
+      returns: List[Dict]
+  get_unhealthy_providers:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+    params:
+      returns: List[str]
+  get_us_index_latest:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [self, symbol, name]
+    params:
+      returns: Dict
+  get_us_macro:
+    type: sync
+    module: backend.skills.macro-economy.scripts.macro
+    args: [self, indicator]
+    params:
+      returns: Dict
+  get_user_portfolio:
+    type: async
+    module: backend.entrypoints.api.routers.agent_personal_finance
+    args: [user_id]
+  get_val:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [metric]
+  get_wordcloud_data:
+    type: sync
+    module: backend.infrastructure.market.xueqiu
+    args: [self, query, limit, finbert_tool, search_tool]
+    params:
+      returns: Dict
+  handle_error:
+    type: sync
+    module: skills.market_data_tool.utils.error_handler
+    args: [self, exception, context]
+    params:
+      returns: Dict
+  has_nan:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_nan_macro
+    args: [obj]
+  health_check:
+    type: async
+    module: agent.api.routes
+  init_db:
+    type: sync
+    module: backend.app.agents.personal_finance.db
+  initialize_session:
+    type: async
+    module: backend.infrastructure.browser.steel_browser
+    args: [self, session_id]
+    params:
+      returns: Dict
+  inspect_page:
+    type: async
+    module: backend.app.agents.news_sentiment.tools
+    args: [url]
+    params:
+      returns: str
+  invoke:
+    type: sync
+    module: memory_system.llm.client
+    args: [self, messages]
+    params:
+      returns: Any
+  is_allowed:
+    type: sync
+    module: skills.market_data_tool.utils.rate_limiter
+    args: [self]
+    params:
+      returns: bool
+  is_healthy:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+    params:
+      returns: bool
+  is_trading_time:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [h, m]
+  langfuse_enabled:
+    type: sync
+    module: backend.infrastructure.langfuse.client
+    params:
+      returns: bool
+  list_jobs:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self, user_id, limit]
+    params:
+      returns: List[ResearchJob]
+  list_tools:
+    type: async
+    module: agent.api.routes
+  load_config:
+    type: sync
+    module: backend.infrastructure.config.loader
+    args: [cls]
+    params:
+      returns: Dict
+  load_config_and_paths:
+    type: sync
+    module: memory_system.config.settings
+    args: [self]
+  log_requests:
+    type: async
+    module: memory_system.api.server
+    args: [request, call_next]
+  main:
+    type: sync
+    module: skills.macro_data_tool.skill
+  main_handle:
+    type: sync
+    module: skills.sentiment_analysis_tool.skill
+    args: [symbol, query]
+    params:
+      returns: Dict
+  manual_login:
+    type: async
+    module: backend.entrypoints.cli.login_tool
+  manual_reset:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+  mark_finalized:
+    type: sync
+    module: memory_system.core.working_memory
+    args: [self]
+    params:
+      returns: None
+  merge:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [self, other]
+  name:
+    type: sync
+    module: skills.web_search_tool.providers.tavily_provider
+    args: [self]
+    params:
+      returns: str
+  observable:
+    type: sync
+    module: backend.infrastructure.langfuse.decorators
+    args: [name, user_id, session_id, tags, metadata]
+  on_agent_action:
+    type: async
+    module: backend.app.agents.research.callbacks
+    args: [self, action]
+    params:
+      returns: Any
+  on_agent_end:
+    type: async
+    module: backend.app.agents.news_sentiment.callbacks
+    args: [self]
+  on_agent_finish:
+    type: async
+    module: backend.app.agents.research.callbacks
+    args: [self, finish]
+    params:
+      returns: Any
+  on_chain_end:
+    type: async
+    module: backend.app.agents.research.callbacks
+    args: [self, outputs]
+    params:
+      returns: None
+  on_llm_end:
+    type: async
+    module: agent.core.agents.chairman
+    args: [self, response]
+    params:
+      returns: None
+  on_llm_error:
+    type: async
+    module: backend.app.agents.research.callbacks
+    args: [self, error]
+    params:
+      returns: None
+  on_llm_new_token:
+    type: async
+    module: backend.app.agents.research.callbacks
+    args: [self, token]
+    params:
+      returns: None
+  on_llm_start:
+    type: async
+    module: agent.core.agents.chairman
+    args: [self, serialized, prompts]
+    params:
+      returns: None
+  on_model_end:
+    type: async
+    module: backend.app.agents.news_sentiment.callbacks
+    args: [self]
+  on_model_start:
+    type: async
+    module: backend.app.agents.news_sentiment.callbacks
+    args: [self]
+  on_tool_end:
+    type: async
+    module: backend.app.agents.news_sentiment.callbacks
+    args: [self]
+  on_tool_start:
+    type: async
+    module: backend.app.agents.news_sentiment.callbacks
+    args: [self]
+  parse:
+    type: sync
+    module: backend.infrastructure.document.pdf_parser
+    args: [self, file_path, language]
+    params:
+      returns: Dict
+  parse_pdf:
+    type: sync
+    module: backend.app.registry
+    args: [self, file_path]
+    params:
+      returns: str
+  perform_garbage_collection:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id]
+  ping:
+    type: async
+    module: agent.main
+  print_registered_routes:
+    type: sync
+    module: backend.entrypoints.api.server
+    args: [app]
+  process_df:
+    type: sync
+    module: backend.infrastructure.market.akshare_tool
+    args: [df, date_col, close_col, change_col]
+  public_key:
+    type: sync
+    module: backend.infrastructure.langfuse.config
+    args: [self]
+    params:
+      returns: Optional[str]
+  publish:
+    type: async
+    module: agent.core.bus
+    args: [self, event]
+  publish_event:
+    type: async
+    module: agent.core.agents.chairman
+    args: [self, type, content, session_id]
+  push_event:
+    type: async
+    module: backend.app.services.research.stream_manager
+    args: [self, job_id, event_type, data]
+  query:
+    type: sync
+    module: memory_system.storage.vector_store
+    args: [self, query_text, n_results, where, where_document]
+    params:
+      returns: Dict
+  query_market_data:
+    type: async
+    module: backend.entrypoints.api.routers.market
+    args: [payload]
+  receptionist_node:
+    type: async
+    module: agent.core.agents.receptionist
+    args: [state, llm]
+  receptionist_wrapper:
+    type: sync
+    module: agent.core.graph
+    args: [state]
+  release:
+    type: sync
+    module: backend.infrastructure.langfuse.config
+    args: [self]
+    params:
+      returns: str
+  release_session:
+    type: sync
+    module: backend.infrastructure.browser.session_manager
+    args: [self, session_id]
+    params:
+      returns: bool
+  reload_config:
+    type: sync
+    module: backend.infrastructure.langfuse.config
+  render_market_context_markdown:
+    type: sync
+    module: backend.app.agents.personal_finance.market_context
+    args: [context]
+    params:
+      returns: str
+  reset_all:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+    args: [self]
+  reset_client:
+    type: sync
+    module: backend.infrastructure.langfuse.client
+  reset_rate_limit:
+    type: sync
+    module: skills.market_data_tool.utils.rate_limiter
+    args: [self, market]
+  retrieve:
+    type: sync
+    module: memory_system.core.episodic_memory
+    args: [self, query, top_k]
+    params:
+      returns: List[Dict]
+  retrieve_relevant_experiences:
+    type: sync
+    module: memory_system.core.semantic_memory
+    args: [self, query, top_k]
+    params:
+      returns: List[Dict]
+  root:
+    type: async
+    module: agent.main
+  run:
+    type: async
+    module: backend.app.agents.news_sentiment.agent
+    args: [self, user_query]
+  run_agent:
+    type: async
+    module: backend.app.agents.research.research_agent
+    args: [job_id, query]
+  run_clustering:
+    type: sync
+    module: memory_system.core.manager
+    args: [self, user_id, agent_id]
+  run_daily_review_analysis:
+    type: async
+    module: backend.app.agents.personal_finance.tools
+    args: [symbol, session_id, market_snapshot]
+    params:
+      returns: str
+  run_daily_simulation:
+    type: async
+    module: backend.app.services.simulation_service
+    args: [self, task_id, tools_instance]
+    params:
+      returns: Dict
+  run_macro_analysis:
+    type: async
+    module: backend.app.agents.personal_finance.tools
+    args: [session_id, market_snapshot]
+    params:
+      returns: str
+  run_market_agent:
+    type: async
+    module: backend.app.agents.market.agent
+    args: [user_id]
+  run_market_analysis:
+    type: async
+    module: backend.app.agents.personal_finance.tools
+    args: [market_snapshot]
+    params:
+      returns: str
+  run_news_analysis:
+    type: async
+    module: backend.app.agents.personal_finance.tools
+    args: [query, session_id, market_snapshot]
+    params:
+      returns: str
+  run_orchestrator:
+    type: async
+    module: backend.app.services.news_sentiment_service
+  run_pipeline:
+    type: async
+    module: agent.core.agent
+  run_react_agent:
+    type: async
+    module: agent.core.agents.utils
+    args: [agent, tools, messages, max_iterations, event_bus, session_id, agent_name]
+  run_review_agent:
+    type: async
+    module: backend.app.agents.review.agent
+    args: [symbol, user_id]
+  run_simulation:
+    type: async
+    module: backend.entrypoints.api.routers.simulation
+    args: [payload]
+  run_step:
+    type: async
+    module: backend.app.agents.news_sentiment.master
+    args: [self, context]
+    params:
+      returns: str
+  run_task:
+    type: async
+    module: agent.core.agents.chairman
+    args: [self, task]
+    params:
+      returns: dict
+  run_technical_analysis:
+    type: async
+    module: backend.app.agents.personal_finance.tools
+    args: [symbol, session_id, market_snapshot]
+    params:
+      returns: str
+  safe_float:
+    type: sync
+    module: backend.domain.services.technical_analysis
+    args: [val]
+  safe_json_extract:
+    type: sync
+    module: backend.app.agents.personal_finance.utils
+    args: [text]
+    params:
+      returns: Optional[Dict]
+  sanitize_for_json:
+    type: sync
+    module: backend.entrypoints.api.routers.research
+    args: [obj]
+    params:
+      returns: Any
+  save_decisions:
+    type: sync
+    module: backend.app.agents.personal_finance.repository
+    args: [self, user_id, cards]
+    params:
+      returns: List[Dict]
+  save_html_content:
+    type: sync
+    module: backend.domain.entities.report_content
+    args: [self, html_content, symbol, source_url]
+    params:
+      returns: Tuple
+  save_important_fact:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_tools
+    args: [fact, importance, agent_id]
+    params:
+      returns: str
+  save_lessons:
+    type: sync
+    module: backend.app.agents.personal_finance.repository
+    args: [self, user_id, lessons]
+  save_portfolio:
+    type: async
+    module: backend.app.services.personal_finance_service
+    args: [user_id, snapshot]
+    params:
+      returns: PortfolioSnapshot
+  save_state:
+    type: async
+    module: backend.infrastructure.browser.auth_repo
+    args: [self, context, site_name]
+  save_user_portfolio:
+    type: async
+    module: backend.entrypoints.api.routers.agent_personal_finance
+    args: [snapshot, user_id]
+  scrape_news:
+    type: sync
+    module: backend.infrastructure.market.sina
+    args: [self, symbol, limit]
+    params:
+      returns: List[Dict]
+  scrape_reddit:
+    type: sync
+    module: backend.infrastructure.search.snscrape_tool
+    args: [self, query, limit]
+    params:
+      returns: List[Dict]
+  scrape_twitter:
+    type: sync
+    module: backend.infrastructure.search.snscrape_tool
+    args: [self, query, limit]
+    params:
+      returns: List[Dict]
+  screenshot:
+    type: async
+    module: backend.infrastructure.browser.actions
+    params:
+      returns: bytes
+  search:
+    type: sync
+    module: backend.infrastructure.search.tavily
+    args: [self, query, max_results, topic, days, include_domains]
+    params:
+      returns: List[Dict]
+  search_all:
+    type: sync
+    module: backend.infrastructure.search.snscrape_tool
+    args: [self, query, limit_per_platform]
+    params:
+      returns: List[Dict]
+  search_discussions:
+    type: sync
+    module: backend.infrastructure.market.xueqiu
+    args: [self, query, limit]
+    params:
+      returns: List[Dict]
+  search_google:
+    type: tool
+    module: backend.app.agents.research.tools
+    args: [query]
+    params:
+      returns: str
+  search_market_news:
+    type: sync
+    module: backend.infrastructure.adk.core.tools
+    args: [query, limit]
+    params:
+      returns: List[Dict]
+  search_memory:
+    type: sync
+    module: backend.infrastructure.adk.core.memory_tools
+    args: [query, agent_id]
+    params:
+      returns: str
+  search_news:
+    type: sync
+    module: backend.skills.news-sentiment.scripts.news
+    args: [self, symbol, limit]
+    params:
+      returns: List[Dict]
+  search_news_for_review:
+    type: tool
+    module: backend.app.agents.review.tools
+    args: [symbol]
+    params:
+      returns: str
+  search_reports:
+    type: sync
+    module: backend.skills.financial-report.scripts.finance
+    args: [self, symbol, market]
+    params:
+      returns: Dict
+  search_social:
+    type: sync
+    module: backend.skills.news-sentiment.scripts.news
+    args: [self, query, source, limit]
+    params:
+      returns: List[Dict]
+  search_web:
+    type: sync
+    module: backend.app.agents.news_sentiment.tools
+    args: [query, days]
+    params:
+      returns: str
+  secret_key:
+    type: sync
+    module: backend.infrastructure.langfuse.config
+    args: [self]
+    params:
+      returns: Optional[str]
+  set_compression_callback:
+    type: sync
+    module: memory_system.core.working_memory
+    args: [self, callback]
+  set_config:
+    type: sync
+    module: agent.core.config
+    args: [config]
+    params:
+      returns: None
+  setup_a2a:
+    type: sync
+    module: agent.core.agents.web_search
+    args: [app, config]
+  setup_logger:
+    type: sync
+    module: memory_system.utils.logger
+  setup_logging:
+    type: sync
+    module: backend.infrastructure.logging.setup
+    args: [log_file, level]
+  should_continue:
+    type: sync
+    module: agent.core.graph
+    args: [state]
+  shutdown_event:
+    type: async
+    module: memory_system.api.server
+  simulation_chat:
+    type: async
+    module: backend.entrypoints.api.routers.simulation
+    args: [payload]
+  start:
+    type: sync
+    module: memory_system.api.server
+  start_analysis:
+    type: async
+    module: backend.entrypoints.api.routers.agent_technical
+    args: [request]
+  start_research:
+    type: async
+    module: backend.app.services.news_sentiment_service
+    args: [self, session_id, query]
+    params:
+      returns: AsyncGenerator
+  start_review:
+    type: async
+    module: backend.entrypoints.api.routers.agent_review
+    args: [request]
+  startup_event:
+    type: async
+    module: memory_system.api.server
+  stream_agent:
+    type: async
+    module: agent.core.a2a_client
+    args: [self, agent_name, message, session_id]
+    params:
+      returns: AsyncGenerator
+  stream_analysis:
+    type: async
+    module: backend.entrypoints.api.routers.agent_personal_finance
+    args: [portfolio]
+    params:
+      returns: AsyncGenerator
+  stream_job:
+    type: async
+    module: backend.entrypoints.api.routers.research
+    args: [job_id, request]
+  stream_review:
+    type: async
+    module: backend.entrypoints.api.routers.agent_review
+    args: [symbol, user_id]
+  stream_run:
+    type: async
+    module: agent.core.agent
+    args: [self, query]
+  submit_research_report:
+    type: tool
+    module: backend.app.agents.research.tools
+    args: [signals, analysis, outlook, references]
+    params:
+      returns: str
+  subscribe:
+    type: async
+    module: agent.core.bus
+    args: [self, session_id]
+    params:
+      returns: AsyncGenerator
+  summarize_conversation:
+    type: sync
+    module: memory_system.core.compressor
+    args: [self, messages]
+    params:
+      returns: str
+  summarize_portfolio:
+    type: sync
+    module: backend.app.agents.personal_finance.utils
+    args: [portfolio, max_assets]
+    params:
+      returns: Dict
+  sync_wrapper:
+    type: sync
+    module: backend.infrastructure.langfuse.decorators
+  synthesize_cards:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self]
+    params:
+      returns: List[RecommendationCard]
+  synthesize_report:
+    type: async
+    module: backend.app.agents.personal_finance.orchestrator
+    args: [self]
+    params:
+      returns: str
+  test_connection:
+    type: sync
+    module: skills.market_data_tool.data_sources.akshare_data
+    args: [self]
+    params:
+      returns: bool
+  test_macro_data:
+    type: sync
+    module: backend.entrypoints.cli.debug.debug_macro_full
+  to_langchain_tool:
+    type: sync
+    module: agent.tools.skill_adapter
+    args: [self]
+    params:
+      returns: Tool
+  to_yaml:
+    type: sync
+    module: agent.core.config
+    args: [self, path]
+    params:
+      returns: None
+  total_tokens:
+    type: sync
+    module: memory_system.core.working_memory
+    args: [self]
+    params:
+      returns: int
+  update_asset_prices:
+    type: async
+    module: backend.entrypoints.api.routers.agent_personal_finance
+    args: [request]
+  update_config:
+    type: async
+    module: agent.api.routes
+    args: [request]
+  update_decision_reviews:
+    type: sync
+    module: backend.app.agents.personal_finance.repository
+    args: [self, user_id, reviews]
+  update_job_status:
+    type: sync
+    module: backend.app.services.research.job_manager
+    args: [self, job_id, status, output]
+    params:
+      returns: Optional[ResearchJob]
+  update_persona:
+    type: sync
+    module: memory_system.core.semantic_memory
+    args: [self, new_traits]
+    params:
+      returns: None
+  update_prices:
+    type: async
+    module: backend.app.services.personal_finance_service
+    args: [assets]
+    params:
+      returns: PriceUpdateMap
+  validate:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [cls, symbol, market]
+    params:
+      returns: ValidationResult
+  validate_a_share:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [cls, symbol]
+    params:
+      returns: ValidationResult
+  validate_change_percent:
+    type: sync
+    module: skills.market_data_tool.models.schemas
+    args: [cls, v]
+  validate_hk_stock:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [cls, symbol]
+    params:
+      returns: ValidationResult
+  validate_index_change_percent:
+    type: sync
+    module: skills.market_data_tool.models.schemas
+    args: [cls, v]
+  validate_market_hours:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [cls, market, timestamp]
+    params:
+      returns: ValidationResult
+  validate_market_response:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [data]
+    params:
+      returns: ValidationResult
+  validate_price_data:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [data]
+    params:
+      returns: ValidationResult
+  validate_price_reasonableness:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [cls, data]
+    params:
+      returns: ValidationResult
+  validate_price_relationships:
+    type: sync
+    module: skills.market_data_tool.models.schemas
+    args: [cls, v, values]
+  validate_status:
+    type: sync
+    module: skills.market_data_tool.models.schemas
+    args: [cls, v]
+  validate_stock_symbol:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [symbol, market]
+    params:
+      returns: ValidationResult
+  validate_symbol:
+    type: sync
+    module: skills.market_data_tool.data_sources.akshare_data
+    args: [self, symbol, market]
+    params:
+      returns: bool
+  validate_time_data:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [timestamp, max_age, market]
+    params:
+      returns: ValidationResult
+  validate_timestamp:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [cls, timestamp, max_age, market]
+    params:
+      returns: ValidationResult
+  validate_us_stock:
+    type: sync
+    module: skills.market_data_tool.utils.validators
+    args: [cls, symbol]
+    params:
+      returns: ValidationResult
+  verify:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_macro
+  verify_akshare:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_tools
+  verify_finbert:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_tools
+  verify_hf:
+    type: sync
+    module: memory_system.verify_hf
+  verify_pdf:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_tools
+  verify_registry:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_registry
+  verify_sina:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_tools
+  verify_system:
+    type: sync
+    module: memory_system.verify_system
+  verify_tavily:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_tools
+  verify_yahoo:
+    type: sync
+    module: backend.entrypoints.cli.debug.verify_tools
+  verify_yaml_loading:
+    type: sync
+    module: memory_system.verify_config
+  visit:
+    type: async
+    module: backend.infrastructure.browser.actions
+    args: [url, timeout]
+  web_search:
+    type: async
+    module: backend.entrypoints.api.routers.search
+    args: [q]
+  wrapper:
+    type: sync
+    module: skills.market_data_tool.utils.circuit_breaker
+
+variables:
+  AGENT_MODEL:
+    type: env
+    params:
+      caller: [os.environ.get]
+      path: [backend.infrastructure.adk.core.llm]
+  DDGS_PROXY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [skills.web_search_tool.providers.ddg_provider, backend.infrastructure.search.duckduckgo]
+  EMBEDDING_PROVIDER:
+    type: env
+    params:
+      caller: [os.environ]
+  env_var:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [backend.infrastructure.config.loader]
+  FRED_API_KEY:
+    type: env
+    params:
+      caller: [os.environ]
+  HF_ENDPOINT:
+    type: env
+    params:
+      caller: [os.environ]
+  LANGFUSE_BASE_URL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [backend.infrastructure.langfuse.config]
+  LANGFUSE_HOST:
+    type: env
+    params:
+      caller: [os.getenv, os.environ]
+      path: [backend.infrastructure.langfuse.client]
+  LANGFUSE_PUBLIC_KEY:
+    type: env
+    params:
+      caller: [os.getenv, os.environ]
+      path: [backend.infrastructure.langfuse.config, backend.infrastructure.langfuse.client]
+  LANGFUSE_RELEASE:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [backend.infrastructure.langfuse.config]
+  LANGFUSE_SECRET_KEY:
+    type: env
+    params:
+      caller: [os.getenv, os.environ]
+      path: [backend.infrastructure.langfuse.config, backend.infrastructure.langfuse.client]
+  LLAMA_CLOUD_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [skills.pdf_parsing_tool.skill]
+  OPENAI_API_BASE:
+    type: env
+    params:
+      caller: [os.environ]
+  OPENAI_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv, os.environ.get, os.environ]
+      path: [backend.app.services.report_analysis, skills.financial_report_tool.skill, backend.app.agents.market.agent, backend.app.services.macro_agent_service,
+        backend.app.agents.news_sentiment.worker, backend.app.agents.research.research_agent, backend.app.agents.news_sentiment.master,
+        backend.infrastructure.adk.core.llm, backend.app.agents.review.agent]
+  SILICONFLOW_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [backend.app.services.report_analysis, skills.financial_report_tool.skill, backend.entrypoints.cli.debug.verify_registry,
+        backend.app.services.macro_agent_service, backend.infrastructure.adk.core.llm]
+  TAVILY_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [backend.skills.web-search.scripts.search, backend.entrypoints.cli.debug.verify_tools]
+
+files:
+  "..":
+    type: literal
+    actions: [read]
+    params:
+      caller: [load_config_and_paths, os.path.join]
+  ../..:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [os.path.dirname(), ../..]
+  ../../:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [os.path.dirname(), ../../]
+  ../../../:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [current_dir, ../../../]
+  ../../../backend:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [os.path.dirname(), ../../../backend]
+  ./logs:
+    type: literal
+    actions: [read]
+    params:
+      caller: [setup_logging]
+  .config.yaml:
+    type: literal
+    actions: [read]
+    params:
+      caller: [load_config_and_paths, os.path.join]
+  .log:
+    type: literal
+    actions: [read]
+    params:
+      caller: [setup_logging]
+      path: [log_dir]
+  app.log:
+    type: literal
+    actions: [read]
+    params:
+      caller: [setup_logger]
+      path: [log_dir]
+  config.yaml:
+    type: literal
+    actions: [read]
+    params:
+      caller: [get_config]
+      path: [agent_dir]
+  config_path:
+    type: literal
+    actions: [read]
+    params:
+      caller: [Path(path), open, yaml.safe_load]
+  DATA_DIR:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.path.exists, os.makedirs]
+  data_dir:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.path.exists, os.listdir]
+  DATA_FILE:
+    type: variable
+    actions: [read, write]
+    params:
+      caller: [os.path.dirname, os.path.exists, open, json.load]
+  error.log:
+    type: literal
+    actions: [read]
+    params:
+      caller: [setup_logger]
+      path: [log_dir]
+  file_path:
+    type: variable
+    actions: [write, read]
+    params:
+      caller: [open, json.load, os.path.exists, fitz.open]
+      alias: [f]
+  full-submission.txt:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [dl_path, sec-edgar-filings, symbol, '*', '*', full-submission.txt]
+  latest_file:
+    type: variable
+    actions: [read]
+    params:
+      caller: [open, json.load]
+      alias: [f]
+  log_dir:
+    type: literal
+    actions: [read, write]
+    params:
+      caller: [Path('./logs'), log_dir.mkdir, os.path.exists, os.makedirs]
+  log_file:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.path.dirname]
+  path:
+    type: variable
+    actions: [read, write]
+    params:
+      caller: [Path, open, os.path.exists, yaml.safe_load]
+  search_path/:
+    type: variable
+    actions: [read]
+    params:
+      links: [search_path]
+      caller: [get_report_content]
+  simulations.json:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [os.path.dirname(), data, simulations.json]
+  skill_path:
+    type: variable
+    actions: [read]
+    params:
+      caller: [Path]
+  SQLITE_FILE_NAME:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [DATA_DIR, SQLITE_FILE_NAME]
+  static_dir:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.path.exists, os.makedirs]
+
+networks:
+  api.openai.com:
+    type: api
+    actions: [GET]
+    urls: [/v1]
+    protocols: [https]
+    ports: ["443"]
+    params:
+      links: [default]
+  api.siliconflow.cn:
+    type: api
+    actions: [GET]
+    urls: [/v1]
+    protocols: [https]
+    ports: ["443"]
+    params:
+      caller: [__init__]
+  app.steel.dev:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      pattern: https://app.steel.dev/sessions/{session_id}
+      caller: [initialize_session]
+  data.sec.gov:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      pattern: https://data.sec.gov/submissions/CIK{cik_str}.json
+      caller: [_get_us_report_manual]
+  finance.sina.com.cn:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      pattern: https://finance.sina.com.cn{url_path}
+      caller: [scrape_news]
+  localhost:
+    type: api
+    actions: [GET]
+    urls: ['/{...}', /a2a/critic, /a2a/receptionist, /a2a/chairman, /]
+    protocols: [http]
+    ports: ["80", "8001", "10000"]
+    params:
+      caller: [__init__, create_agent]
+      pattern: http://localhost:8001/a2a/{name.lower}
+      links: [url, base_url, memory_base_url]
+  localhost.1:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [http]
+    ports: ["80"]
+    params:
+      pattern: http://localhost:8000/static/reports/{filename}
+      caller: [save_html_content]
+  localhost.2:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [http]
+    ports: ["80"]
+    params:
+      pattern: http://localhost:8000/static/reports/{filename}
+      caller: [download_and_parse_pdf]
+  localhost.3:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [http]
+    ports: ["80"]
+    params:
+      pattern: http://localhost:8000/static/reports/{filename}
+      caller: [save_html_content]
+  localhost.4:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [http]
+    ports: ["80"]
+    params:
+      pattern: http://localhost:8000/static/reports/{filename}
+      caller: [download_and_parse_pdf]
+  www.cninfo.com.cn:
+    type: api
+    actions: [POST]
+    urls: [/new/hisAnnouncement/query, /new/information/topSearch/query]
+    protocols: [http]
+    ports: ["80"]
+    params:
+      caller: [_get_ashare_report, _get_cninfo_org_id, _fetch_cninfo_pdf]
+  www.cninfo.com.cn.1:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [http]
+    ports: ["80"]
+    params:
+      pattern: http://www.cninfo.com.cn/new/disclosure/stock?stockCode={symbol}&orgId=
+      caller: [_get_ashare_report_metadata]
+  www.cninfo.com.cn.2:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [http]
+    ports: ["80"]
+    params:
+      pattern: http://www.cninfo.com.cn/new/disclosure/stock?stockCode={symbol}
+      caller: [_get_ashare_report_metadata]
+  www.reddit.com:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      caller: [fetch_reddit_rss]
+  www.sec.gov:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      pattern: https://www.sec.gov/Archives/edgar/data/{symbol}/10-k.htm
+      caller: [get_report_content]
+  www.sec.gov.1:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      caller: [_get_us_report_manual]
+  www.sec.gov.2:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      caller: [_get_us_report_manual]
+  www.sec.gov.3:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      pattern: https://www.sec.gov{real_path}
+      caller: [save_html_content]
+  www.sec.gov.4:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      pattern: https://www.sec.gov{real_path}
+      caller: [save_html_content]
+  www1.hkexnews.hk:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      caller: [_get_hk_report, _get_hk_report_metadata]
+  xueqiu.com:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      pattern: https://xueqiu.com/search?q={query}
+      caller: [get_wordcloud_data]
